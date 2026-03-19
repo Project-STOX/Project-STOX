@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STOX — Inventory Intelligence Dashboard</title>
+<meta name="description" content="STOX Inventory Dashboard – KPIs, demand forecasting, risk alerts, reorder suggestions, and compliance controls.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<link rel="stylesheet" href="fluent.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     TOP BAR
+     ═══════════════════════════════════════════════════════ -->
+<header class="topbar">
+  <a href="dashboard.html" style="text-decoration:none">
+    <div class="topbar__logo">
+      <div class="topbar__logo-icon">S</div>
+      STOX
+    </div>
+  </a>
+  <nav class="topbar__nav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="inventory.html" class="active">Inventory</a>
+    <a href="products.html">Products</a>
+    <a href="#">Suppliers</a>
+    <a href="reports.html">Reports</a>
+    <a href="analytics.html">Analytics</a>
+    <a href="#">Import / Export</a>
+    <a href="roles.html">User / Roles</a>
+    <a href="#">Settings</a>
+  </nav>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__search">
+    <input type="text" placeholder="Search products, SKUs…">
+    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM9.5 14A4.5 4.5 0 1114 9.5 4.49 4.49 0 019.5 14z"/></svg>
+  </div>
+  <div class="topbar__right">
+    <span class="security-badge tls"><span class="dot"></span>TLS 1.3</span>
+    <span class="security-badge mfa"><span class="dot"></span>MFA Active</span>
+  </div>
+  <div class="topbar__user">
+    <div class="topbar__avatar">JD</div>
+    <div class="topbar__user-info">
+      <strong>Jane Doe</strong>
+      Inventory Manager
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE HEADER + ACTIONS
+     ═══════════════════════════════════════════════════════ -->
+<div class="page-header" style="align-items:flex-start">
+  <div>
+    <h1><span>STOX</span> — Execution & Variance Control</h1>
+    <p style="color:var(--text-muted);margin-top:6px;font-size:13px">Manage physical stock reality, receipts, and structural disconnections.</p>
+  </div>
+  <div class="page-header__right">
+    <div class="quick-actions">
+      <button class="action-btn" id="btn-receive" style="background:var(--green-bg);border-color:var(--green-border);color:#fff">Record Stock Receipt</button>
+      <button class="action-btn" id="btn-damage" style="background:var(--red-bg);border-color:var(--red-border);color:#fff">Report Damaged Goods</button>
+      <button class="action-btn" id="btn-adjust" style="background:var(--amber-bg);border-color:var(--amber-border);color:#fff">Manual Adjustment</button>
+      <button class="action-btn" style="background:var(--blue-bg);border-color:var(--border-light);color:#fff">Request Supplier Quote</button>
+      <button class="action-btn" style="background:var(--blue-bg);border-color:var(--border-light);color:#fff">Initiate Cycle Count</button>
+      <button class="action-btn" style="background:var(--blue-bg);border-color:var(--border-light);color:#fff">Generate Barcode Labels</button>
+      <button class="action-btn" style="background:var(--blue-bg);border-color:var(--border-light);color:#fff">Export Inventory Logs</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     KPI ROW
+     ═══════════════════════════════════════════════════════ -->
+<section style="padding:0 24px 4px">
+  <div class="kpi-grid" id="kpi-cards">
+    <!-- Inventory Value -->
+    <div class="kpi status-green">
+      
+      <div class="kpi__label">Total Inventory Value</div>
+      <div class="kpi__value">$2.47<small>M</small></div>
+      <div class="kpi__sub up">↑ 3.2% vs last month</div>
+      <div style="height:32px;overflow:hidden;margin-top:6px"><canvas id="valueSparkline"></canvas></div>
+    </div>
+    <!-- Holding Cost -->
+    <div class="kpi status-amber">
+      
+      <div class="kpi__label">Est. Holding Cost / Month</div>
+      <div class="kpi__value">$61.8<small>K</small></div>
+      <div class="kpi__sub neutral">≈ 2.5% of inventory value</div>
+      <div style="height:32px;overflow:hidden;margin-top:6px"><canvas id="costSparkline"></canvas></div>
+    </div>
+    <!-- Inventory Turnover -->
+    <div class="kpi status-green">
+      
+      <div class="kpi__label">Inventory Turnover Ratio</div>
+      <div class="kpi__value">6.3<small>× / yr</small></div>
+      <div class="kpi__sub up">↑ 0.4 vs prior quarter · Healthy</div>
+      <div style="height:32px;overflow:hidden;margin-top:6px"><canvas id="turnoverSparkline"></canvas></div>
+    </div>
+    <!-- Days of Supply -->
+    <div class="kpi status-red">
+      
+      <div class="kpi__label">Avg. Days of Supply</div>
+      <div class="kpi__value">18<small>days</small></div>
+      <div class="kpi__sub down">↓ 5 days · Below 21-day target</div>
+      <div style="height:32px;overflow:hidden;margin-top:6px"><canvas id="supplySparkline"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     MAIN DASHBOARD GRID
+     ═══════════════════════════════════════════════════════ -->
+<div class="dashboard">
+
+  <!-- ═══ VARIANCE LEDGER (SPAN 2) ═══ -->
+  <div class="card span-2" id="variance-ledger-card">
+    <div class="card__header">
+      <h2>Variance Ledger</h2>
+      <span class="card-badge" style="background:var(--red-bg);color:var(--red)">3 High Variance Alerts</span>
+    </div>
+    <div class="card__body" style="padding:0">
+      <div class="scroll-x">
+        <table class="risk-table">
+          <thead>
+            <tr><th>SKU</th><th>Product Name</th><th>System Qty</th><th>Physical Qty</th><th>Delta</th><th>Last Count Date</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            <tr><td style="color:var(--text-muted)">BRG-6205</td><td class="product-name">Industrial Bearings 6205</td><td>212</td><td style="color:var(--red);font-weight:700">198</td><td style="color:var(--red);font-weight:700">-14</td><td style="color:var(--text-dim)">Today, 08:30</td><td><span class="risk-badge stockout">Investigate</span></td></tr>
+            <tr><td style="color:var(--text-muted)">HYD-340</td><td class="product-name">Hydraulic Filter HF-340</td><td>50</td><td style="color:var(--amber);font-weight:700">51</td><td style="color:var(--amber);font-weight:700">+1</td><td style="color:var(--text-dim)">Today, 09:12</td><td><span class="risk-badge overstock">Minor Variance</span></td></tr>
+            <tr><td style="color:var(--text-muted)">THP-TG7</td><td class="product-name">Thermal Paste TG-7 Tubes</td><td>320</td><td style="color:var(--red);font-weight:700">210</td><td style="color:var(--red);font-weight:700">-110</td><td style="color:var(--text-dim)">Yesterday</td><td><span class="risk-badge stockout">Critical Shrinkage</span></td></tr>
+            <tr><td style="color:var(--text-muted)">CWR-14A</td><td class="product-name">Copper Wire Spool 14AWG</td><td>4,200</td><td style="color:var(--green);font-weight:700">4,200</td><td style="color:var(--green);font-weight:700">0</td><td style="color:var(--text-dim)">17 Mar</td><td><span class="risk-badge slow" style="background:var(--green-bg);color:var(--green);border-color:var(--green-border)">Reconciled</span></td></tr>
+            <tr><td style="color:var(--text-muted)">SSB-M12</td><td class="product-name">Stainless Bolts M12×40</td><td>9,800</td><td style="color:var(--amber);font-weight:700">9,750</td><td style="color:var(--amber);font-weight:700">-50</td><td style="color:var(--text-dim)">15 Mar</td><td><span class="risk-badge overstock">Monitor</span></td></tr>
+            <tr><td style="color:var(--text-muted)">PNV-120</td><td class="product-name">Pneumatic Valve PV-120</td><td>155</td><td style="color:var(--green);font-weight:700">155</td><td style="color:var(--green);font-weight:700">0</td><td style="color:var(--text-dim)">10 Mar</td><td><span class="risk-badge slow" style="background:var(--green-bg);color:var(--green);border-color:var(--green-border)">Reconciled</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ PENDING RECEIPTS QUEUE (SPAN 1) ═══ -->
+  <div class="card" id="pending-receipts-card">
+    <div class="card__header">
+      <h2>Pending Receipts Queue</h2>
+      <span class="card-badge" style="background:var(--amber-bg);color:var(--amber)">In Transit</span>
+    </div>
+    <div class="card__body">
+      <div style="display:flex;flex-direction:column;gap:12px">
+        
+        <!-- High Risk Receipt -->
+        <div style="padding:12px;background:var(--bg-elevated);border:1px solid var(--red-border);border-radius:var(--radius-sm);position:relative;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--red)"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <h3 style="font-size:12px;color:#fff;font-weight:600">PO #7402 — Urgent</h3>
+            <span style="font-size:10px;font-weight:700;color:var(--red);background:var(--red-bg);padding:2px 6px;border-radius:4px">Arriving Late</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Industrial Bearings 6205 <span style="color:#fff">(480 units)</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:10.5px">
+            <div><span style="color:var(--text-dim)">Expected:</span> <span style="color:#fff;font-weight:500">Mar 22</span></div>
+            <div><span style="color:var(--text-dim)">Stockout Date:</span> <span style="color:var(--red);font-weight:600">Mar 21</span></div>
+          </div>
+        </div>
+
+        <!-- Normal Receipt -->
+        <div style="padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);position:relative;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--blue)"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <h3 style="font-size:12px;color:#fff;font-weight:600">PO #7405</h3>
+            <span style="font-size:10px;font-weight:700;color:var(--blue);background:var(--blue-bg);padding:2px 6px;border-radius:4px">On Schedule</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Hydraulic Filter HF-340 <span style="color:#fff">(260 units)</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:10.5px">
+            <div><span style="color:var(--text-dim)">Expected:</span> <span style="color:#fff;font-weight:500">Mar 25</span></div>
+            <div><span style="color:var(--text-dim)">Stockout Date:</span> <span style="color:var(--green);font-weight:600">Mar 30</span></div>
+          </div>
+        </div>
+
+        <!-- Normal Receipt -->
+        <div style="padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);position:relative;overflow:hidden">
+          <div style="position:absolute;top:0;left:0;width:3px;height:100%;background:var(--blue)"></div>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+            <h3 style="font-size:12px;color:#fff;font-weight:600">PO #7398</h3>
+            <span style="font-size:10px;font-weight:700;color:var(--blue);background:var(--blue-bg);padding:2px 6px;border-radius:4px">On Schedule</span>
+          </div>
+          <div style="font-size:11px;color:var(--text-muted);margin-bottom:8px">Pneumatic Valve PV-120 <span style="color:#fff">(150 units)</span></div>
+          <div style="display:flex;justify-content:space-between;font-size:10.5px">
+            <div><span style="color:var(--text-dim)">Expected:</span> <span style="color:#fff;font-weight:500">Mar 27</span></div>
+            <div><span style="color:var(--text-dim)">Stockout Date:</span> <span style="color:var(--green);font-weight:600">Apr 04</span></div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div><!-- /dashboard -->
+
+
+<!-- ═══════════════════════════════════════════════════════
+     CHARTS (Chart.js)
+     ═══════════════════════════════════════════════════════ -->
+<script>
+/* ── Shared Options ── */
+const gridColor = '#1e293b';
+const tickFont = {size:10, family:'Inter'};
+const tickColor = '#64748b';
+const tooltipOpts = {
+  backgroundColor:'#1c2335',
+  titleFont:{size:11,family:'Inter',weight:'600'},
+  bodyFont:{size:11,family:'Inter'},
+  borderColor:'#263350',borderWidth:1,
+  padding:10,cornerRadius:6,
+  displayColors:true,boxPadding:4,
+};
+
+/* ════════════════════════════════════════════
+   DEMAND FORECAST CHART
+   ════════════════════════════════════════════ */
+(function(){
+  const historicalLabels = ['Oct','Nov','Dec','Jan','Feb','Mar 1-19'];
+  const forecastLabels = ['Mar 20-31','Apr 1-15','Apr 16-30','May 1-15','May 16-31'];
+  const labels = [...historicalLabels, ...forecastLabels];
+
+  const historicalData = [420, 385, 510, 460, 490, 340];
+  const forecastMean =  [null, null, null, null, null, 340, 380, 410, 440, 470, 450];
+  const forecastUpper = [null, null, null, null, null, 340, 420, 470, 510, 550, 530];
+  const forecastLower = [null, null, null, null, null, 340, 340, 350, 370, 390, 370];
+
+  new Chart(document.getElementById('demandForecastChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Actual Sales',
+          data: [...historicalData, ...Array(forecastLabels.length).fill(null)],
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99,102,241,.08)',
+          fill: true,
+          tension: .35,
+          pointRadius: 4,
+          pointBackgroundColor: '#6366f1',
+          pointBorderColor: '#131825',
+          pointBorderWidth: 2,
+          borderWidth: 2.5,
+        },
+        {
+          label: 'Forecast (Mean)',
+          data: forecastMean,
+          borderColor: '#06b6d4',
+          borderDash: [6, 3],
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#06b6d4',
+          fill: false,
+          tension: .3,
+        },
+        {
+          label: 'Upper Band',
+          data: forecastUpper,
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(6,182,212,.1)',
+          fill: '+1',
+          pointRadius: 0,
+          tension: .3,
+        },
+        {
+          label: 'Lower Band',
+          data: forecastLower,
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(6,182,212,.1)',
+          fill: false,
+          pointRadius: 0,
+          tension: .3,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction:{mode:'index',intersect:false},
+      scales: {
+        x: {grid:{color:gridColor}, ticks:{font:tickFont,color:tickColor}},
+        y: {
+          grid:{color:gridColor},
+          ticks:{font:tickFont,color:tickColor,callback:v=>v+' u'},
+          beginAtZero:false,
+        }
+      },
+      plugins: {
+        legend:{display:false},
+        tooltip:tooltipOpts,
+        annotation: {
+          annotations: {
+            reorderLine: {
+              type: 'line',
+              yMin: 360, yMax: 360,
+              borderColor: 'rgba(239,68,68,.6)',
+              borderWidth: 2,
+              borderDash: [8, 4],
+              label: {
+                display: true,
+                content: 'Reorder Point',
+                position: 'start',
+                backgroundColor: 'rgba(239,68,68,.15)',
+                color: '#ef4444',
+                font: {size: 10, family: 'Inter', weight: '600'},
+                padding: {top:3,bottom:3,left:6,right:6},
+              }
+            },
+            forecastZone: {
+              type: 'box',
+              xMin: 5, xMax: 10,
+              backgroundColor: 'rgba(6,182,212,.04)',
+              borderWidth: 0,
+            }
+          }
+        }
+      }
+    }
+  });
+})();
+
+/* ════════════════════════════════════════════
+   FINANCIAL GAINS — CAPITAL ALLOCATION BAR CHART
+   ════════════════════════════════════════════ */
+(function(){
+  const cats = ['Bearings','Filters','Wire/Cable','Fasteners','Electronics','Valves'];
+  const current   = [420, 310, 580, 340, 290, 510]; // $K
+  const optimized = [380, 280, 340, 310, 270, 440]; // $K after STOX suggestions
+  new Chart(document.getElementById('financialGainsChart'), {
+    type: 'bar',
+    data: {
+      labels: cats,
+      datasets: [
+        {
+          label: 'Current Value ($K)',
+          data: current,
+          backgroundColor: 'rgba(99,102,241,.65)',
+          borderRadius: 4,
+          barPercentage: .7,
+          categoryPercentage: .65,
+        },
+        {
+          label: 'Optimized Target ($K)',
+          data: optimized,
+          backgroundColor: 'rgba(34,197,94,.65)',
+          borderRadius: 4,
+          barPercentage: .7,
+          categoryPercentage: .65,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {grid:{display:false}, ticks:{font:tickFont,color:tickColor}},
+        y: {
+          grid:{color:gridColor},
+          ticks:{font:tickFont,color:tickColor,callback:v=>'$'+v+'K'},
+          beginAtZero:true,
+        }
+      },
+      plugins: {
+        legend:{display:false},
+        tooltip:{
+          ...tooltipOpts,
+          callbacks:{
+            label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y + 'K',
+            afterBody: items => {
+              if (items.length === 2) {
+                const diff = items[0].parsed.y - items[1].parsed.y;
+                return diff > 0 ? ' Capital Released: $' + diff + 'K' : '';
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+})();
+
+/* ════════════════════════════════════════════
+   KPI SPARKLINES
+   ════════════════════════════════════════════ */
+function initGradientSparkline(id, data, yMin, yMax, targetLine, optimalMin, optimalMax, formatCallback) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  const gradient = ctx.getContext('2d').createLinearGradient(0,0,ctx.offsetWidth||200,0);
+  gradient.addColorStop(0, '#ef4444');    
+  gradient.addColorStop(0.28, '#f59e0b'); 
+  gradient.addColorStop(0.5, '#22c55e');  
+  gradient.addColorStop(1, '#22c55e');
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ["H1'24", "H2'24", "Q3", "Q4", "Q1'25", "Q2", "Q3"],
+      datasets: [{
+        data: data,
+        borderColor: gradient,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        fill: false,
+        tension: .4,
+      }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales: {x:{display:false}, y:{display:false, min:yMin, max:yMax}},
+      plugins: {
+        legend:{display:false},
+        tooltip:{enabled:true,...tooltipOpts,callbacks:{label:c=>formatCallback(c.parsed.y)}},
+        annotation:{
+          annotations:{
+            optimal:{type:'box',yMin:optimalMin,yMax:optimalMax,backgroundColor:'rgba(34,197,94,.06)',borderWidth:0},
+            target:{type:'line',yMin:targetLine,yMax:targetLine,borderColor:'rgba(245,158,11,.3)',borderWidth:1,borderDash:[4,3]}
+          }
+        }
+      }
+    }
+  });
+}
+
+// Total Value Sparkline
+initGradientSparkline('valueSparkline', [1.85, 1.95, 2.05, 1.98, 2.20, 2.35, 2.47], 1.5, 3.0, 2.0, 2.2, 3.0, y=>'$'+y.toFixed(2)+'M');
+
+// Holding Cost Sparkline
+initGradientSparkline('costSparkline', [75.2, 72.5, 68.1, 70.8, 65.2, 63.9, 61.8], 50, 90, 65.0, 50, 62, y=>'$'+y.toFixed(1)+'K');
+
+// Inventory Turnover Sparkline
+initGradientSparkline('turnoverSparkline', [4.2, 4.8, 5.0, 5.2, 5.5, 5.9, 6.3], 3, 8, 5.0, 5.5, 8.0, y=>y.toFixed(1)+'×');
+
+// Days of Supply Sparkline
+initGradientSparkline('supplySparkline', [32, 29, 25, 24, 21, 19, 18], 10, 40, 21, 19, 23, y=>Math.round(y)+' days');
+
+/* ════════════════════════════════════════════
+   SUPPLIER SPARKLINES
+   ════════════════════════════════════════════ */
+(function(){
+  const sparkData = {
+    spark1: [4,3.8,4.1,4.5,4.2,4.0,4.3,4.1,3.9,4.2,4.4,4.2],
+    spark2: [6,5.5,5.8,6.2,5.6,5.9,5.7,6.0,5.4,5.8,5.5,5.8],
+    spark3: [7,6.5,5.8,6.2,6.0,6.3,5.9,6.1,6.4,5.7,6.2,6.1],
+    spark4: [10,9,8,8.5,7.5,9.2,8.8,7.9,8.4,9.1,8.0,8.4],
+  };
+  const sparkColors = {spark1:'#22c55e',spark2:'#6366f1',spark3:'#06b6d4',spark4:'#f59e0b'};
+  Object.entries(sparkData).forEach(([id,data])=>{
+    new Chart(document.getElementById(id),{
+      type:'line',
+      data:{labels:data.map((_,i)=>i),datasets:[{data,borderColor:sparkColors[id],borderWidth:1.5,pointRadius:0,fill:false,tension:.3}]},
+      options:{responsive:true,maintainAspectRatio:false,scales:{x:{display:false},y:{display:false}},plugins:{legend:{display:false},tooltip:{enabled:false}},elements:{line:{borderWidth:1.5}}}
+    });
+  });
+})();
+
+/* ════════════════════════════════════════════
+   AUDIT LOG FILTERS
+   ════════════════════════════════════════════ */
+(function(){
+  const filterBtns = document.querySelectorAll('#audit-filters .audit-filter-btn');
+  const entries = document.querySelectorAll('.audit-entry[data-category]');
+  filterBtns.forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      filterBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const f = btn.dataset.filter;
+      entries.forEach(e=>{
+        e.style.display = (f==='all' || e.dataset.category===f) ? '' : 'none';
+      });
+    });
+  });
+})();
+
+/* ════════════════════════════════════════════
+   REORDER TOAST NOTIFICATIONS (FR-18)
+   ════════════════════════════════════════════ */
+(function(){
+  // Create toast container
+  const tc = document.createElement('div');
+  tc.className = 'toast-container';
+  tc.id = 'toast-container';
+  document.body.appendChild(tc);
+
+  function showToast(msg, type='success'){
+    const t = document.createElement('div');
+    t.className = 'toast ' + type;
+    t.innerHTML = (type==='success'?'':'') + ' ' + msg;
+    tc.appendChild(t);
+    setTimeout(()=>t.remove(), 4200);
+  }
+
+  document.querySelectorAll('.reorder-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const product = btn.closest('.reorder-item').querySelector('.reorder-item__product').childNodes[0].textContent.trim();
+      const qty = btn.textContent.match(/[\d,]+\s*units/)?.[0] || 'items';
+      btn.textContent = ' Order Submitted';
+      btn.style.opacity = '.6';
+      btn.style.pointerEvents = 'none';
+      showToast('Reorder placed for <strong>'+product+'</strong> ('+qty+'). Notification sent to SME Owner for approval.','success');
+      setTimeout(()=>showToast(' Email notification dispatched to <strong>rajesh.k@stoxinv.com</strong> (SME Owner)','info'),800);
+    });
+  });
+})();
+</script>
+</body>
+</html>

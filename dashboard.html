@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STOX — Inventory Intelligence Dashboard</title>
+<meta name="description" content="STOX Inventory Dashboard – KPIs, demand forecasting, risk alerts, reorder suggestions, and compliance controls.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<link rel="stylesheet" href="fluent.css">
+<style>
+  .dashboard { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+  #risk-flags-card { order: 1; }
+  #financial-gains-card { order: 2; }
+  #demand-forecast-card { order: 3; }
+  #quick-actions-card { order: 4; }
+  #reorder-panel { order: 5; }
+  #supplier-reliability-card { order: 6; }
+  #audit-log-card { order: 7; }
+  #security-card { order: 8; }
+
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     TOP BAR
+     ═══════════════════════════════════════════════════════ -->
+<header class="topbar">
+  <a href="dashboard.html" style="text-decoration:none">
+    <div class="topbar__logo">
+      <div class="topbar__logo-icon">S</div>
+      STOX
+    </div>
+  </a>
+  <nav class="topbar__nav">
+    <a href="dashboard.html" class="active">Dashboard</a>
+    <a href="inventory.html">Inventory</a>
+    <a href="products.html">Products</a>
+    <a href="#">Suppliers</a>
+    <a href="reports.html">Reports</a>
+    <a href="analytics.html">Analytics</a>
+    <a href="#">Import / Export</a>
+    <a href="roles.html">User / Roles</a>
+    <a href="#">Settings</a>
+  </nav>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__search">
+    <input type="text" placeholder="Search products, SKUs…">
+    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM9.5 14A4.5 4.5 0 1114 9.5 4.49 4.49 0 019.5 14z"/></svg>
+  </div>
+  <div class="topbar__right">
+    <span class="security-badge tls"><span class="dot"></span>TLS 1.3</span>
+    <span class="security-badge mfa"><span class="dot"></span>MFA Active</span>
+  </div>
+  <div class="topbar__user">
+    <div class="topbar__avatar">JD</div>
+    <div class="topbar__user-info">
+      <strong>Jane Doe</strong>
+      Inventory Manager
+    </div>
+  </div>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════
+     PAGE HEADER + DATA STATUS
+     ═══════════════════════════════════════════════════════ -->
+<div class="page-header">
+  <h1><span>STOX</span> — Inventory Intelligence</h1>
+  <div class="page-header__right">
+    <div class="data-freshness" id="data-freshness">
+      <span class="status-dot healthy"></span>
+      <div>
+        <strong>CSV Import Health: OK</strong><br>
+        <span class="timestamp">Last sync: 19 Mar 2026, 07:15 IST · 247 products · 4,812 rows</span><br>
+        <span class="timestamp">Last validated: 19 Mar 2026, 07:16 IST · <span style="color:var(--green);font-weight:600"> Checksum passed</span> · 0 integrity errors</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════
+     KPI ROW
+     ═══════════════════════════════════════════════════════ -->
+<section style="padding:0 24px 4px">
+  <div class="kpi-grid" id="kpi-cards">
+    <!-- Inventory Value -->
+    <div class="kpi status-green">
+      
+      <div class="kpi__label">Total Inventory Value</div>
+      <div class="kpi__value">$2.47<small>M</small></div>
+      <div class="kpi__sub up">↑ 3.2% vs last month</div>
+      <div style="height:32px;overflow:hidden;margin-top:6px"><canvas id="valueSparkline"></canvas></div>
+    </div>
+    <!-- Holding Cost -->
+    <div class="kpi status-amber">
+      
+      <div class="kpi__label">Est. Holding Cost / Month</div>
+      <div class="kpi__value">$61.8<small>K</small></div>
+      <div class="kpi__sub neutral">≈ 2.5% of inventory value</div>
+      <div style="height:32px;overflow:hidden;margin-top:6px"><canvas id="costSparkline"></canvas></div>
+    </div>
+    <!-- Inventory Turnover -->
+    <div class="kpi status-green">
+      
+      <div class="kpi__label">Inventory Turnover Ratio</div>
+      <div class="kpi__value">6.3<small>× / yr</small></div>
+      <div class="kpi__sub up">↑ 0.4 vs prior quarter · Healthy</div>
+      <div style="height:32px;overflow:hidden;margin-top:6px"><canvas id="turnoverSparkline"></canvas></div>
+    </div>
+    <!-- Days of Supply -->
+    <div class="kpi status-red">
+      
+      <div class="kpi__label">Avg. Days of Supply</div>
+      <div class="kpi__value">18<small>days</small></div>
+      <div class="kpi__sub down">↓ 5 days · Below 21-day target</div>
+      <div style="height:32px;overflow:hidden;margin-top:6px"><canvas id="supplySparkline"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════════════════════════════════════════════
+     MAIN DASHBOARD GRID
+     ═══════════════════════════════════════════════════════ -->
+<div class="dashboard">
+
+  <!-- ═══ ROW 1: URGENT — Risk Flags + Quick Actions ═══ -->
+  <div class="card span-2" id="risk-flags-card">
+    <div class="card__header">
+      <h2>Automated Risk Flags</h2>
+      <span class="card-badge" style="background:var(--red-bg);color:var(--red)">7 Active Alerts</span>
+    </div>
+    <div class="card__body" style="padding:0">
+      <div class="scroll-x">
+        <table class="risk-table">
+          <thead><tr><th>Product</th><th>SKU</th><th>Risk Type</th><th>Current Qty</th><th>Safety Stock</th><th>30d Demand</th><th>Severity</th><th>Last Moved</th></tr></thead>
+          <tbody>
+            <tr><td class="product-name">Industrial Bearings 6205</td><td style="color:var(--text-muted)">BRG-6205</td><td><span class="risk-badge stockout">Stockout Risk</span></td><td style="color:var(--red);font-weight:700">12</td><td>50</td><td>140</td><td><div class="severity-bar"><div class="severity-bar__fill high"></div></div></td><td style="color:var(--text-muted)">2 days ago</td></tr>
+            <tr><td class="product-name">Hydraulic Filter HF-340</td><td style="color:var(--text-muted)">HYD-340</td><td><span class="risk-badge stockout">Stockout Risk</span></td><td style="color:var(--red);font-weight:700">3</td><td>25</td><td>80</td><td><div class="severity-bar"><div class="severity-bar__fill high"></div></div></td><td style="color:var(--text-muted)">1 day ago</td></tr>
+            <tr><td class="product-name">Copper Wire Spool 14AWG</td><td style="color:var(--text-muted)">CWR-14A</td><td><span class="risk-badge overstock">Overstocking</span></td><td style="color:var(--amber);font-weight:700">4,200</td><td>300</td><td>85</td><td><div class="severity-bar"><div class="severity-bar__fill medium"></div></div></td><td style="color:var(--text-muted)">5 days ago</td></tr>
+            <tr><td class="product-name">Stainless Bolts M12×40</td><td style="color:var(--text-muted)">SSB-M12</td><td><span class="risk-badge overstock">Overstocking</span></td><td style="color:var(--amber);font-weight:700">9,800</td><td>500</td><td>210</td><td><div class="severity-bar"><div class="severity-bar__fill medium"></div></div></td><td style="color:var(--text-muted)">3 days ago</td></tr>
+            <tr><td class="product-name">Thermal Paste TG-7 Tubes</td><td style="color:var(--text-muted)">THP-TG7</td><td><span class="risk-badge slow">Slow-Moving</span></td><td>320</td><td>40</td><td>2</td><td><div class="severity-bar"><div class="severity-bar__fill low"></div></div></td><td style="color:var(--text-dim)">47 days ago</td></tr>
+            <tr><td class="product-name">Legacy PCB Board v2.1</td><td style="color:var(--text-muted)">PCB-V21</td><td><span class="risk-badge slow">Slow-Moving</span></td><td>185</td><td>20</td><td>0</td><td><div class="severity-bar"><div class="severity-bar__fill low"></div></div></td><td style="color:var(--text-dim)">62 days ago</td></tr>
+            <tr><td class="product-name">Pneumatic Valve PV-120</td><td style="color:var(--text-muted)">PNV-120</td><td><span class="risk-badge stockout">Stockout Risk</span></td><td style="color:var(--red);font-weight:700">8</td><td>35</td><td>110</td><td><div class="severity-bar"><div class="severity-bar__fill high"></div></div></td><td style="color:var(--text-muted)">Today</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    </div>
+  <div class="card span-2" id="quick-actions-card">
+    <div class="card__header"><h2>Quick Actions</h2></div>
+    <div class="card__body">
+      <div class="quick-actions" style="flex-direction:column">
+        <button class="action-btn" id="btn-receive">Record Stock Receipt</button>
+        <button class="action-btn" id="btn-damage">Record Damaged Items</button>
+        <button class="action-btn" id="btn-adjust">Manual Adjustment</button>
+        <button class="action-btn" id="btn-quote">Request Supplier Quote</button>
+        <button class="action-btn" id="btn-audit">Initiate Cycle Count</button>
+        <button class="action-btn" id="btn-labels">Generate Barcode Labels</button>
+        <button class="action-btn" id="btn-export">Export Audit Log</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card span-2" id="demand-forecast-card">
+    <div class="card__header">
+      <h2>Demand Forecast — 60 Day Window</h2>
+      <span class="card-badge" style="background:var(--accent-glow);color:var(--accent)">AI Projection</span>
+    </div>
+    <div class="card__body">
+      <div class="chart-container"><canvas id="demandForecastChart"></canvas></div>
+      <div class="chart-legend">
+        <span><span class="swatch" style="background:var(--accent)"></span>Actual Sales</span>
+        <span><span class="swatch" style="background:var(--cyan)"></span>Forecast (Mean)</span>
+        <span><span class="swatch" style="background:rgba(6,182,212,.2)"></span>Confidence Band (±σ)</span>
+        <span><span class="swatch" style="background:var(--red)"></span>Reorder Point</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="card span-2" id="financial-gains-card">
+    <div class="card__header">
+      <h2>Capital Allocation & Gains</h2>
+      <span class="card-badge" style="background:var(--green-bg);color:var(--green)">Q1 2026</span>
+    </div>
+    <div class="card__body">
+      <div class="chart-container"><canvas id="financialGainsChart"></canvas></div>
+      <div class="chart-legend">
+        <span><span class="swatch" style="background:var(--accent)"></span>Current Value</span>
+        <span><span class="swatch" style="background:var(--green)"></span>Optimized Target</span>
+        <span><span class="swatch" style="background:rgba(34,197,94,.2)"></span>Capital Unlocked</span>
+      </div>
+      <div style="margin-top:10px;padding:8px 10px;background:var(--bg-elevated);border-radius:var(--radius-sm);border:1px solid var(--green-border);font-size:11px;display:flex;align-items:center;gap:6px">
+        
+        <div><strong style="color:var(--green)">$184K capital unlocked</strong><br><span style="color:var(--text-muted)">Est. $12.3K/mo savings from overstock reduction</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ROW 3: ACTIONABLE — Reorder Suggestions ═══ -->
+  <div class="card span-4" id="reorder-panel">
+    <div class="card__header">
+      <h2>Reorder Suggestions — EOQ & Safety Stock</h2>
+      <span class="card-badge" style="background:var(--green-bg);color:var(--green)">3 Items Need Reorder</span>
+    </div>
+    <div class="card__body">
+      <div class="reorder-grid">
+        <div class="reorder-item">
+          <div class="reorder-item__product">Industrial Bearings 6205 <span class="sku">BRG-6205</span></div>
+          <div class="metrics">
+            <div class="metric"><div class="metric__label">EOQ</div><div class="metric__value highlight">480 units</div></div>
+            <div class="metric"><div class="metric__label">Safety Stock</div><div class="metric__value">50 units</div></div>
+            <div class="metric"><div class="metric__label">Lead Time</div><div class="metric__value">7 days</div></div>
+            <div class="metric"><div class="metric__label">Restock By</div><div class="metric__value" style="color:var(--red)">Mar 21</div></div>
+          </div>
+          <button class="reorder-btn">Place Reorder — 480 units</button>
+        </div>
+        <div class="reorder-item">
+          <div class="reorder-item__product">Hydraulic Filter HF-340 <span class="sku">HYD-340</span></div>
+          <div class="metrics">
+            <div class="metric"><div class="metric__label">EOQ</div><div class="metric__value highlight">260 units</div></div>
+            <div class="metric"><div class="metric__label">Safety Stock</div><div class="metric__value">25 units</div></div>
+            <div class="metric"><div class="metric__label">Lead Time</div><div class="metric__value">5 days</div></div>
+            <div class="metric"><div class="metric__label">Restock By</div><div class="metric__value" style="color:var(--red)">Mar 20</div></div>
+          </div>
+          <button class="reorder-btn">Place Reorder — 260 units</button>
+        </div>
+        <div class="reorder-item">
+          <div class="reorder-item__product">Pneumatic Valve PV-120 <span class="sku">PNV-120</span></div>
+          <div class="metrics">
+            <div class="metric"><div class="metric__label">EOQ</div><div class="metric__value highlight">150 units</div></div>
+            <div class="metric"><div class="metric__label">Safety Stock</div><div class="metric__value">35 units</div></div>
+            <div class="metric"><div class="metric__label">Lead Time</div><div class="metric__value">10 days</div></div>
+            <div class="metric"><div class="metric__label">Restock By</div><div class="metric__value" style="color:var(--amber)">Mar 24</div></div>
+          </div>
+          <button class="reorder-btn">Place Reorder — 150 units</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ROW 4: OVERSIGHT — Suppliers + Audit Log + Security ═══ -->
+  <div class="card span-2" id="supplier-reliability-card">
+    <div class="card__header">
+      <h2>Top Reliable Suppliers</h2>
+      <span class="card-badge" style="background:var(--accent-glow);color:var(--accent)">Lead Time Variance</span>
+    </div>
+    <div class="card__body">
+      <div class="supplier-list">
+        <div class="supplier-row"><div class="supplier-row__rank" style="background:linear-gradient(135deg,#22c55e,#4ade80)">1</div><div class="supplier-row__info"><div class="supplier-row__name">Apex Industrial Supply</div><div class="supplier-row__meta">Avg lead: 4.2d · 98 orders</div></div><canvas class="supplier-row__spark" id="spark1"></canvas><div class="supplier-row__score good">97.2%</div></div>
+        <div class="supplier-row"><div class="supplier-row__rank" style="background:linear-gradient(135deg,#6366f1,#818cf8)">2</div><div class="supplier-row__info"><div class="supplier-row__name">TechParts Global</div><div class="supplier-row__meta">Avg lead: 5.8d · 74 orders</div></div><canvas class="supplier-row__spark" id="spark2"></canvas><div class="supplier-row__score good">94.6%</div></div>
+        <div class="supplier-row"><div class="supplier-row__rank" style="background:linear-gradient(135deg,#06b6d4,#22d3ee)">3</div><div class="supplier-row__info"><div class="supplier-row__name">MetalWorks Co.</div><div class="supplier-row__meta">Avg lead: 6.1d · 62 orders</div></div><canvas class="supplier-row__spark" id="spark3"></canvas><div class="supplier-row__score good">91.3%</div></div>
+        <div class="supplier-row"><div class="supplier-row__rank" style="background:linear-gradient(135deg,#f59e0b,#fbbf24)">4</div><div class="supplier-row__info"><div class="supplier-row__name">FastFreight Logistics</div><div class="supplier-row__meta">Avg lead: 8.4d · 45 orders</div></div><canvas class="supplier-row__spark" id="spark4"></canvas><div class="supplier-row__score ok">82.1%</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card span-2" id="audit-log-card">
+    <div class="card__header">
+      <h2>Audit Log</h2>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="card-badge" style="background:var(--accent-glow);color:var(--accent)">Last 24h</span>
+        <a href="#" style="font-size:11px;font-weight:600" onclick="return false">View All →</a>
+      </div>
+    </div>
+    <div class="card__body">
+      <div class="audit-filters" id="audit-filters">
+        <button class="audit-filter-btn active" data-filter="all">All</button>
+        <button class="audit-filter-btn" data-filter="security">Critical / Security</button>
+        <button class="audit-filter-btn" data-filter="operational">Operational</button>
+        <button class="audit-filter-btn" data-filter="system">System</button>
+      </div>
+      <div class="audit-log">
+        <div class="audit-entry" data-category="operational"><span class="audit-entry__time">07:15</span><span class="audit-entry__user">jane.doe</span><span class="audit-entry__action"><span class="action-type import">IMPORT</span>CSV imported — <strong>inventory_q1_2026.csv</strong> · 4,812 rows · 0 errors</span></div>
+        <div class="audit-entry" data-category="security"><span class="audit-entry__time">07:02</span><span class="audit-entry__user">jane.doe</span><span class="audit-entry__action"><span class="action-type auth">AUTH</span>Login via MFA (TOTP) from 192.168.1.42</span></div>
+        <div class="audit-entry" data-category="system"><span class="audit-entry__time">06:48</span><span class="audit-entry__user">system</span><span class="audit-entry__action"><span class="action-type config">SYSTEM</span>Automated backup completed — snapshot #1247</span></div>
+        <div class="audit-entry" data-category="operational"><span class="audit-entry__time">Yesterday</span><span class="audit-entry__user">mike.r</span><span class="audit-entry__action"><span class="action-type stock">STOCK</span>Stock receipt — BRG-6205 +200 units from Supplier #A-104</span></div>
+        <div class="audit-entry" data-category="operational"><span class="audit-entry__time">Yesterday</span><span class="audit-entry__user">jane.doe</span><span class="audit-entry__action"><span class="action-type config">CONFIG</span>Reorder point changed: HYD-340: 20 → 25 units</span></div>
+        <div class="audit-entry" data-category="operational"><span class="audit-entry__time">Yesterday</span><span class="audit-entry__user">mike.r</span><span class="audit-entry__action"><span class="action-type stock">STOCK</span>Damaged items — 3× THP-TG7 (water damage)</span></div>
+        <div class="audit-entry" data-category="security"><span class="audit-entry__time">18 Mar</span><span class="audit-entry__user">admin</span><span class="audit-entry__action"><span class="action-type auth">AUTH</span>Password policy — minimum 14 chars enforced</span></div>
+        <div class="audit-entry" data-category="system"><span class="audit-entry__time">18 Mar</span><span class="audit-entry__user">system</span><span class="audit-entry__action"><span class="action-type import">IMPORT</span>CSV imported — <strong>supplier_orders_mar.csv</strong> · 312 rows · 2 warnings</span></div>
+        <div class="audit-entry" data-category="operational"><span class="audit-entry__time">17 Mar</span><span class="audit-entry__user">jane.doe</span><span class="audit-entry__action"><span class="action-type stock">ADJUST</span>Manual adjustment — SSB-M12: 9,650 → 9,800 (+150)</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card span-4" id="security-card">
+    <div class="card__header"><h2>Security & Compliance</h2></div>
+    <div class="card__body">
+      <div class="security-grid">
+        <div class="sec-item"><div class="sec-item__label">Transport</div><div class="sec-item__status ok">TLS 1.3</div></div>
+        <div class="sec-item"><div class="sec-item__label">Data at Rest</div><div class="sec-item__status ok">AES-256</div></div>
+        <div class="sec-item"><div class="sec-item__label">MFA</div><div class="sec-item__status ok">TOTP </div></div>
+      </div>
+      <div style="margin-top:14px;padding:10px 12px;background:var(--bg-elevated);border-radius:var(--radius-sm);border:1px solid var(--border);font-size:11px">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="color:var(--green);font-weight:700"></span><strong style="color:#fff">All Systems Operational</strong></div>
+        <div style="color:var(--text-muted);line-height:1.5">Session: <code style="color:var(--accent);background:var(--accent-glow);padding:1px 5px;border-radius:3px;font-size:10px">stox-9f4e2a…b3c1</code><br>Cert: SHA-256 verified<br>Last scan: 18 Mar 2026 23:00</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /dashboard -->
+
+
+<!-- ═══════════════════════════════════════════════════════
+     CHARTS (Chart.js)
+     ═══════════════════════════════════════════════════════ -->
+<script>
+/* ── Shared Options ── */
+const gridColor = '#1e293b';
+const tickFont = {size:10, family:'Inter'};
+const tickColor = '#64748b';
+const tooltipOpts = {
+  backgroundColor:'#1c2335',
+  titleFont:{size:11,family:'Inter',weight:'600'},
+  bodyFont:{size:11,family:'Inter'},
+  borderColor:'#263350',borderWidth:1,
+  padding:10,cornerRadius:6,
+  displayColors:true,boxPadding:4,
+};
+
+/* ════════════════════════════════════════════
+   DEMAND FORECAST CHART
+   ════════════════════════════════════════════ */
+(function(){
+  const historicalLabels = ['Oct','Nov','Dec','Jan','Feb','Mar 1-19'];
+  const forecastLabels = ['Mar 20-31','Apr 1-15','Apr 16-30','May 1-15','May 16-31'];
+  const labels = [...historicalLabels, ...forecastLabels];
+
+  const historicalData = [420, 385, 510, 460, 490, 340];
+  const forecastMean =  [null, null, null, null, null, 340, 380, 410, 440, 470, 450];
+  const forecastUpper = [null, null, null, null, null, 340, 420, 470, 510, 550, 530];
+  const forecastLower = [null, null, null, null, null, 340, 340, 350, 370, 390, 370];
+
+  new Chart(document.getElementById('demandForecastChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Actual Sales',
+          data: [...historicalData, ...Array(forecastLabels.length).fill(null)],
+          borderColor: '#6366f1',
+          backgroundColor: 'rgba(99,102,241,.08)',
+          fill: true,
+          tension: .35,
+          pointRadius: 4,
+          pointBackgroundColor: '#6366f1',
+          pointBorderColor: '#131825',
+          pointBorderWidth: 2,
+          borderWidth: 2.5,
+        },
+        {
+          label: 'Forecast (Mean)',
+          data: forecastMean,
+          borderColor: '#06b6d4',
+          borderDash: [6, 3],
+          borderWidth: 2,
+          pointRadius: 3,
+          pointBackgroundColor: '#06b6d4',
+          fill: false,
+          tension: .3,
+        },
+        {
+          label: 'Upper Band',
+          data: forecastUpper,
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(6,182,212,.1)',
+          fill: '+1',
+          pointRadius: 0,
+          tension: .3,
+        },
+        {
+          label: 'Lower Band',
+          data: forecastLower,
+          borderColor: 'transparent',
+          backgroundColor: 'rgba(6,182,212,.1)',
+          fill: false,
+          pointRadius: 0,
+          tension: .3,
+        },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction:{mode:'index',intersect:false},
+      scales: {
+        x: {grid:{color:gridColor}, ticks:{font:tickFont,color:tickColor}},
+        y: {
+          grid:{color:gridColor},
+          ticks:{font:tickFont,color:tickColor,callback:v=>v+' u'},
+          beginAtZero:false,
+        }
+      },
+      plugins: {
+        legend:{display:false},
+        tooltip:tooltipOpts,
+        annotation: {
+          annotations: {
+            reorderLine: {
+              type: 'line',
+              yMin: 360, yMax: 360,
+              borderColor: 'rgba(239,68,68,.6)',
+              borderWidth: 2,
+              borderDash: [8, 4],
+              label: {
+                display: true,
+                content: 'Reorder Point',
+                position: 'start',
+                backgroundColor: 'rgba(239,68,68,.15)',
+                color: '#ef4444',
+                font: {size: 10, family: 'Inter', weight: '600'},
+                padding: {top:3,bottom:3,left:6,right:6},
+              }
+            },
+            forecastZone: {
+              type: 'box',
+              xMin: 5, xMax: 10,
+              backgroundColor: 'rgba(6,182,212,.04)',
+              borderWidth: 0,
+            }
+          }
+        }
+      }
+    }
+  });
+})();
+
+/* ════════════════════════════════════════════
+   FINANCIAL GAINS — CAPITAL ALLOCATION BAR CHART
+   ════════════════════════════════════════════ */
+(function(){
+  const cats = ['Bearings','Filters','Wire/Cable','Fasteners','Electronics','Valves'];
+  const current   = [420, 310, 580, 340, 290, 510]; // $K
+  const optimized = [380, 280, 340, 310, 270, 440]; // $K after STOX suggestions
+  new Chart(document.getElementById('financialGainsChart'), {
+    type: 'bar',
+    data: {
+      labels: cats,
+      datasets: [
+        {
+          label: 'Current Value ($K)',
+          data: current,
+          backgroundColor: 'rgba(99,102,241,.65)',
+          borderRadius: 4,
+          barPercentage: .7,
+          categoryPercentage: .65,
+        },
+        {
+          label: 'Optimized Target ($K)',
+          data: optimized,
+          backgroundColor: 'rgba(34,197,94,.65)',
+          borderRadius: 4,
+          barPercentage: .7,
+          categoryPercentage: .65,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      scales: {
+        x: {grid:{display:false}, ticks:{font:tickFont,color:tickColor}},
+        y: {
+          grid:{color:gridColor},
+          ticks:{font:tickFont,color:tickColor,callback:v=>'$'+v+'K'},
+          beginAtZero:true,
+        }
+      },
+      plugins: {
+        legend:{display:false},
+        tooltip:{
+          ...tooltipOpts,
+          callbacks:{
+            label: ctx => ctx.dataset.label + ': $' + ctx.parsed.y + 'K',
+            afterBody: items => {
+              if (items.length === 2) {
+                const diff = items[0].parsed.y - items[1].parsed.y;
+                return diff > 0 ? ' Capital Released: $' + diff + 'K' : '';
+              }
+            }
+          }
+        }
+      }
+    }
+  });
+})();
+
+/* ════════════════════════════════════════════
+   KPI SPARKLINES
+   ════════════════════════════════════════════ */
+function initGradientSparkline(id, data, yMin, yMax, targetLine, optimalMin, optimalMax, formatCallback) {
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  const gradient = ctx.getContext('2d').createLinearGradient(0,0,ctx.offsetWidth||200,0);
+  gradient.addColorStop(0, '#ef4444');    
+  gradient.addColorStop(0.28, '#f59e0b'); 
+  gradient.addColorStop(0.5, '#22c55e');  
+  gradient.addColorStop(1, '#22c55e');
+
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: ["H1'24", "H2'24", "Q3", "Q4", "Q1'25", "Q2", "Q3"],
+      datasets: [{
+        data: data,
+        borderColor: gradient,
+        borderWidth: 2,
+        pointRadius: 0,
+        pointHoverRadius: 3,
+        fill: false,
+        tension: .4,
+      }]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:false,
+      scales: {x:{display:false}, y:{display:false, min:yMin, max:yMax}},
+      plugins: {
+        legend:{display:false},
+        tooltip:{enabled:true,...tooltipOpts,callbacks:{label:c=>formatCallback(c.parsed.y)}},
+        annotation:{
+          annotations:{
+            optimal:{type:'box',yMin:optimalMin,yMax:optimalMax,backgroundColor:'rgba(34,197,94,.06)',borderWidth:0},
+            target:{type:'line',yMin:targetLine,yMax:targetLine,borderColor:'rgba(245,158,11,.3)',borderWidth:1,borderDash:[4,3]}
+          }
+        }
+      }
+    }
+  });
+}
+
+// Total Value Sparkline
+initGradientSparkline('valueSparkline', [1.85, 1.95, 2.05, 1.98, 2.20, 2.35, 2.47], 1.5, 3.0, 2.0, 2.2, 3.0, y=>'$'+y.toFixed(2)+'M');
+
+// Holding Cost Sparkline
+initGradientSparkline('costSparkline', [75.2, 72.5, 68.1, 70.8, 65.2, 63.9, 61.8], 50, 90, 65.0, 50, 62, y=>'$'+y.toFixed(1)+'K');
+
+// Inventory Turnover Sparkline
+initGradientSparkline('turnoverSparkline', [4.2, 4.8, 5.0, 5.2, 5.5, 5.9, 6.3], 3, 8, 5.0, 5.5, 8.0, y=>y.toFixed(1)+'×');
+
+// Days of Supply Sparkline
+initGradientSparkline('supplySparkline', [32, 29, 25, 24, 21, 19, 18], 10, 40, 21, 19, 23, y=>Math.round(y)+' days');
+
+/* ════════════════════════════════════════════
+   SUPPLIER SPARKLINES
+   ════════════════════════════════════════════ */
+(function(){
+  const sparkData = {
+    spark1: [4,3.8,4.1,4.5,4.2,4.0,4.3,4.1,3.9,4.2,4.4,4.2],
+    spark2: [6,5.5,5.8,6.2,5.6,5.9,5.7,6.0,5.4,5.8,5.5,5.8],
+    spark3: [7,6.5,5.8,6.2,6.0,6.3,5.9,6.1,6.4,5.7,6.2,6.1],
+    spark4: [10,9,8,8.5,7.5,9.2,8.8,7.9,8.4,9.1,8.0,8.4],
+  };
+  const sparkColors = {spark1:'#22c55e',spark2:'#6366f1',spark3:'#06b6d4',spark4:'#f59e0b'};
+  Object.entries(sparkData).forEach(([id,data])=>{
+    new Chart(document.getElementById(id),{
+      type:'line',
+      data:{labels:data.map((_,i)=>i),datasets:[{data,borderColor:sparkColors[id],borderWidth:1.5,pointRadius:0,fill:false,tension:.3}]},
+      options:{responsive:true,maintainAspectRatio:false,scales:{x:{display:false},y:{display:false}},plugins:{legend:{display:false},tooltip:{enabled:false}},elements:{line:{borderWidth:1.5}}}
+    });
+  });
+})();
+
+/* ════════════════════════════════════════════
+   AUDIT LOG FILTERS
+   ════════════════════════════════════════════ */
+(function(){
+  const filterBtns = document.querySelectorAll('#audit-filters .audit-filter-btn');
+  const entries = document.querySelectorAll('.audit-entry[data-category]');
+  filterBtns.forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      filterBtns.forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const f = btn.dataset.filter;
+      entries.forEach(e=>{
+        e.style.display = (f==='all' || e.dataset.category===f) ? '' : 'none';
+      });
+    });
+  });
+})();
+
+/* ════════════════════════════════════════════
+   REORDER TOAST NOTIFICATIONS (FR-18)
+   ════════════════════════════════════════════ */
+(function(){
+  // Create toast container
+  const tc = document.createElement('div');
+  tc.className = 'toast-container';
+  tc.id = 'toast-container';
+  document.body.appendChild(tc);
+
+  function showToast(msg, type='success'){
+    const t = document.createElement('div');
+    t.className = 'toast ' + type;
+    t.innerHTML = (type==='success'?'':'') + ' ' + msg;
+    tc.appendChild(t);
+    setTimeout(()=>t.remove(), 4200);
+  }
+
+  document.querySelectorAll('.reorder-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const product = btn.closest('.reorder-item').querySelector('.reorder-item__product').childNodes[0].textContent.trim();
+      const qty = btn.textContent.match(/[\d,]+\s*units/)?.[0] || 'items';
+      btn.textContent = ' Order Submitted';
+      btn.style.opacity = '.6';
+      btn.style.pointerEvents = 'none';
+      showToast('Reorder placed for <strong>'+product+'</strong> ('+qty+'). Notification sent to SME Owner for approval.','success');
+      setTimeout(()=>showToast(' Email notification dispatched to <strong>rajesh.k@stoxinv.com</strong> (SME Owner)','info'),800);
+    });
+  });
+})();
+</script>
+</body>
+</html>

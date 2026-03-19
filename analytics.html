@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STOX — Analytics & Forecasting Engine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@3.0.1/dist/chartjs-plugin-annotation.min.js"></script>
+<link rel="stylesheet" href="fluent.css">
+<style>
+  .dashboard { grid-template-columns: 2fr 1fr; grid-template-rows: auto auto; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="dashboard.html" style="text-decoration:none">
+    <div class="topbar__logo"><div class="topbar__logo-icon">S</div>STOX</div>
+  </a>
+  <nav class="topbar__nav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="inventory.html">Inventory</a>
+    <a href="products.html">Products</a>
+    <a href="#">Suppliers</a>
+    <a href="reports.html">Reports</a>
+    <a href="analytics.html" class="active">Analytics</a>
+    <a href="#">Import / Export</a>
+    <a href="roles.html">User / Roles</a>
+    <a href="#">Settings</a>
+  </nav>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__search">
+    <input type="text" placeholder="Search forecast data…">
+    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM9.5 14A4.5 4.5 0 1114 9.5 4.49 4.49 0 019.5 14z"/></svg>
+  </div>
+  <div class="topbar__right">
+    <span class="security-badge tls"><span class="dot"></span>TLS 1.3</span>
+  </div>
+  <div class="topbar__user">
+    <div class="topbar__avatar">JD</div>
+    <div class="topbar__user-info"><strong>Jane Doe</strong>Inventory Manager</div>
+  </div>
+</header>
+
+
+<div class="page-header" style="align-items:flex-start">
+  <div>
+    <h1>Forecasting & Analytics Engine</h1>
+    <p style="color:var(--text-muted);margin-top:6px;font-size:13px">AI-driven demand projections, "what-if" scenario stress testing, and capital efficiency breakdowns.</p>
+  </div>
+</div>
+
+<div class="dashboard">
+
+  <!-- Predictive Demand Engine -->
+  <div class="card" style="grid-column: span 1">
+    <div class="card__header">
+      <h2>Predictive Demand Engine (60-Day)</h2>
+      <span class="card-badge" style="background:var(--accent-glow);color:var(--accent)">Neural Net: Active</span>
+    </div>
+    <div class="card__body">
+      <div class="chart-container"><canvas id="demandChart"></canvas></div>
+      <div class="chart-legend">
+        <span><span class="swatch line" style="background:var(--cyan)"></span>Historical Demand</span>
+        <span><span class="swatch line" style="background:var(--accent);border-style:dashed"></span>Forecast Model</span>
+        <span><span class="swatch" style="background:rgba(99,102,241,0.2)"></span>95% Confidence</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scenario Stress Tester -->
+  <div class="card" style="grid-column: span 1; grid-row: span 2">
+    <div class="card__header">
+      <h2>Scenario Stress-Tester</h2>
+      <span class="card-badge" style="background:var(--amber-bg);color:var(--amber)">Simulation Mode</span>
+    </div>
+    <div class="card__body">
+      <p style="color:var(--text-muted);font-size:12px;margin-bottom:20px;line-height:1.5">Model the impact of external shocks to the supply chain. Adjust the variables below to recalculate ROP/EOQ across the entire catalog.</p>
+      
+      <div class="stress-tester">
+        
+        <div class="stress-group">
+          <div class="stress-header">
+            <span>Supplier Logistics Delay</span>
+            <span id="label-delay" style="color:var(--red)">+0 Days</span>
+          </div>
+          <input type="range" class="range-slider red" min="0" max="30" value="0" id="slide-delay" oninput="updateStress()">
+          <div class="stress-labels"><span>Normal</span><span>+30 Days</span></div>
+        </div>
+        
+        <div class="stress-group">
+          <div class="stress-header">
+            <span>Demand Volatility Spike</span>
+            <span id="label-spike" style="color:var(--accent)">0%</span>
+          </div>
+          <input type="range" class="range-slider" min="-20" max="100" step="5" value="0" id="slide-spike" oninput="updateStress()">
+          <div class="stress-labels"><span>-20% Drop</span><span>+100% Surge</span></div>
+        </div>
+
+        <div class="stress-group">
+          <div class="stress-header">
+            <span>Holding Cost Increase</span>
+            <span id="label-cost" style="color:var(--amber)">0%</span>
+          </div>
+          <input type="range" class="range-slider" style="accent-color:var(--amber)" min="0" max="50" step="5" value="0" id="slide-cost" oninput="updateStress()">
+          <div class="stress-labels"><span>Static</span><span>+50% Rates</span></div>
+        </div>
+        
+        <div style="margin-top:8px;padding:14px;background:rgba(34,197,94,0.05);border:1px solid var(--green-border);border-radius:var(--radius-sm)">
+          <div style="font-size:10px;text-transform:uppercase;color:var(--green);font-weight:700;letter-spacing:1px;margin-bottom:8px">Impact Profile</div>
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px">
+            <span style="color:var(--text-muted)">Projected Stockouts:</span>
+            <span style="color:#fff;font-weight:700" id="impact-stockout">4 Items</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:12px">
+            <span style="color:var(--text-muted)">Capital Required:</span>
+            <span style="color:#fff;font-weight:700" id="impact-capital">$0 Delta</span>
+          </div>
+        </div>
+
+        <button class="action-btn">Run Scenario Simulation</button>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Capital Allocation Efficiency -->
+  <div class="card" style="grid-column: span 1">
+    <div class="card__header">
+      <h2>Capital Allocation Efficiency</h2>
+      <span class="card-badge" style="background:var(--green-bg);color:var(--green)">Optimized</span>
+    </div>
+    <div class="card__body">
+      <div class="allocation-list">
+        
+        <div class="alloc-item">
+          <div class="alloc-labels">
+            <span>Active Inventory (Healthy)</span>
+            <span style="color:var(--green)">$2.4M</span>
+          </div>
+          <div class="alloc-bar"><div class="alloc-fill" style="width: 75%; background: var(--green)"></div></div>
+        </div>
+
+        <div class="alloc-item">
+          <div class="alloc-labels">
+            <span>Safety Stock Buffer</span>
+            <span style="color:var(--blue)">$450K</span>
+          </div>
+          <div class="alloc-bar"><div class="alloc-fill" style="width: 15%; background: var(--blue)"></div></div>
+        </div>
+
+        <div class="alloc-item">
+          <div class="alloc-labels">
+            <span>Overstock Risk (Bleed)</span>
+            <span style="color:var(--amber)">$180K</span>
+          </div>
+          <div class="alloc-bar"><div class="alloc-fill" style="width: 8%; background: var(--amber)"></div></div>
+        </div>
+
+        <div class="alloc-item">
+          <div class="alloc-labels">
+            <span>Dead Stock (Illiquid)</span>
+            <span style="color:var(--red)">$42K</span>
+          </div>
+          <div class="alloc-bar"><div class="alloc-fill" style="width: 2%; background: var(--red)"></div></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Chart.js Default Configs
+Chart.defaults.color = '#64748b';
+Chart.defaults.font.family = "'Inter', sans-serif";
+const tooltipOpts = {
+  backgroundColor: 'rgba(15, 23, 42, 0.95)',
+  titleColor: '#fff', bodyColor: '#cbd5e1',
+  borderColor: '#334155', borderWidth: 1,
+  padding: 10, cornerRadius: 6, displayColors: false
+};
+
+// Predictive Demand Engine Chart
+const demandCanvas = document.getElementById('demandChart');
+const ctx = demandCanvas.getContext('2d');
+
+const gradHist = ctx.createLinearGradient(0,0,0,300);
+gradHist.addColorStop(0, 'rgba(6, 182, 212, 0.2)');
+gradHist.addColorStop(1, 'rgba(6, 182, 212, 0)');
+
+const gradForecast = ctx.createLinearGradient(0,0,0,300);
+gradForecast.addColorStop(0, 'rgba(99, 102, 241, 0.2)');
+gradForecast.addColorStop(1, 'rgba(99, 102, 241, 0)');
+
+// Fake data for last 30 days and next 60 days
+const labels = Array.from({length: 90}, (_, i) => \`Day \${i-30}\`);
+const histData = Array.from({length: 31}, () => Math.round(100 + Math.random()*40));
+const forecastData = Array.from({length: 90}, (_, i) => {
+  if(i < 30) return null;
+  if(i === 30) return histData[30]; // connect
+  return Math.round(120 + i*0.4 + Math.sin(i/5)*15);
+});
+const confUpper = forecastData.map(v => v ? v + 25 : null);
+const confLower = forecastData.map(v => v ? v - 25 : null);
+
+new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: labels,
+    datasets: [
+      {
+        label: 'Historical Demand',
+        data: histData.concat(Array(59).fill(null)),
+        borderColor: '#06b6d4', borderWidth: 2,
+        backgroundColor: gradHist, fill: true,
+        pointRadius: 0, tension: 0.3
+      },
+      {
+        label: '+60d Forecast',
+        data: forecastData,
+        borderColor: '#6366f1', borderWidth: 2,
+        borderDash: [5, 5],
+        backgroundColor: gradForecast, fill: true,
+        pointRadius: 0, tension: 0.3
+      },
+      {
+        label: 'Confidence Upper',
+        data: confUpper,
+        borderColor: 'transparent',
+        backgroundColor: 'transparent',
+        fill: false, pointRadius: 0, tension: 0.3
+      },
+      {
+        label: 'Confidence Lower',
+        data: confLower,
+        borderColor: 'transparent',
+        backgroundColor: 'rgba(99, 102, 241, 0.08)',
+        fill: '-1', pointRadius: 0, tension: 0.3
+      }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      x: { grid: { display: false, color: '#1e293b' }, ticks: { maxTicksLimit: 8 } },
+      y: { grid: { color: '#1e293b' }, beginAtZero: false, min: 50, max: 250 }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: tooltipOpts,
+      annotation: {
+        annotations: {
+          line1: {
+            type: 'line', xMin: 30, xMax: 30,
+            borderColor: '#f59e0b', borderWidth: 1, borderDash: [4, 4],
+            label: { display: true, content: 'TODAY', position: 'start', backgroundColor: '#f59e0b', color: '#fff', font: {size: 10, weight: 'bold'} }
+          }
+        }
+      }
+    }
+  }
+});
+
+function updateStress() {
+  const delay = document.getElementById('slide-delay').value;
+  const spike = document.getElementById('slide-spike').value;
+  const cost = document.getElementById('slide-cost').value;
+
+  document.getElementById('label-delay').textContent = \`+\${delay} Days\`;
+  document.getElementById('label-spike').textContent = \`\${spike > 0 ? '+':''}\${spike}%\`;
+  document.getElementById('label-cost').textContent = \`+\${cost}%\`;
+
+  // Fake logic to alter impact numbers
+  const stockoutRisk = 4 + Math.round((delay * 1.5) + (spike * 0.2));
+  const capitalRisk = Math.round((delay * 12) + (spike * 5) + (cost * 8));
+
+  document.getElementById('impact-stockout').textContent = \`\${Math.max(0, stockoutRisk)} Items\`;
+  document.getElementById('impact-stockout').style.color = stockoutRisk > 10 ? 'var(--red)' : '#fff';
+  
+  document.getElementById('impact-capital').textContent = \`+\$\${capitalRisk}K Req.\`;
+}
+</script>
+</body>
+</html>

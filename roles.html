@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STOX — User &amp; Role Management</title>
+<meta name="description" content="STOX User & Role Management – Manage user accounts, roles, and permissions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fluent.css">
+<style>
+  .perm-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════ TOP BAR ═══════ -->
+<header class="topbar">
+  <a href="dashboard.html" style="text-decoration:none">
+    <div class="topbar__logo">
+      <div class="topbar__logo-icon">S</div>
+      STOX
+    </div>
+  </a>
+  <nav class="topbar__nav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="inventory.html">Inventory</a>
+    <a href="products.html">Products</a>
+    <a href="#">Suppliers</a>
+    <a href="reports.html">Reports</a>
+    <a href="analytics.html">Analytics</a>
+    <a href="#">Import / Export</a>
+    <a href="roles.html" class="active">User / Roles</a>
+    <a href="#">Settings</a>
+  </nav>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__right">
+    <span class="security-badge tls"><span class="dot"></span>TLS 1.3</span>
+    <span class="security-badge mfa"><span class="dot"></span>MFA Active</span>
+  </div>
+  <div class="topbar__user">
+    <div class="topbar__avatar">JD</div>
+    <div class="topbar__user-info">
+      <strong>Jane Doe</strong>
+      Inventory Manager
+    </div>
+  </div>
+</header>
+
+<!-- ═══════ PAGE HEADER ═══════ -->
+<div class="page-header">
+  <h1><span>User</span> &amp; Role Management</h1>
+  <div class="page-header__actions">
+    <button class="btn-secondary" id="btn-export-users">Export Users</button>
+    <button class="btn-primary" id="btn-add-user">Add New User</button>
+  </div>
+</div>
+
+<!-- ═══════ TABS ═══════ -->
+<div class="content">
+  <div class="tabs" id="page-tabs">
+    <button class="tab active" data-tab="users"> Users (6)</button>
+    <button class="tab" data-tab="roles">Role Permissions</button>
+    <button class="tab" data-tab="activity">Activity History</button>
+  </div>
+
+  <!-- ═══════ TAB: USERS ═══════ -->
+  <div class="tab-content" id="tab-users">
+    <div class="card">
+      <div class="card__header">
+        <h2>All Users</h2>
+        <span style="font-size:11px;color:var(--text-muted)">6 accounts · 5 active · 1 locked</span>
+      </div>
+      <div class="card__body" style="padding:0">
+        <table class="users-table">
+          <thead>
+            <tr>
+              <th>User</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>MFA</th>
+              <th>Last Login</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>
+                <div class="user-name">
+                  <div class="user-avatar" style="background:linear-gradient(135deg,#a855f7,#c084fc)">RK</div>
+                  <div class="user-name__info"><strong>Rajesh Kumar</strong><span>rajesh.k@stoxinv.com</span></div>
+                </div>
+              </td>
+              <td><span class="role-badge owner">SME Owner</span></td>
+              <td><span class="status-pill active">Active</span></td>
+              <td><span class="mfa-status enabled"> TOTP</span></td>
+              <td style="color:var(--text-muted);font-size:11px">Today, 06:45</td>
+              <td class="action-links"><a href="#">Edit</a><a href="#">Reset PW</a></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="user-name">
+                  <div class="user-avatar" style="background:linear-gradient(135deg,#6366f1,#818cf8)">JD</div>
+                  <div class="user-name__info"><strong>Jane Doe</strong><span>jane.doe@stoxinv.com</span></div>
+                </div>
+              </td>
+              <td><span class="role-badge manager">Inventory Manager</span></td>
+              <td><span class="status-pill active">Active</span></td>
+              <td><span class="mfa-status enabled"> TOTP</span></td>
+              <td style="color:var(--text-muted);font-size:11px">Today, 07:02</td>
+              <td class="action-links"><a href="#">Edit</a><a href="#">Reset PW</a></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="user-name">
+                  <div class="user-avatar" style="background:linear-gradient(135deg,#3b82f6,#60a5fa)">MR</div>
+                  <div class="user-name__info"><strong>Mike Reynolds</strong><span>mike.r@stoxinv.com</span></div>
+                </div>
+              </td>
+              <td><span class="role-badge manager">Inventory Manager</span></td>
+              <td><span class="status-pill active">Active</span></td>
+              <td><span class="mfa-status enabled"> TOTP</span></td>
+              <td style="color:var(--text-muted);font-size:11px">Yesterday, 17:30</td>
+              <td class="action-links"><a href="#">Edit</a><a href="#">Reset PW</a></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="user-name">
+                  <div class="user-avatar" style="background:linear-gradient(135deg,#06b6d4,#22d3ee)">SA</div>
+                  <div class="user-name__info"><strong>Sara Ahmed</strong><span>sara.a@stoxinv.com</span></div>
+                </div>
+              </td>
+              <td><span class="role-badge analyst">Cybersecurity Analyst</span></td>
+              <td><span class="status-pill active">Active</span></td>
+              <td><span class="mfa-status enabled"> FIDO2</span></td>
+              <td style="color:var(--text-muted);font-size:11px">Today, 05:18</td>
+              <td class="action-links"><a href="#">Edit</a><a href="#">Reset PW</a></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="user-name">
+                  <div class="user-avatar" style="background:linear-gradient(135deg,#22c55e,#4ade80)">TP</div>
+                  <div class="user-name__info"><strong>Tom Parker</strong><span>tom.p@stoxinv.com</span></div>
+                </div>
+              </td>
+              <td><span class="role-badge viewer">Read-Only Viewer</span></td>
+              <td><span class="status-pill active">Active</span></td>
+              <td><span class="mfa-status disabled"> Disabled</span></td>
+              <td style="color:var(--text-muted);font-size:11px">18 Mar, 14:22</td>
+              <td class="action-links"><a href="#">Edit</a><a href="#">Reset PW</a><a href="#" class="danger">Enforce MFA</a></td>
+            </tr>
+            <tr>
+              <td>
+                <div class="user-name">
+                  <div class="user-avatar" style="background:linear-gradient(135deg,#ef4444,#f87171)">LW</div>
+                  <div class="user-name__info"><strong>Lisa Wong</strong><span>lisa.w@stoxinv.com</span></div>
+                </div>
+              </td>
+              <td><span class="role-badge manager">Inventory Manager</span></td>
+              <td><span class="status-pill locked">Locked</span></td>
+              <td><span class="mfa-status enabled"> TOTP</span></td>
+              <td style="color:var(--text-muted);font-size:11px">15 Mar, 09:41</td>
+              <td class="action-links"><a href="#">Edit</a><a href="#">Unlock</a><a href="#" class="danger">Revoke</a></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ TAB: ROLE PERMISSIONS ═══════ -->
+  <div class="tab-content" id="tab-roles" style="display:none">
+    <div class="perm-grid">
+      <!-- SME Owner -->
+      <div class="perm-card">
+        <div class="perm-card__header">
+          <div class="perm-card__icon" style="background:rgba(168,85,247,.12)"></div>
+          <div>
+            <div class="perm-card__title">SME Owner</div>
+            <div class="perm-card__subtitle">Full system access</div>
+          </div>
+        </div>
+        <ul class="perm-list">
+          <li>View Dashboard <span class="perm-check yes"></span></li>
+          <li>Manage Inventory <span class="perm-check yes"></span></li>
+          <li>Approve Reorders <span class="perm-check yes"></span></li>
+          <li>Import / Export CSV <span class="perm-check yes"></span></li>
+          <li>View Audit Logs <span class="perm-check yes"></span></li>
+          <li>Manage Users <span class="perm-check yes"></span></li>
+          <li>Configure Thresholds <span class="perm-check yes"></span></li>
+          <li>View Financial Data <span class="perm-check yes"></span></li>
+        </ul>
+      </div>
+      <!-- Inventory Manager -->
+      <div class="perm-card">
+        <div class="perm-card__header">
+          <div class="perm-card__icon" style="background:var(--accent-glow)"></div>
+          <div>
+            <div class="perm-card__title">Inventory Manager</div>
+            <div class="perm-card__subtitle">Stock operations access</div>
+          </div>
+        </div>
+        <ul class="perm-list">
+          <li>View Dashboard <span class="perm-check yes"></span></li>
+          <li>Manage Inventory <span class="perm-check yes"></span></li>
+          <li>Approve Reorders <span class="perm-check partial">~</span></li>
+          <li>Import / Export CSV <span class="perm-check yes"></span></li>
+          <li>View Audit Logs <span class="perm-check partial">~</span></li>
+          <li>Manage Users <span class="perm-check no"></span></li>
+          <li>Configure Thresholds <span class="perm-check yes"></span></li>
+          <li>View Financial Data <span class="perm-check partial">~</span></li>
+        </ul>
+      </div>
+      <!-- Cybersecurity Analyst -->
+      <div class="perm-card">
+        <div class="perm-card__header">
+          <div class="perm-card__icon" style="background:var(--blue-bg)"></div>
+          <div>
+            <div class="perm-card__title">Cybersecurity Analyst</div>
+            <div class="perm-card__subtitle">Security oversight</div>
+          </div>
+        </div>
+        <ul class="perm-list">
+          <li>View Dashboard <span class="perm-check yes"></span></li>
+          <li>Manage Inventory <span class="perm-check no"></span></li>
+          <li>Approve Reorders <span class="perm-check no"></span></li>
+          <li>Import / Export CSV <span class="perm-check no"></span></li>
+          <li>View Audit Logs <span class="perm-check yes"></span></li>
+          <li>Manage Users <span class="perm-check partial">~</span></li>
+          <li>Configure Thresholds <span class="perm-check no"></span></li>
+          <li>View Financial Data <span class="perm-check no"></span></li>
+        </ul>
+      </div>
+      <!-- Read-Only Viewer -->
+      <div class="perm-card">
+        <div class="perm-card__header">
+          <div class="perm-card__icon" style="background:rgba(255,255,255,.05)">R</div>
+          <div>
+            <div class="perm-card__title">Read-Only Viewer</div>
+            <div class="perm-card__subtitle">View-only access</div>
+          </div>
+        </div>
+        <ul class="perm-list">
+          <li>View Dashboard <span class="perm-check yes"></span></li>
+          <li>Manage Inventory <span class="perm-check no"></span></li>
+          <li>Approve Reorders <span class="perm-check no"></span></li>
+          <li>Import / Export CSV <span class="perm-check no"></span></li>
+          <li>View Audit Logs <span class="perm-check no"></span></li>
+          <li>Manage Users <span class="perm-check no"></span></li>
+          <li>Configure Thresholds <span class="perm-check no"></span></li>
+          <li>View Financial Data <span class="perm-check no"></span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════ TAB: ACTIVITY HISTORY ═══════ -->
+  <div class="tab-content" id="tab-activity" style="display:none">
+    <div class="card">
+      <div class="card__header">
+        <h2>User Activity History</h2>
+        <span style="font-size:11px;color:var(--text-muted)">Last 7 days</span>
+      </div>
+      <div class="card__body">
+        <div class="activity-log">
+          <div class="activity-entry">
+            <span class="activity-entry__time">19 Mar 07:02</span>
+            <span class="activity-entry__action"><strong>jane.doe</strong> logged in via MFA (TOTP) from 192.168.1.42</span>
+          </div>
+          <div class="activity-entry">
+            <span class="activity-entry__time">19 Mar 06:45</span>
+            <span class="activity-entry__action"><strong>rajesh.k</strong> logged in via MFA (TOTP) from 10.0.0.15</span>
+          </div>
+          <div class="activity-entry">
+            <span class="activity-entry__time">18 Mar 17:30</span>
+            <span class="activity-entry__action"><strong>mike.r</strong> session expired (idle timeout 30m)</span>
+          </div>
+          <div class="activity-entry">
+            <span class="activity-entry__time">18 Mar 14:22</span>
+            <span class="activity-entry__action"><strong>tom.p</strong> logged in (password only — MFA not enforced)</span>
+          </div>
+          <div class="activity-entry">
+            <span class="activity-entry__time">18 Mar 11:05</span>
+            <span class="activity-entry__action"><strong>rajesh.k</strong> updated role for <strong>tom.p</strong>: Inventory Manager → Read-Only Viewer</span>
+          </div>
+          <div class="activity-entry">
+            <span class="activity-entry__time">17 Mar 16:20</span>
+            <span class="activity-entry__action"><strong>sara.a</strong> reviewed audit logs — exported 312 entries as CSV</span>
+          </div>
+          <div class="activity-entry">
+            <span class="activity-entry__time">15 Mar 09:41</span>
+            <span class="activity-entry__action"><strong>lisa.w</strong> account locked after 5 failed login attempts</span>
+          </div>
+          <div class="activity-entry">
+            <span class="activity-entry__time">15 Mar 09:30</span>
+            <span class="activity-entry__action"><strong>system</strong> detected brute-force attempt on <strong>lisa.w</strong> from IP 185.73.22.x — blocked</span>
+          </div>
+          <div class="activity-entry">
+            <span class="activity-entry__time">14 Mar 10:15</span>
+            <span class="activity-entry__action"><strong>rajesh.k</strong> enforced minimum 14-character password policy</span>
+          </div>
+          <div class="activity-entry">
+            <span class="activity-entry__time">13 Mar 08:00</span>
+            <span class="activity-entry__action"><strong>rajesh.k</strong> created account for <strong>tom.p</strong> (Read-Only Viewer)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════ TAB SWITCHING ═══════ -->
+<script>
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+    tab.classList.add('active');
+    document.getElementById('tab-' + tab.dataset.tab).style.display = 'block';
+  });
+});
+</script>
+</body>
+</html>

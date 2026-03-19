@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STOX — Immutable Reporting & Audit</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fluent.css">
+<style>
+  .dashboard { grid-template-columns: 1fr 1fr 1fr; }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <a href="dashboard.html" style="text-decoration:none">
+    <div class="topbar__logo"><div class="topbar__logo-icon">S</div>STOX</div>
+  </a>
+  <nav class="topbar__nav">
+    <a href="dashboard.html">Dashboard</a>
+    <a href="inventory.html">Inventory</a>
+    <a href="products.html">Products</a>
+    <a href="#">Suppliers</a>
+    <a href="reports.html" class="active">Reports</a>
+    <a href="analytics.html">Analytics</a>
+    <a href="#">Import / Export</a>
+    <a href="roles.html">User / Roles</a>
+    <a href="#">Settings</a>
+  </nav>
+  <div class="topbar__spacer"></div>
+  <div class="topbar__search">
+    <input type="text" placeholder="Search parameters, audits…">
+    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.47 6.47 0 0016 9.5 6.5 6.5 0 109.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zM9.5 14A4.5 4.5 0 1114 9.5 4.49 4.49 0 019.5 14z"/></svg>
+  </div>
+  <div class="topbar__right">
+    <span class="security-badge tls"><span class="dot"></span>TLS 1.3</span>
+    <span class="security-badge mfa"><span class="dot"></span>MFA Active</span>
+  </div>
+  <div class="topbar__user">
+    <div class="topbar__avatar">JD</div>
+    <div class="topbar__user-info"><strong>Jane Doe</strong>Inventory Manager</div>
+  </div>
+</header>
+
+
+<div class="page-header" style="align-items:flex-start">
+  <div>
+    <h1>Immutable Reporting & Audit</h1>
+    <p style="color:var(--text-muted);margin-top:6px;font-size:13px">Generate timestamped snapshots of financial performance and system changes, guaranteed against retrospective doctoring.</p>
+  </div>
+</div>
+
+<div class="dashboard">
+
+  <!-- Report HUB -->
+  <div class="card report-card red">
+    <div class="card__body" style="display:flex;flex-direction:column;height:100%">
+      <div class="title">Capital Bleed Report</div>
+      <div class="desc">Isolates assets stuck in overstock or dead stock. Details holding cost attrition and calculates the highest priority items dragging on capital efficiency.</div>
+      <div style="display:flex;gap:8px">
+        <button class="action-btn">Export CSV</button>
+        <button class="action-btn primary">Generate PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card report-card green">
+    <div class="card__body" style="display:flex;flex-direction:column;height:100%">
+      <div class="title">Inventory Valuation Snapshot</div>
+      <div class="desc">A raw, aggregate breakdown of current on-hand asset value segmented by product lifecycle, warehouse location, and active supplier ledgers.</div>
+      <div style="display:flex;gap:8px">
+        <button class="action-btn">Export CSV</button>
+        <button class="action-btn primary">Generate PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card report-card">
+    <div class="card__body" style="display:flex;flex-direction:column;height:100%">
+      <div class="title">System Audit Ledger</div>
+      <div class="desc">Complete historical trace of all system actions: user log-ins, parameter recalculations, CSV uploads, and manual stock reconciliations.</div>
+      <div style="display:flex;gap:8px">
+        <button class="action-btn">Export CSV</button>
+        <button class="action-btn primary">Generate PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Data Integrity Table -->
+  <div class="card span-3" style="margin-top:8px">
+    <div class="card__header">
+      <h2>Data Integrity & Import History</h2>
+    </div>
+    <div class="card__body" style="padding:0;overflow-x:auto;">
+      <table class="risk-table">
+        <thead>
+          <tr><th>Timestamp</th><th>Filename & Batch ID</th><th>Action Type</th><th>Rows Processed</th><th>Status</th><th>Notes</th><th>Triggered By</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="date-col">2026-03-19 07:15:22 UTC</td>
+            <td style="color:#fff;font-weight:600">inventory_master_q1.csv<br><span style="color:var(--text-dim);font-weight:normal;font-size:10px">BATCH-A8F92</span></td>
+            <td>Master Read</td>
+            <td style="color:var(--accent);font-weight:700">4,812</td>
+            <td><span class="status-badge success">Success</span></td>
+            <td style="color:var(--text-muted)">Clean import. All hashes verified.</td>
+            <td>SYS_CRON</td>
+          </tr>
+          <tr>
+            <td class="date-col">2026-03-18 14:02:11 UTC</td>
+            <td style="color:#fff;font-weight:600">supplier_orders_mar.csv<br><span style="color:var(--text-dim);font-weight:normal;font-size:10px">BATCH-B3100</span></td>
+            <td>Reconciliation</td>
+            <td style="color:var(--accent);font-weight:700">312</td>
+            <td><span class="status-badge warning">Warning</span></td>
+            <td style="color:var(--text-muted)">2 missing SKU mappings. See line 18, 45.</td>
+            <td>jane.doe</td>
+          </tr>
+          <tr>
+            <td class="date-col">2026-03-17 09:30:00 UTC</td>
+            <td style="color:#fff;font-weight:600">daily_count_warehouse_A.csv<br><span style="color:var(--text-dim);font-weight:normal;font-size:10px">BATCH-C9921</span></td>
+            <td>Count Update</td>
+            <td style="color:var(--accent);font-weight:700">1,204</td>
+            <td><span class="status-badge success">Success</span></td>
+            <td style="color:var(--text-muted)">5 variances detected and logged.</td>
+            <td>mike.r</td>
+          </tr>
+          <tr>
+            <td class="date-col">2026-03-16 11:45:33 UTC</td>
+            <td style="color:#fff;font-weight:600">eoq_params_q2_update.csv<br><span style="color:var(--text-dim);font-weight:normal;font-size:10px">BATCH-D1044</span></td>
+            <td>Parameter Tuning</td>
+            <td style="color:var(--accent);font-weight:700">188</td>
+            <td><span class="status-badge success">Success</span></td>
+            <td style="color:var(--text-muted)">Override successful for 188 parameters.</td>
+            <td>jane.doe</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
