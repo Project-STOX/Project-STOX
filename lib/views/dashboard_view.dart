@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
 import '../models/user.dart';
+import 'manage_products_view.dart';
 
 class DashboardView extends StatelessWidget {
   final UserModel user;
@@ -122,7 +123,10 @@ class DashboardView extends StatelessWidget {
                     final allowed = await authController.hasPermission(user.roleId, "manage_products");
                     if (allowed) {
                       Navigator.pop(context); // Close drawer
-                      Navigator.pushNamed(context, '/products');
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ManageProductsView(roleId: user.roleId)),
+                      );
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Access denied: manage_products")),

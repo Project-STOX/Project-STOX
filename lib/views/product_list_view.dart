@@ -21,7 +21,7 @@ class _ProductListViewState extends State<ProductListView> {
 
   void loadProducts() async {
     final data = await controller.fetchProducts();
-    setState(() => products = data);
+    setState(() => products = data.map((map) => Product.fromJson(map)).toList());
   }
 
   @override
