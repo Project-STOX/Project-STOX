@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
 import '../models/user.dart';
 import 'manage_products_view.dart';
+import 'manage_supplier_view.dart';
 
 class DashboardView extends StatelessWidget {
   final UserModel user;
@@ -130,6 +131,24 @@ class DashboardView extends StatelessWidget {
                     } else {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Access denied: manage_products")),
+                      );
+                    }
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.business),
+                  title: const Text('Manage Suppliers'),
+                  onTap: () async {
+                    final allowed = await authController.hasPermission(user.roleId, "manage_suppliers");
+                    if (allowed) {
+                      Navigator.pop(context); // Close drawer
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => ManageSuppliersView(roleId: user.roleId, userId: user.userId)),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Access denied: manage_suppliers")),
                       );
                     }
                   },
