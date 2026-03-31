@@ -1,6 +1,7 @@
 import '../services/supabase_service.dart';
 import '../models/user.dart';
 import '../models/role.dart';
+import 'auth_controller.dart';
 
 class UserController {
   final supabase = SupabaseService.client;
@@ -69,6 +70,39 @@ class UserController {
     await supabase
         .from('user')
         .update(updates)
+        .eq('user_id', userId);
+  }
+
+  // Update password with verification
+  Future<void> updatePassword(int userId, String oldPassword, String newPassword, {String? tfaCode}) async {
+    // First, verify old password or 2FA
+    final userResponse = await supabase
+        .from('user')
+        .select('password_hash, tfa_active')
+        .eq('user_id', userId)
+        .single();
+
+    final currentPasswordHash = userResponse['password_hash'];
+    final tfaActive = userResponse['tfa_active'];
+
+    bool verified = false;
+
+    if (tfaActive && tfaCode != null) {
+      // Verify 2FA code
+      final authController = AuthController();
+      verified = await authController.verify2FA(userId, tfaCode);
+    } else if (oldPassword == currentPasswordHash) {
+      verified = true;
+    }
+
+    if (!verified) {
+      throw Exception('Invalid old password or 2FA code');
+    }
+
+    // Update password
+    await supabase
+        .from('user')
+        .update({'password_hash': newPassword})
         .eq('user_id', userId);
   }
 

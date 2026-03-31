@@ -3,6 +3,7 @@ import '../controllers/auth_controller.dart';
 import '../models/user.dart';
 import 'manage_products_view.dart';
 import 'manage_supplier_view.dart';
+import 'account_view.dart';
 
 class DashboardView extends StatelessWidget {
   final UserModel user;
@@ -154,6 +155,17 @@ class DashboardView extends StatelessWidget {
                   },
                 ),
                 const Divider(),
+                ListTile(
+                  leading: const Icon(Icons.account_circle),
+                  title: const Text('Account'),
+                  onTap: () {
+                    Navigator.pop(context); // Close drawer
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => AccountView(user: user)),
+                    );
+                  },
+                ),
                 ListTile(
                   leading: const Icon(Icons.logout),
                   title: const Text('Logout'),
