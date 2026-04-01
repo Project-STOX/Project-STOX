@@ -1,5 +1,7 @@
 import '../services/supabase_service.dart';
 import '../models/role.dart';
+import '../models/permission.dart';
+import '../models/user.dart';
 
 class RoleController {
   final supabase = SupabaseService.client;
@@ -29,11 +31,12 @@ class RoleController {
   }
 
   // Create new role
-  Future<void> createRole(String roleName, String? description) async {
-    await supabase.from('role').insert({
+  Future<int> createRole(String roleName, String? description) async {
+    final response = await supabase.from('role').insert({
       'role_name': roleName,
       'description': description,
-    });
+    }).select('role_id').single();
+    return response['role_id'];
   }
 
   // Update role
@@ -53,6 +56,73 @@ class RoleController {
         .from('role')
         .delete()
         .eq('role_id', roleId);
+  }
+
+  // Check if role has users
+  Future<bool> roleHasUsers(int roleId) async {
+    final response = await supabase
+        .from('user')
+        .select('user_id')
+        .eq('role_id', roleId)
+        .limit(1);
+
+    return response.isNotEmpty;
+  }
+
+  // Get all permissions
+  Future<List<Permission>> getAllPermissions() async {
+    final response = await supabase
+        .from('permission')
+        .select()
+        .order('perm_name');
+
+    return response.map<Permission>((json) => Permission.fromJson(json)).toList();
+  }
+
+  // Get permissions for a role
+  Future<List<Permission>> getPermissionsForRole(int roleId) async {
+    final response = await supabase
+        .from('role_permission')
+        .select('permission!inner(*)')
+        .eq('role_id', roleId);
+
+    return response.map<Permission>((json) => Permission.fromJson(json['permission'])).toList();
+  }
+
+  // Assign permission to role
+  Future<void> assignPermissionToRole(int roleId, int permId) async {
+    await supabase.from('role_permission').insert({
+      'role_id': roleId,
+      'perm_id': permId,
+    });
+  }
+
+  // Remove permission from role
+  Future<void> removePermissionFromRole(int roleId, int permId) async {
+    await supabase
+        .from('role_permission')
+        .delete()
+        .eq('role_id', roleId)
+        .eq('perm_id', permId);
+  }
+
+  // Get users for a role
+  Future<List<UserModel>> getUsersForRole(int roleId) async {
+    final response = await supabase
+        .from('user')
+        .select()
+        .eq('role_id', roleId)
+        .order('username');
+
+    return response.map<UserModel>((json) => UserModel.fromJson(json)).toList();
+  }
+
+  // Assign user to role
+  Future<void> assignUserToRole(int userId, int roleId) async {
+    await supabase
+        .from('user')
+        .update({'role_id': roleId})
+        .eq('user_id', userId);
   }
 
   // Check if role has permission

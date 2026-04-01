@@ -74,26 +74,38 @@ class DashboardView extends StatelessWidget {
                     ],
                   ),
                 ),
-                if (role == "SME Owner") ...[
-                  ListTile(
-                    leading: const Icon(Icons.admin_panel_settings),
-                    title: const Text('Manage Roles & Permissions'),
-                    onTap: () {
-                      Navigator.pop(context); // Close drawer
-                      Navigator.pushNamed(context, '/manageRoles');
-                    },
-                  ),
-                ],
-                if (role == "Inventory Manager") ...[
-                  ListTile(
-                    leading: const Icon(Icons.inventory),
-                    title: const Text('Record Stock Receipt'),
-                    onTap: () {
-                      Navigator.pop(context); // Close drawer
-                      Navigator.pushNamed(context, '/stockReceipt');
-                    },
-                  ),
-                ],
+                FutureBuilder<bool>(
+                  future: authController.hasPermission(user.roleId, "Manage Roles"),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data == true) {
+                      return ListTile(
+                        leading: const Icon(Icons.admin_panel_settings),
+                        title: const Text('Manage Roles & Permissions'),
+                        onTap: () {
+                          Navigator.pop(context); // Close drawer
+                          Navigator.pushNamed(context, '/manageRoles', arguments: user);
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                FutureBuilder<bool>(
+                  future: authController.hasPermission(user.roleId, "Manage stock"),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data == true) {
+                      return ListTile(
+                        leading: const Icon(Icons.inventory),
+                        title: const Text('Record Stock Receipt'),
+                        onTap: () {
+                          Navigator.pop(context); // Close drawer
+                          Navigator.pushNamed(context, '/stockReceipt');
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
                 ListTile(
                   leading: const Icon(Icons.inventory_2),
                   title: const Text('View Products'),
@@ -103,7 +115,7 @@ class DashboardView extends StatelessWidget {
                   },
                 ),
                 FutureBuilder<bool>(
-                  future: authController.hasPermission(user.roleId, "manage_users"),
+                  future: authController.hasPermission(user.roleId, "Manage Users"),
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data == true) {
                       return ListTile(
@@ -118,40 +130,42 @@ class DashboardView extends StatelessWidget {
                     return const SizedBox.shrink();
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.production_quantity_limits),
-                  title: const Text('Manage Products'),
-                  onTap: () async {
-                    final allowed = await authController.hasPermission(user.roleId, "manage_products");
-                    if (allowed) {
-                      Navigator.pop(context); // Close drawer
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => ManageProductsView(roleId: user.roleId)),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Access denied: manage_products")),
+                FutureBuilder<bool>(
+                  future: authController.hasPermission(user.roleId, "Manage Products"),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data == true) {
+                      return ListTile(
+                        leading: const Icon(Icons.production_quantity_limits),
+                        title: const Text('Manage Products'),
+                        onTap: () {
+                          Navigator.pop(context); // Close drawer
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => ManageProductsView(roleId: user.roleId)),
+                          );
+                        },
                       );
                     }
+                    return const SizedBox.shrink();
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.business),
-                  title: const Text('Manage Suppliers'),
-                  onTap: () async {
-                    final allowed = await authController.hasPermission(user.roleId, "manage_suppliers");
-                    if (allowed) {
-                      Navigator.pop(context); // Close drawer
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (context) => ManageSuppliersView(roleId: user.roleId, userId: user.userId)),
-                      );
-                    } else {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text("Access denied: manage_suppliers")),
+                FutureBuilder<bool>(
+                  future: authController.hasPermission(user.roleId, "Manage Suppliers"),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data == true) {
+                      return ListTile(
+                        leading: const Icon(Icons.business),
+                        title: const Text('Manage Suppliers'),
+                        onTap: () {
+                          Navigator.pop(context); // Close drawer
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => ManageSuppliersView(roleId: user.roleId, userId: user.userId)),
+                          );
+                        },
                       );
                     }
+                    return const SizedBox.shrink();
                   },
                 ),
                 const Divider(),

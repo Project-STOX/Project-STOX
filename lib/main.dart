@@ -6,6 +6,7 @@ import 'views/login_view.dart';
 import 'views/dashboard_view.dart';
 import 'views/product_list_view.dart';
 import 'views/manage_users_view.dart';
+import 'views/manage_roles_view.dart';
 import 'models/user.dart';
 
 void main() async {
@@ -37,6 +38,10 @@ class MyApp extends StatelessWidget {
         '/manageUsers': (context) {
           final user = ModalRoute.of(context)!.settings.arguments as UserModel;
           return ManageUsersView(user: user);
+        },
+        '/manageRoles': (context) {
+          final user = ModalRoute.of(context)!.settings.arguments as UserModel;
+          return ManageRolesView(user: user);
         },
       },
     );

@@ -148,89 +148,89 @@ class _ManageUsersViewState extends State<ManageUsersView> {
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<String?>(
-      future: _authController.getUserRole(widget.user.roleId),
-      builder: (context, snapshot) {
-        final userRole = snapshot.data;
-
-        return Scaffold(
-          appBar: AppBar(
-            title: const Text('Manage Users'),
-            actions: [
-              if (userRole == 'SME Owner')
-                IconButton(
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Manage Users'),
+        actions: [
+          FutureBuilder<bool>(
+            future: _authController.hasPermission(widget.user.roleId, 'Manage Roles'),
+            builder: (context, snapshot) {
+              if (snapshot.hasData && snapshot.data == true) {
+                return IconButton(
                   icon: const Icon(Icons.admin_panel_settings),
                   onPressed: _showManageRolesDialog,
                   tooltip: 'Manage Roles',
-                ),
-              IconButton(
-                icon: const Icon(Icons.refresh),
-                onPressed: _refreshData,
-              ),
-              IconButton(
-                icon: const Icon(Icons.add),
-                onPressed: _showAddUserDialog,
-              ),
-            ],
+                );
+              }
+              return const SizedBox.shrink();
+            },
           ),
-          body: _isLoading
-              ? const Center(child: CircularProgressIndicator())
-              : _users.isEmpty
-                  ? const Center(child: Text('No users found'))
-                  : ListView.builder(
-                      itemCount: _users.length,
-                      itemBuilder: (context, index) {
-                        final user = _users[index];
-                        final role = _roles.where((r) => r.roleId == user.roleId).firstOrNull;
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _refreshData,
+          ),
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _showAddUserDialog,
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _users.isEmpty
+              ? const Center(child: Text('No users found'))
+              : ListView.builder(
+                  itemCount: _users.length,
+                  itemBuilder: (context, index) {
+                    final user = _users[index];
+                    final role = _roles.where((r) => r.roleId == user.roleId).firstOrNull;
 
-                        return Card(
-                          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: ListTile(
-                            leading: CircleAvatar(
-                              backgroundColor: user.isActive ? Colors.green : Colors.red,
-                              child: Icon(
-                                user.isActive ? Icons.check : Icons.check_circle,
-                                color: Colors.white,
-                              ),
-                            ),
-                            title: Text(user.username),
-                            subtitle: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(user.email),
-                                Text('Role: ${role?.roleName ?? 'Unknown'}'),
-                              ],
-                            ),
-                            trailing: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: Icon(
-                                    user.isActive ? Icons.block : Icons.check_circle,
-                                    color: user.isActive ? Colors.red : Colors.green,
-                                  ),
-                                  onPressed: () => _toggleUserActive(user),
-                                  tooltip: user.isActive ? 'Deactivate' : 'Activate',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.edit),
-                                  onPressed: () => _showUserDetails(user),
-                                  tooltip: 'Edit User',
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
-                                  onPressed: () => _deleteUser(user),
-                                  tooltip: 'Delete User',
-                                ),
-                              ],
-                            ),
-                            onTap: () => _showUserDetails(user),
+                    return Card(
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      child: ListTile(
+                        leading: CircleAvatar(
+                          backgroundColor: user.isActive ? Colors.green : Colors.red,
+                          child: Icon(
+                            user.isActive ? Icons.check : Icons.check_circle,
+                            color: Colors.white,
                           ),
-                        );
-                      },
-                    ),
-        );
-      },
+                        ),
+                        title: Text(user.username),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(user.email),
+                            Text('Role: ${role?.roleName ?? 'Unknown'}'),
+                          ],
+                        ),
+                        trailing: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              icon: Icon(
+                                user.isActive ? Icons.block : Icons.check_circle,
+                                color: user.isActive ? Colors.red : Colors.green,
+                              ),
+                              onPressed: () => _toggleUserActive(user),
+                              tooltip: user.isActive ? 'Deactivate' : 'Activate',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.edit),
+                              onPressed: () => _showUserDetails(user),
+                              tooltip: 'Edit User',
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.delete, color: Colors.red),
+                              onPressed: () => _deleteUser(user),
+                              tooltip: 'Delete User',
+                            ),
+                          ],
+                        ),
+                        onTap: () => _showUserDetails(user),
+                      ),
+                    );
+                  },
+                ),
     );
   }
 }
@@ -416,6 +416,8 @@ class _AddUserDialogState extends State<AddUserDialog> {
   int? _selectedRoleId;
   bool _isLoading = false;
   bool _showPassword = false;
+  bool _verifyEmail = false; // Default to false to avoid rate limits
+
 
   @override
   void dispose() {
@@ -435,6 +437,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
         _emailController.text,
         _passwordController.text,
         _selectedRoleId!,
+        verifyEmail: _verifyEmail,
       );
       widget.onUserAdded();
       if (mounted) {
@@ -514,6 +517,13 @@ class _AddUserDialogState extends State<AddUserDialog> {
                   return null;
                 },
                 onChanged: (value) => setState(() => _selectedRoleId = value),
+              ),
+              const SizedBox(height: 16),
+              SwitchListTile(
+                title: const Text('Verify via Email'),
+                subtitle: const Text('If off, user is created immediately without verification (avoids rate limits).'),
+                value: _verifyEmail,
+                onChanged: (value) => setState(() => _verifyEmail = value),
               ),
             ],
           ),

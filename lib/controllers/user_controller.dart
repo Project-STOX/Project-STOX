@@ -31,25 +31,33 @@ class UserController {
   }
 
   // Create new user
-  Future<void> createUser(String username, String email, String password, int roleId) async {
-    // First create auth user
-    final authResponse = await supabase.auth.signUp(
-      email: email,
-      password: password,
-    );
+  Future<void> createUser(String username, String email, String password, int roleId, {bool verifyEmail = true}) async {
+    String? authUserId;
 
-    if (authResponse.user != null) {
-      // Insert user data into custom table
-      await supabase.from('user').insert({
-        'user_id': authResponse.user!.id,
-        'username': username,
-        'email': email,
-        'password_hash': password, // Note: In production, hash the password
-        'role_id': roleId,
-        'is_active': true,
-        'tfa_active': false,
-      });
+    if (verifyEmail) {
+      // Create auth user (sends confirmation email by default in Supabase)
+      final authResponse = await supabase.auth.signUp(
+        email: email,
+        password: password,
+      );
+      authUserId = authResponse.user?.id;
     }
+
+    // Insert user data into custom table
+    final data = {
+      'username': username,
+      'email': email,
+      'password_hash': password, // Note: In production, hash the password
+      'role_id': roleId,
+      'is_active': true,
+      'tfa_active': false,
+    };
+
+    if (authUserId != null) {
+      data['user_id'] = authUserId as dynamic;
+    }
+
+    await supabase.from('user').insert(data);
   }
 
   // Update user
