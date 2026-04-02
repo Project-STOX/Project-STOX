@@ -4,6 +4,7 @@ import '../controllers/user_controller.dart';
 import '../models/role.dart';
 import '../models/permission.dart';
 import '../models/user.dart';
+import '../controllers/notification_controller.dart';
 
 class ManageRolesView extends StatefulWidget {
   final UserModel user;
@@ -17,6 +18,7 @@ class ManageRolesView extends StatefulWidget {
 class _ManageRolesViewState extends State<ManageRolesView> {
   final RoleController _roleController = RoleController();
   final UserController _userController = UserController();
+  final NotificationController _notificationController = NotificationController();
   List<Role> _roles = [];
   List<Permission> _permissions = [];
   bool _isLoading = true;
@@ -79,14 +81,42 @@ class _ManageRolesViewState extends State<ManageRolesView> {
       final currentPermIds = currentPerms.map((p) => p.permId).toSet();
       final newPermIds = result['permissions'].map((p) => p.permId).toSet();
 
-      // Remove permissions not in new set
-      for (final permId in currentPermIds.difference(newPermIds)) {
-        await _roleController.removePermissionFromRole(role.roleId, permId);
+      if (currentPermIds.difference(newPermIds).isNotEmpty || newPermIds.difference(currentPermIds).isNotEmpty) {
+        // Find users in this role
+        final roleUsers = await _roleController.getUsersForRole(role.roleId);
+        final userIds = roleUsers.map((u) => u.userId).toList();
+        
+        // Actually update permissions in database
+        // Remove permissions not in new set
+        for (final permId in currentPermIds.difference(newPermIds)) {
+          await _roleController.removePermissionFromRole(role.roleId, permId);
+        }
+        // Add new permissions
+        for (final permId in newPermIds.difference(currentPermIds)) {
+          await _roleController.assignPermissionToRole(role.roleId, permId);
+        }
+
+        if (userIds.isNotEmpty) {
+          final addedPermNames = _permissions
+              .where((p) => newPermIds.difference(currentPermIds).contains(p.permId))
+              .map((p) => p.permName);
+          final removedPermNames = _permissions
+              .where((p) => currentPermIds.difference(newPermIds).contains(p.permId))
+              .map((p) => p.permName);
+
+          String message = 'System: Access permissions for your role "${role.roleName}" have been updated.';
+          if (addedPermNames.isNotEmpty) message += '\nGranted: ${addedPermNames.join(', ')}';
+          if (removedPermNames.isNotEmpty) message += '\nRevoked: ${removedPermNames.join(', ')}';
+
+          await _notificationController.sendNotifications(
+            widget.user.userId, // The admin performing the update
+            userIds,
+            message,
+            'System',
+          );
+        }
       }
-      // Add new permissions
-      for (final permId in newPermIds.difference(currentPermIds)) {
-        await _roleController.assignPermissionToRole(role.roleId, permId);
-      }
+
       _loadData();
     }
   }

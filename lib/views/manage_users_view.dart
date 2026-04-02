@@ -4,6 +4,7 @@ import '../controllers/auth_controller.dart';
 import '../controllers/role_controller.dart';
 import '../models/user.dart';
 import '../models/role.dart';
+import '../controllers/notification_controller.dart';
 
 class ManageUsersView extends StatefulWidget {
   final UserModel user;
@@ -18,6 +19,7 @@ class _ManageUsersViewState extends State<ManageUsersView> {
   final UserController _userController = UserController();
   final AuthController _authController = AuthController();
   final RoleController _roleController = RoleController();
+  final NotificationController _notificationController = NotificationController();
 
   List<UserModel> _users = [];
   List<Role> _roles = [];
@@ -62,6 +64,7 @@ class _ManageUsersViewState extends State<ManageUsersView> {
         onUpdate: _refreshData,
         userController: _userController,
         roleController: _roleController,
+        adminId: widget.user.userId,
       ),
     );
   }
@@ -130,11 +133,21 @@ class _ManageUsersViewState extends State<ManageUsersView> {
 
   Future<void> _toggleUserActive(UserModel user) async {
     try {
-      await _userController.toggleUserActive(user.userId, !user.isActive);
+      final newStatus = !user.isActive;
+      await _userController.toggleUserActive(user.userId, newStatus);
+      
+      // Send system notification to the user
+      await _notificationController.sendNotifications(
+        widget.user.userId, // The admin performing the action
+        [user.userId],
+        'System: Your account has been ${newStatus ? 'activated' : 'deactivated'} by the administrator.',
+        'System',
+      );
+
       await _refreshData();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('User ${user.isActive ? 'deactivated' : 'activated'} successfully')),
+          SnackBar(content: Text('User ${newStatus ? 'activated' : 'deactivated'} successfully')),
         );
       }
     } catch (e) {
@@ -241,14 +254,17 @@ class UserDetailsDialog extends StatefulWidget {
   final VoidCallback onUpdate;
   final UserController userController;
   final RoleController roleController;
+  final NotificationController notificationController = NotificationController();
+  final int adminId;
 
-  const UserDetailsDialog({
+  UserDetailsDialog({
     super.key,
     required this.user,
     required this.roles,
     required this.onUpdate,
     required this.userController,
     required this.roleController,
+    required this.adminId,
   });
 
   @override
@@ -292,6 +308,25 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
         isActive: _isActive,
         tfaActive: _tfaActive,
       );
+      // Check for changes to notify
+      if (widget.user.roleId != _selectedRoleId) {
+        final newRole = widget.roles.firstWhere((r) => r.roleId == _selectedRoleId).roleName;
+        await widget.notificationController.sendNotifications(
+          widget.adminId,
+          [widget.user.userId],
+          'System: Your role has been changed to $newRole.',
+          'System',
+        );
+      }
+      if (widget.user.isActive != _isActive) {
+        await widget.notificationController.sendNotifications(
+          widget.adminId,
+          [widget.user.userId],
+          'System: Your account status has been changed to ${_isActive ? 'Active' : 'Inactive'}.',
+          'System',
+        );
+      }
+
       widget.onUpdate();
       if (mounted) {
         Navigator.of(context).pop();

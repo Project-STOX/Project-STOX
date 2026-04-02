@@ -4,32 +4,57 @@ import '../models/user.dart';
 import 'manage_products_view.dart';
 import 'manage_supplier_view.dart';
 import 'account_view.dart';
+import 'send_notification_view.dart';
+import 'notifications_list_view.dart';
+import '../controllers/notification_controller.dart';
 
-class DashboardView extends StatelessWidget {
+class DashboardView extends StatefulWidget {
   final UserModel user;
-  final AuthController authController = AuthController();
 
-  DashboardView({super.key, required this.user});
+  const DashboardView({super.key, required this.user});
+
+  @override
+  State<DashboardView> createState() => _DashboardViewState();
+}
+
+class _DashboardViewState extends State<DashboardView> {
+  final AuthController authController = AuthController();
+  final NotificationController notificationController =
+      NotificationController();
+
+  @override
+  void initState() {
+    super.initState();
+    // Ensure "Send message" permission exists in DB
+    notificationController.ensureSendMessagePermission();
+  }
 
   void _logout(BuildContext context) async {
     try {
       // Sign out from Supabase Auth (in case there's an active session from 2FA)
       await authController.supabase.auth.signOut();
-      
+
       // Navigate back to login page and clear navigation stack
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (Route<dynamic> route) => false);
+      if (mounted)
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil('/', (Route<dynamic> route) => false);
     } catch (e) {
       // Even if sign out fails, navigate to login
-      Navigator.of(context).pushNamedAndRemoveUntil('/', (Route<dynamic> route) => false);
+      if (mounted)
+        Navigator.of(
+          context,
+        ).pushNamedAndRemoveUntil('/', (Route<dynamic> route) => false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<String?>(
-      future: authController.getUserRole(user.roleId),
+      future: authController.getUserRole(widget.user.roleId),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snapshot.hasData)
+          return const Center(child: CircularProgressIndicator());
 
         final role = snapshot.data;
 
@@ -42,21 +67,33 @@ class DashboardView extends StatelessWidget {
                 onPressed: () => Scaffold.of(context).openDrawer(),
               ),
             ),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.notifications),
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          NotificationsListView(userId: widget.user.userId),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
           drawer: Drawer(
             child: ListView(
               padding: EdgeInsets.zero,
               children: [
                 DrawerHeader(
-                  decoration: const BoxDecoration(
-                    color: Colors.blue,
-                  ),
+                  decoration: const BoxDecoration(color: Colors.blue),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
                       Text(
-                        user.username,
+                        widget.user.username,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 20,
@@ -75,7 +112,10 @@ class DashboardView extends StatelessWidget {
                   ),
                 ),
                 FutureBuilder<bool>(
-                  future: authController.hasPermission(user.roleId, "Manage Roles"),
+                  future: authController.hasPermission(
+                    widget.user.roleId,
+                    "Manage Roles",
+                  ),
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data == true) {
                       return ListTile(
@@ -83,7 +123,11 @@ class DashboardView extends StatelessWidget {
                         title: const Text('Manage Roles & Permissions'),
                         onTap: () {
                           Navigator.pop(context); // Close drawer
-                          Navigator.pushNamed(context, '/manageRoles', arguments: user);
+                          Navigator.pushNamed(
+                            context,
+                            '/manageRoles',
+                            arguments: widget.user,
+                          );
                         },
                       );
                     }
@@ -91,7 +135,10 @@ class DashboardView extends StatelessWidget {
                   },
                 ),
                 FutureBuilder<bool>(
-                  future: authController.hasPermission(user.roleId, "Manage stock"),
+                  future: authController.hasPermission(
+                    widget.user.roleId,
+                    "Manage stock",
+                  ),
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data == true) {
                       return ListTile(
@@ -115,7 +162,10 @@ class DashboardView extends StatelessWidget {
                   },
                 ),
                 FutureBuilder<bool>(
-                  future: authController.hasPermission(user.roleId, "Manage Users"),
+                  future: authController.hasPermission(
+                    widget.user.roleId,
+                    "Manage Users",
+                  ),
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data == true) {
                       return ListTile(
@@ -123,7 +173,11 @@ class DashboardView extends StatelessWidget {
                         title: const Text('Manage Users'),
                         onTap: () {
                           Navigator.pop(context); // Close drawer
-                          Navigator.pushNamed(context, '/manageUsers', arguments: user);
+                          Navigator.pushNamed(
+                            context,
+                            '/manageUsers',
+                            arguments: widget.user,
+                          );
                         },
                       );
                     }
@@ -131,7 +185,10 @@ class DashboardView extends StatelessWidget {
                   },
                 ),
                 FutureBuilder<bool>(
-                  future: authController.hasPermission(user.roleId, "Manage Products"),
+                  future: authController.hasPermission(
+                    widget.user.roleId,
+                    "Manage Products",
+                  ),
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data == true) {
                       return ListTile(
@@ -141,7 +198,11 @@ class DashboardView extends StatelessWidget {
                           Navigator.pop(context); // Close drawer
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => ManageProductsView(roleId: user.roleId)),
+                            MaterialPageRoute(
+                              builder: (context) => ManageProductsView(
+                                roleId: widget.user.roleId,
+                              ),
+                            ),
                           );
                         },
                       );
@@ -150,7 +211,10 @@ class DashboardView extends StatelessWidget {
                   },
                 ),
                 FutureBuilder<bool>(
-                  future: authController.hasPermission(user.roleId, "Manage Suppliers"),
+                  future: authController.hasPermission(
+                    widget.user.roleId,
+                    "Manage Suppliers",
+                  ),
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data == true) {
                       return ListTile(
@@ -160,7 +224,38 @@ class DashboardView extends StatelessWidget {
                           Navigator.pop(context); // Close drawer
                           Navigator.push(
                             context,
-                            MaterialPageRoute(builder: (context) => ManageSuppliersView(roleId: user.roleId, userId: user.userId)),
+                            MaterialPageRoute(
+                              builder: (context) => ManageSuppliersView(
+                                roleId: widget.user.roleId,
+                                userId: widget.user.userId,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                FutureBuilder<bool>(
+                  future: authController.hasPermission(
+                    widget.user.roleId,
+                    "Send message",
+                  ),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data == true) {
+                      return ListTile(
+                        leading: const Icon(Icons.message),
+                        title: const Text('Send Message'),
+                        onTap: () {
+                          Navigator.pop(context); // Close drawer
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SendNotificationView(
+                                senderId: widget.user.userId,
+                              ),
+                            ),
                           );
                         },
                       );
@@ -176,7 +271,9 @@ class DashboardView extends StatelessWidget {
                     Navigator.pop(context); // Close drawer
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => AccountView(user: user)),
+                      MaterialPageRoute(
+                        builder: (context) => AccountView(user: widget.user),
+                      ),
                     );
                   },
                 ),
