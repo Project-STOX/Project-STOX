@@ -30,8 +30,11 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   // Filters
   DateTime? _startDate;
   DateTime? _endDate;
-  final TextEditingController _productSearchController = TextEditingController();
-  final TextEditingController _supplierSearchController = TextEditingController();
+  String _productQuery = '';
+  String _supplierQuery = '';
+
+  List<String> _productNames = [];
+  List<String> _supplierNames = [];
 
   @override
   void initState() {
@@ -54,8 +57,13 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
       return;
     }
 
+    final products = await _salesController.getProductNames();
+    final suppliers = await _salesController.getSupplierNames();
+
     setState(() {
       _hasAccess = true;
+      _productNames = products;
+      _supplierNames = suppliers;
     });
     
     await _loadSalesData();
@@ -70,8 +78,8 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
       final sales = await _salesController.fetchSales(
         startDate: _startDate,
         endDate: _endDate,
-        productQuery: _productSearchController.text,
-        supplierQuery: _supplierSearchController.text,
+        productQuery: _productQuery,
+        supplierQuery: _supplierQuery,
       );
       setState(() {
         _sales = sales;
@@ -135,9 +143,11 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     setState(() {
       _startDate = null;
       _endDate = null;
-      _productSearchController.clear();
-      _supplierSearchController.clear();
+      _productQuery = '';
+      _supplierQuery = '';
     });
+    // This will fetch all data naturally. Note: Autocomplete TextFields won't clear automatically
+    // unless their controllers are cleared, but their internal state handles it okay if user deletes text.
     _loadSalesData();
   }
 
@@ -248,28 +258,72 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
           children: [
             SizedBox(
               width: 200,
-              child: TextField(
-                controller: _productSearchController,
-                decoration: InputDecoration(
-                  labelText: 'Search Product',
-                  prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                onSubmitted: (_) => _loadSalesData(),
+              child: Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  _productQuery = textEditingValue.text;
+                  if (textEditingValue.text.isEmpty) { return const Iterable<String>.empty(); }
+                  return _productNames.where((String option) =>
+                      option.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+                },
+                onSelected: (String selection) {
+                  _productQuery = selection;
+                  _loadSalesData();
+                },
+                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      labelText: 'Search Product',
+                      prefixIcon: const Icon(Icons.search),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    onChanged: (val) {
+                      _productQuery = val;
+                      if (val.isEmpty) _loadSalesData();
+                    },
+                    onSubmitted: (_) {
+                      onFieldSubmitted();
+                      _loadSalesData();
+                    },
+                  );
+                },
               ),
             ),
             SizedBox(
               width: 200,
-              child: TextField(
-                controller: _supplierSearchController,
-                decoration: InputDecoration(
-                  labelText: 'Search Supplier',
-                  prefixIcon: const Icon(Icons.business),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                ),
-                onSubmitted: (_) => _loadSalesData(),
+              child: Autocomplete<String>(
+                optionsBuilder: (TextEditingValue textEditingValue) {
+                  _supplierQuery = textEditingValue.text;
+                  if (textEditingValue.text.isEmpty) { return const Iterable<String>.empty(); }
+                  return _supplierNames.where((String option) =>
+                      option.toLowerCase().contains(textEditingValue.text.toLowerCase()));
+                },
+                onSelected: (String selection) {
+                  _supplierQuery = selection;
+                  _loadSalesData();
+                },
+                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+                  return TextField(
+                    controller: controller,
+                    focusNode: focusNode,
+                    decoration: InputDecoration(
+                      labelText: 'Search Supplier',
+                      prefixIcon: const Icon(Icons.business),
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
+                    onChanged: (val) {
+                      _supplierQuery = val;
+                      if (val.isEmpty) _loadSalesData();
+                    },
+                    onSubmitted: (_) {
+                      onFieldSubmitted();
+                      _loadSalesData();
+                    },
+                  );
+                },
               ),
             ),
             ElevatedButton.icon(

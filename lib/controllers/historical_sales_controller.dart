@@ -26,6 +26,28 @@ class HistoricalSalesController {
     }
   }
 
+  // Get unique product names for auto-complete
+  Future<List<String>> getProductNames() async {
+    try {
+      final response = await supabase.from('product').select('product_name');
+      return response.map<String>((e) => e['product_name'] as String).toList().toSet().toList();
+    } catch (e) {
+      print('Error fetching product names: $e');
+      return [];
+    }
+  }
+
+  // Get unique supplier names for auto-complete
+  Future<List<String>> getSupplierNames() async {
+    try {
+      final response = await supabase.from('supplier').select('supplier_name');
+      return response.map<String>((e) => e['supplier_name'] as String).toList().toSet().toList();
+    } catch (e) {
+      print('Error fetching supplier names: $e');
+      return [];
+    }
+  }
+
   // Fetch sales with filters
   Future<List<HistoricalSale>> fetchSales({
     DateTime? startDate,
