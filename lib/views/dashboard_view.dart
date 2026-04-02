@@ -7,6 +7,8 @@ import 'account_view.dart';
 import 'send_notification_view.dart';
 import 'notifications_list_view.dart';
 import '../controllers/notification_controller.dart';
+import '../controllers/historical_sales_controller.dart';
+import 'historical_sales_view.dart';
 
 class DashboardView extends StatefulWidget {
   final UserModel user;
@@ -21,12 +23,15 @@ class _DashboardViewState extends State<DashboardView> {
   final AuthController authController = AuthController();
   final NotificationController notificationController =
       NotificationController();
+  final HistoricalSalesController historicalSalesController =
+      HistoricalSalesController();
 
   @override
   void initState() {
     super.initState();
-    // Ensure "Send message" permission exists in DB
+    // Ensure permissions exist in DB
     notificationController.ensureSendMessagePermission();
+    historicalSalesController.ensureHistoricalDataPermission();
   }
 
   void _logout(BuildContext context) async {
@@ -35,16 +40,18 @@ class _DashboardViewState extends State<DashboardView> {
       await authController.supabase.auth.signOut();
 
       // Navigate back to login page and clear navigation stack
-      if (mounted)
+      if (mounted) {
         Navigator.of(
           context,
         ).pushNamedAndRemoveUntil('/', (Route<dynamic> route) => false);
+      }
     } catch (e) {
       // Even if sign out fails, navigate to login
-      if (mounted)
+      if (mounted) {
         Navigator.of(
           context,
         ).pushNamedAndRemoveUntil('/', (Route<dynamic> route) => false);
+      }
     }
   }
 
@@ -53,8 +60,9 @@ class _DashboardViewState extends State<DashboardView> {
     return FutureBuilder<String?>(
       future: authController.getUserRole(widget.user.roleId),
       builder: (context, snapshot) {
-        if (!snapshot.hasData)
+        if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
+        }
 
         final role = snapshot.data;
 
@@ -254,6 +262,32 @@ class _DashboardViewState extends State<DashboardView> {
                             MaterialPageRoute(
                               builder: (context) => SendNotificationView(
                                 senderId: widget.user.userId,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                FutureBuilder<bool>(
+                  future: authController.hasPermission(
+                    widget.user.roleId,
+                    "Historical data",
+                  ),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data == true) {
+                      return ListTile(
+                        leading: const Icon(Icons.history),
+                        title: const Text('Historical Sales Data'),
+                        onTap: () {
+                          Navigator.pop(context); // Close drawer
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => HistoricalSalesView(
+                                user: widget.user,
                               ),
                             ),
                           );

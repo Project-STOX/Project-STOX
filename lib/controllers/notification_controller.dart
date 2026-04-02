@@ -64,86 +64,14 @@ class NotificationController {
   // Ensure "Send message" permission exists in the database
   Future<void> ensureSendMessagePermission() async {
     try {
-      final lowercasePerm = await supabase
+      final perm = await supabase
           .from('permission')
           .select()
-          .eq('perm_name', 'Send message')
+          .ilike('perm_name', 'Send message')
           .maybeSingle();
       
-      final capitalPerm = await supabase
-          .from('permission')
-          .select()
-          .eq('perm_name', 'Send Message')
-          .maybeSingle();
-
-      final typoPerm = await supabase
-          .from('permission')
-          .select()
-          .eq('perm_name', 'Send mesage')
-          .maybeSingle();
-
-      if (lowercasePerm == null) {
-        if (capitalPerm != null) {
-          // Rename capital to lowercase if lowercase doesn't exist
-          await supabase
-              .from('permission')
-              .update({'perm_name': 'Send message'})
-              .eq('perm_id', capitalPerm['perm_id']);
-        } else if (typoPerm != null) {
-          // Rename typo to lowercase
-          await supabase
-              .from('permission')
-              .update({'perm_name': 'Send message'})
-              .eq('perm_id', typoPerm['perm_id']);
-        } else {
-          // Create new lowercase if nothing exists
-          await supabase.from('permission').insert({'perm_name': 'Send message'});
-        }
-      } else {
-        // Clean up duplicates if lowercase already exists
-        if (capitalPerm != null) {
-          // First, check if any roles are using the capital version and move them to the lowercase version if not already present
-          final mappings = await supabase
-              .from('role_permission')
-              .select()
-              .eq('perm_id', capitalPerm['perm_id']);
-          
-          for (final mapping in mappings) {
-            final exists = await supabase
-                .from('role_permission')
-                .select()
-                .eq('role_id', mapping['role_id'])
-                .eq('perm_id', lowercasePerm['perm_id'])
-                .maybeSingle();
-            
-            if (exists == null) {
-              await supabase.from('role_permission').insert({
-                'role_id': mapping['role_id'],
-                'perm_id': lowercasePerm['perm_id']
-              });
-            }
-            // Delete the old mapping
-            await supabase
-                .from('role_permission')
-                .delete()
-                .eq('role_id', mapping['role_id'])
-                .eq('perm_id', capitalPerm['perm_id']);
-          }
-
-          // Delete the capital version from permission table
-          await supabase
-              .from('permission')
-              .delete()
-              .eq('perm_id', capitalPerm['perm_id']);
-        }
-        
-        // Clean up typo if lowercase already exists
-        if (typoPerm != null) {
-            await supabase
-                .from('permission')
-                .delete()
-                .eq('perm_id', typoPerm['perm_id']);
-        }
+      if (perm == null) {
+        await supabase.from('permission').insert({'perm_name': 'Send message'});
       }
     } catch (e) {
       print('Error ensuring permission exists: $e');

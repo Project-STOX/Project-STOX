@@ -130,7 +130,7 @@ class RoleController {
     final perm = await supabase
         .from('permission')
         .select('perm_id')
-        .eq('perm_name', permissionName)
+        .ilike('perm_name', permissionName)
         .maybeSingle();
 
     if (perm == null) return false;
