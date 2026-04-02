@@ -1,7 +1,5 @@
-
 import '../services/supabase_service.dart';
 import '../models/historical_sale.dart';
-
 
 class HistoricalSalesController {
   final supabase = SupabaseService.client;
@@ -30,7 +28,11 @@ class HistoricalSalesController {
   Future<List<String>> getProductNames() async {
     try {
       final response = await supabase.from('product').select('product_name');
-      return response.map<String>((e) => e['product_name'] as String).toList().toSet().toList();
+      return response
+          .map<String>((e) => e['product_name'] as String)
+          .toList()
+          .toSet()
+          .toList();
     } catch (e) {
       print('Error fetching product names: $e');
       return [];
@@ -41,7 +43,11 @@ class HistoricalSalesController {
   Future<List<String>> getSupplierNames() async {
     try {
       final response = await supabase.from('supplier').select('supplier_name');
-      return response.map<String>((e) => e['supplier_name'] as String).toList().toSet().toList();
+      return response
+          .map<String>((e) => e['supplier_name'] as String)
+          .toList()
+          .toSet()
+          .toList();
     } catch (e) {
       print('Error fetching supplier names: $e');
       return [];
@@ -56,7 +62,11 @@ class HistoricalSalesController {
     String? supplierQuery,
   }) async {
     try {
-      var query = supabase.from('historical_sales').select('*, product!inner(product_name, supplier!inner(supplier_name))');
+      var query = supabase
+          .from('historical_sales')
+          .select(
+            '*, product!inner(product_name, supplier!inner(supplier_name))',
+          );
 
       if (startDate != null) {
         query = query.gte('sale_date', startDate.toIso8601String());
@@ -68,14 +78,19 @@ class HistoricalSalesController {
         query = query.ilike('product.product_name', '%$productQuery%');
       }
       if (supplierQuery != null && supplierQuery.isNotEmpty) {
-        query = query.ilike('product.supplier.supplier_name', '%$supplierQuery%');
+        query = query.ilike(
+          'product.supplier.supplier_name',
+          '%$supplierQuery%',
+        );
       }
 
       final response = await query.order('sale_date', ascending: false);
-      return response.map<HistoricalSale>((json) => HistoricalSale.fromJson(json)).toList();
+      return response
+          .map<HistoricalSale>((json) => HistoricalSale.fromJson(json))
+          .toList();
     } catch (e) {
       print('Error fetching historical sales: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -104,7 +119,7 @@ class HistoricalSalesController {
         'Sale Date',
         'Quantity Sold',
         'Revenue',
-        'Supplier'
+        'Supplier',
       ]);
 
       // Data
@@ -120,18 +135,25 @@ class HistoricalSalesController {
       }
 
       // Convert to CSV string natively
-      String csvData = rows.map((row) {
-        return row.map((item) {
-          String str = item.toString();
-          // Escape quotes and commas
-          if (str.contains(',') || str.contains('"') || str.contains('\n')) {
-            str = '"${str.replaceAll('"', '""')}"';
-          }
-          return str;
-        }).join(',');
-      }).join('\r\n');
+      String csvData = rows
+          .map((row) {
+            return row
+                .map((item) {
+                  String str = item.toString();
+                  // Escape quotes and commas
+                  if (str.contains(',') ||
+                      str.contains('"') ||
+                      str.contains('\n')) {
+                    str = '"${str.replaceAll('"', '""')}"';
+                  }
+                  return str;
+                })
+                .join(',');
+          })
+          .join('\r\n');
       // Log export activity to csv_import
-      final fileName = 'historical_sales_export_${DateTime.now().millisecondsSinceEpoch}.csv';
+      final fileName =
+          'historical_sales_export_${DateTime.now().millisecondsSinceEpoch}.csv';
       await supabase.from('csv_import').insert({
         'filename': fileName,
         'imported_by': userId,
@@ -142,7 +164,7 @@ class HistoricalSalesController {
       return csvData;
     } catch (e) {
       print('Error exporting to CSV: $e');
-      throw e;
+      rethrow;
     }
   }
 }
