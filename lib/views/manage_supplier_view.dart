@@ -60,9 +60,11 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
 
   void _filterSuppliers() {
     setState(() {
+      final query = searchQuery.toLowerCase().trim();
       filteredSuppliers = suppliers.where((s) {
-        final query = searchQuery.toLowerCase().trim();
-        return s.supplierName.toLowerCase().contains(query);
+        if (query.isEmpty) return true;
+        return s.supplierName.toLowerCase().contains(query) ||
+            s.supplierId.toString().contains(query);
       }).toList();
       _sortSuppliers();
     });
@@ -142,7 +144,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
             padding: const EdgeInsets.all(8.0),
             child: TextField(
               decoration: const InputDecoration(
-                labelText: 'Search by Supplier Name',
+                labelText: 'Search by Supplier Name or ID',
                 prefixIcon: Icon(Icons.search),
               ),
               onChanged: (value) {
@@ -175,7 +177,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
                 final supplier = filteredSuppliers[index];
                 return ListTile(
                   title: Text(supplier.supplierName),
-                  subtitle: Text('Address: ${supplier.address ?? 'N/A'}, Contact: ${supplier.contactInfo ?? 'N/A'}, Lead Time: ${supplier.leadTimeDays ?? 'N/A'} days'),
+                  subtitle: Text('Supplier ID: ${supplier.supplierId}, Address: ${supplier.address ?? 'N/A'}, Contact: ${supplier.contactInfo ?? 'N/A'}, Lead Time: ${supplier.leadTimeDays ?? 'N/A'} days'),
                   onTap: () => _showSupplierDetails(supplier),
                 );
               },

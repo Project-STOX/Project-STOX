@@ -22,6 +22,7 @@ class SupplierDetailPage extends StatefulWidget {
 }
 
 class _SupplierDetailPageState extends State<SupplierDetailPage> {
+  late TextEditingController supplierIdController;
   late TextEditingController nameController;
   late TextEditingController addressController;
   late TextEditingController contactController;
@@ -32,16 +33,28 @@ class _SupplierDetailPageState extends State<SupplierDetailPage> {
     super.initState();
     final supplier = widget.supplier;
     if (supplier != null) {
+      supplierIdController = TextEditingController(text: supplier.supplierId.toString());
       nameController = TextEditingController(text: supplier.supplierName);
       addressController = TextEditingController(text: supplier.address ?? '');
       contactController = TextEditingController(text: supplier.contactInfo ?? '');
       leadTimeController = TextEditingController(text: supplier.leadTimeDays?.toString() ?? '');
     } else {
+      supplierIdController = TextEditingController();
       nameController = TextEditingController();
       addressController = TextEditingController();
       contactController = TextEditingController();
       leadTimeController = TextEditingController();
     }
+  }
+
+  @override
+  void dispose() {
+    supplierIdController.dispose();
+    nameController.dispose();
+    addressController.dispose();
+    contactController.dispose();
+    leadTimeController.dispose();
+    super.dispose();
   }
 
   void _save() async {
@@ -104,6 +117,13 @@ class _SupplierDetailPageState extends State<SupplierDetailPage> {
         child: SingleChildScrollView(
           child: Column(
             children: [
+              if (!isNew)
+                TextField(
+                  controller: supplierIdController,
+                  decoration: const InputDecoration(labelText: 'Supplier ID'),
+                  readOnly: true,
+                  enabled: false,
+                ),
               TextField(
                 controller: nameController,
                 decoration: const InputDecoration(labelText: 'Supplier Name'),

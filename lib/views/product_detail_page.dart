@@ -171,13 +171,19 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
                 popupProps: PopupProps.menu(
                   showSearchBox: true,
                   searchFieldProps: TextFieldProps(
-                    decoration: InputDecoration(
-                      labelText: 'Search Supplier',
+                    decoration: const InputDecoration(
+                      labelText: 'Search Supplier Name or ID',
                     ),
                   ),
                 ),
                 items: widget.suppliers,
-                itemAsString: (Supplier s) => s.supplierName,
+                itemAsString: (Supplier s) => 'ID: ${s.supplierId} - ${s.supplierName}',
+                filterFn: (Supplier s, String filter) {
+                  final query = filter.toLowerCase().trim();
+                  if (query.isEmpty) return true;
+                  return s.supplierName.toLowerCase().contains(query) ||
+                      s.supplierId.toString().contains(query);
+                },
                 selectedItem: widget.suppliers.isNotEmpty
                     ? widget.suppliers.firstWhere(
                         (s) => s.supplierId == selectedSupplierId,
