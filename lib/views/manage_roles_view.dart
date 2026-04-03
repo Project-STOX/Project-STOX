@@ -18,7 +18,8 @@ class ManageRolesView extends StatefulWidget {
 class _ManageRolesViewState extends State<ManageRolesView> {
   final RoleController _roleController = RoleController();
   final UserController _userController = UserController();
-  final NotificationController _notificationController = NotificationController();
+  final NotificationController _notificationController =
+      NotificationController();
   List<Role> _roles = [];
   List<Permission> _permissions = [];
   bool _isLoading = true;
@@ -32,6 +33,7 @@ class _ManageRolesViewState extends State<ManageRolesView> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
+      await _roleController.ensurePermissionDictionary();
       final roles = await _roleController.getAllRoles();
       final permissions = await _roleController.getAllPermissions();
       setState(() {
@@ -41,9 +43,9 @@ class _ManageRolesViewState extends State<ManageRolesView> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading data: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading data: $e')));
     }
   }
 
@@ -56,7 +58,10 @@ class _ManageRolesViewState extends State<ManageRolesView> {
       ),
     );
     if (result != null) {
-      final roleId = await _roleController.createRole(result['name'], result['description']);
+      final roleId = await _roleController.createRole(
+        result['name'],
+        result['description'],
+      );
       // Assign permissions
       for (final perm in result['permissions']) {
         await _roleController.assignPermissionToRole(roleId, perm.permId);
@@ -75,17 +80,24 @@ class _ManageRolesViewState extends State<ManageRolesView> {
       ),
     );
     if (result != null) {
-      await _roleController.updateRole(role.roleId, result['name'], result['description']);
+      await _roleController.updateRole(
+        role.roleId,
+        result['name'],
+        result['description'],
+      );
       // Update permissions
-      final currentPerms = await _roleController.getPermissionsForRole(role.roleId);
+      final currentPerms = await _roleController.getPermissionsForRole(
+        role.roleId,
+      );
       final currentPermIds = currentPerms.map((p) => p.permId).toSet();
       final newPermIds = result['permissions'].map((p) => p.permId).toSet();
 
-      if (currentPermIds.difference(newPermIds).isNotEmpty || newPermIds.difference(currentPermIds).isNotEmpty) {
+      if (currentPermIds.difference(newPermIds).isNotEmpty ||
+          newPermIds.difference(currentPermIds).isNotEmpty) {
         // Find users in this role
         final roleUsers = await _roleController.getUsersForRole(role.roleId);
         final userIds = roleUsers.map((u) => u.userId).toList();
-        
+
         // Actually update permissions in database
         // Remove permissions not in new set
         for (final permId in currentPermIds.difference(newPermIds)) {
@@ -98,15 +110,22 @@ class _ManageRolesViewState extends State<ManageRolesView> {
 
         if (userIds.isNotEmpty) {
           final addedPermNames = _permissions
-              .where((p) => newPermIds.difference(currentPermIds).contains(p.permId))
+              .where(
+                (p) => newPermIds.difference(currentPermIds).contains(p.permId),
+              )
               .map((p) => p.permName);
           final removedPermNames = _permissions
-              .where((p) => currentPermIds.difference(newPermIds).contains(p.permId))
+              .where(
+                (p) => currentPermIds.difference(newPermIds).contains(p.permId),
+              )
               .map((p) => p.permName);
 
-          String message = 'System: Access permissions for your role "${role.roleName}" have been updated.';
-          if (addedPermNames.isNotEmpty) message += '\nGranted: ${addedPermNames.join(', ')}';
-          if (removedPermNames.isNotEmpty) message += '\nRevoked: ${removedPermNames.join(', ')}';
+          String message =
+              'System: Access permissions for your role "${role.roleName}" have been updated.';
+          if (addedPermNames.isNotEmpty)
+            message += '\nGranted: ${addedPermNames.join(', ')}';
+          if (removedPermNames.isNotEmpty)
+            message += '\nRevoked: ${removedPermNames.join(', ')}';
 
           await _notificationController.sendNotifications(
             widget.user.userId, // The admin performing the update
@@ -125,7 +144,9 @@ class _ManageRolesViewState extends State<ManageRolesView> {
     final hasUsers = await _roleController.roleHasUsers(role.roleId);
     if (hasUsers) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Cannot delete role: it has assigned users')),
+        const SnackBar(
+          content: Text('Cannot delete role: it has assigned users'),
+        ),
       );
       return;
     }
@@ -153,9 +174,9 @@ class _ManageRolesViewState extends State<ManageRolesView> {
         await _roleController.deleteRole(role.roleId);
         _loadData();
       } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error deleting role: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error deleting role: $e')));
       }
     }
   }
@@ -176,9 +197,7 @@ class _ManageRolesViewState extends State<ManageRolesView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Manage Roles & Permissions'),
-      ),
+      appBar: AppBar(title: const Text('Manage Roles & Permissions')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -196,7 +215,10 @@ class _ManageRolesViewState extends State<ManageRolesView> {
                     itemBuilder: (context, index) {
                       final role = _roles[index];
                       return Card(
-                        margin: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                        margin: const EdgeInsets.symmetric(
+                          horizontal: 16.0,
+                          vertical: 8.0,
+                        ),
                         child: ListTile(
                           title: Text(role.roleName),
                           subtitle: Text(role.description ?? ''),
@@ -261,16 +283,18 @@ class _RoleDialogState extends State<RoleDialog> {
 
   Future<void> _loadPermissions() async {
     try {
-      final perms = await widget.roleController.getPermissionsForRole(widget.role!.roleId);
+      final perms = await widget.roleController.getPermissionsForRole(
+        widget.role!.roleId,
+      );
       setState(() {
         _selectedPermissions = perms;
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading permissions: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading permissions: $e')));
     }
   }
 
@@ -279,7 +303,10 @@ class _RoleDialogState extends State<RoleDialog> {
     return AlertDialog(
       title: Text(widget.role == null ? 'Add Role' : 'Edit Role'),
       content: _isLoading
-          ? const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()))
+          ? const SizedBox(
+              height: 200,
+              child: Center(child: CircularProgressIndicator()),
+            )
           : SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -294,9 +321,14 @@ class _RoleDialogState extends State<RoleDialog> {
                     maxLines: 3,
                   ),
                   const SizedBox(height: 16),
-                  const Text('Permissions:', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text(
+                    'Permissions:',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   ...widget.permissions.map((perm) {
-                    final isSelected = _selectedPermissions.any((p) => p.permId == perm.permId);
+                    final isSelected = _selectedPermissions.any(
+                      (p) => p.permId == perm.permId,
+                    );
                     return CheckboxListTile(
                       title: Text(perm.permName),
                       value: isSelected,
@@ -305,7 +337,9 @@ class _RoleDialogState extends State<RoleDialog> {
                           if (value == true) {
                             _selectedPermissions.add(perm);
                           } else {
-                            _selectedPermissions.removeWhere((p) => p.permId == perm.permId);
+                            _selectedPermissions.removeWhere(
+                              (p) => p.permId == perm.permId,
+                            );
                           }
                         });
                       },
@@ -329,7 +363,9 @@ class _RoleDialogState extends State<RoleDialog> {
             }
             Navigator.pop(context, {
               'name': _nameController.text,
-              'description': _descriptionController.text.isEmpty ? null : _descriptionController.text,
+              'description': _descriptionController.text.isEmpty
+                  ? null
+                  : _descriptionController.text,
               'permissions': _selectedPermissions,
             });
           },
@@ -371,7 +407,9 @@ class _RoleUsersViewState extends State<RoleUsersView> {
     setState(() => _isLoading = true);
     try {
       final allUsers = await widget.userController.getAllUsers();
-      final roleUsers = await widget.roleController.getUsersForRole(widget.role.roleId);
+      final roleUsers = await widget.roleController.getUsersForRole(
+        widget.role.roleId,
+      );
       setState(() {
         _allUsers = allUsers;
         _roleUsers = roleUsers;
@@ -379,29 +417,30 @@ class _RoleUsersViewState extends State<RoleUsersView> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading users: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading users: $e')));
     }
   }
 
   Future<void> _assignUser(UserModel user) async {
     try {
-      await widget.roleController.assignUserToRole(user.userId, widget.role.roleId);
+      await widget.roleController.assignUserToRole(
+        user.userId,
+        widget.role.roleId,
+      );
       _loadData();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error assigning user: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error assigning user: $e')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Manage Users for ${widget.role.roleName}'),
-      ),
+      appBar: AppBar(title: Text('Manage Users for ${widget.role.roleName}')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(
@@ -438,7 +477,9 @@ class _RoleUsersViewState extends State<RoleUsersView> {
                     itemCount: _allUsers.length,
                     itemBuilder: (context, index) {
                       final user = _allUsers[index];
-                      final isInRole = _roleUsers.any((u) => u.userId == user.userId);
+                      final isInRole = _roleUsers.any(
+                        (u) => u.userId == user.userId,
+                      );
                       return ListTile(
                         title: Text(user.username),
                         subtitle: Text(user.email),

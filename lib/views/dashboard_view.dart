@@ -8,6 +8,7 @@ import 'send_notification_view.dart';
 import 'notifications_list_view.dart';
 import '../controllers/notification_controller.dart';
 import '../controllers/historical_sales_controller.dart';
+import '../controllers/stock_controller.dart';
 import 'historical_sales_view.dart';
 
 class DashboardView extends StatefulWidget {
@@ -25,6 +26,7 @@ class _DashboardViewState extends State<DashboardView> {
       NotificationController();
   final HistoricalSalesController historicalSalesController =
       HistoricalSalesController();
+  final StockController stockController = StockController();
 
   @override
   void initState() {
@@ -32,6 +34,7 @@ class _DashboardViewState extends State<DashboardView> {
     // Ensure permissions exist in DB
     notificationController.ensureSendMessagePermission();
     historicalSalesController.ensureHistoricalDataPermission();
+    stockController.ensureStockReceiptPermission();
   }
 
   void _logout(BuildContext context) async {
@@ -154,7 +157,11 @@ class _DashboardViewState extends State<DashboardView> {
                         title: const Text('Record Stock Receipt'),
                         onTap: () {
                           Navigator.pop(context); // Close drawer
-                          Navigator.pushNamed(context, '/stockReceipt');
+                          Navigator.pushNamed(
+                            context,
+                            '/stockReceipt',
+                            arguments: widget.user,
+                          );
                         },
                       );
                     }
@@ -286,9 +293,8 @@ class _DashboardViewState extends State<DashboardView> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => HistoricalSalesView(
-                                user: widget.user,
-                              ),
+                              builder: (context) =>
+                                  HistoricalSalesView(user: widget.user),
                             ),
                           );
                         },
