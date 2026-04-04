@@ -122,14 +122,16 @@ class _ManageRolesViewState extends State<ManageRolesView> {
 
           String message =
               'System: Access permissions for your role "${role.roleName}" have been updated.';
-          if (addedPermNames.isNotEmpty)
+          if (addedPermNames.isNotEmpty) {
             message += '\nGranted: ${addedPermNames.join(', ')}';
-          if (removedPermNames.isNotEmpty)
+          }
+          if (removedPermNames.isNotEmpty) {
             message += '\nRevoked: ${removedPermNames.join(', ')}';
+          }
 
           await _notificationController.sendNotifications(
             widget.user.userId, // The admin performing the update
-            userIds,
+            userIds.cast<int>(),
             message,
             'System',
           );

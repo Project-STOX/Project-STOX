@@ -51,6 +51,8 @@ class _TwoFactorViewState extends State<TwoFactorView> {
     final enteredCode = codeController.text.trim();
     final isValid = await authController.verify2FA(widget.user.userId, enteredCode);
 
+    if (!mounted) return;
+
     setState(() => isLoading = false);
 
     if (isValid) {
@@ -68,6 +70,7 @@ class _TwoFactorViewState extends State<TwoFactorView> {
     // Call your controller to resend the code
     await authController.generate2FA(widget.user.userId);
 
+    _timer.cancel();
     setState(() {
       isLoading = false;
       _remainingSeconds = 300; // reset countdown

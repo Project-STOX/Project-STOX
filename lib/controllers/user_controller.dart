@@ -1,6 +1,7 @@
 import '../services/supabase_service.dart';
 import '../models/user.dart';
 import '../models/role.dart';
+import '../utils/password_hasher.dart';
 import 'auth_controller.dart';
 
 class UserController {
@@ -32,30 +33,29 @@ class UserController {
 
   // Create new user
   Future<void> createUser(String username, String email, String password, int roleId, {bool verifyEmail = true}) async {
-    String? authUserId;
+    final normalizedEmail = email.trim().toLowerCase();
+    final normalizedUsername = username.trim();
 
     if (verifyEmail) {
       // Create auth user (sends confirmation email by default in Supabase)
-      final authResponse = await supabase.auth.signUp(
-        email: email,
+      await supabase.auth.signUp(
+        email: normalizedEmail,
         password: password,
       );
-      authUserId = authResponse.user?.id;
     }
 
-    // Insert user data into custom table
+    final passwordHash = await PasswordHasher.hashPassword(password);
+
+    // Always create the app profile row. When verifyEmail is false,
+    // account creation is local-only and skips auth email verification.
     final data = {
-      'username': username,
-      'email': email,
-      'password_hash': password, // Note: In production, hash the password
+      'username': normalizedUsername,
+      'email': normalizedEmail,
       'role_id': roleId,
       'is_active': true,
       'tfa_active': false,
+      'password_hash': passwordHash,
     };
-
-    if (authUserId != null) {
-      data['user_id'] = authUserId as dynamic;
-    }
 
     await supabase.from('user').insert(data);
   }
@@ -99,7 +99,7 @@ class UserController {
       // Verify 2FA code
       final authController = AuthController();
       verified = await authController.verify2FA(userId, tfaCode);
-    } else if (oldPassword == currentPasswordHash) {
+    } else if (await PasswordHasher.verifyPassword(oldPassword, currentPasswordHash.toString())) {
       verified = true;
     }
 
@@ -107,15 +107,34 @@ class UserController {
       throw Exception('Invalid old password or 2FA code');
     }
 
+    final newPasswordHash = await PasswordHasher.hashPassword(newPassword);
+
     // Update password
     await supabase
         .from('user')
-        .update({'password_hash': newPassword})
+      .update({'password_hash': newPasswordHash})
         .eq('user_id', userId);
   }
 
   // Delete user
   Future<void> deleteUser(int userId) async {
+    // Remove dependent notification records first to satisfy FK constraints.
+    await supabase
+      .from('notification')
+      .delete()
+      .eq('recipient_id', userId);
+
+    await supabase
+      .from('notification')
+      .delete()
+      .eq('sender_id', userId);
+
+    // Remove dependent session records first to satisfy FK constraints.
+    await supabase
+      .from('user_session')
+      .delete()
+      .eq('user_id', userId);
+
     await supabase
         .from('user')
         .delete()

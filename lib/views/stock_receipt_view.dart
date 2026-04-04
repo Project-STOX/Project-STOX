@@ -159,7 +159,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<Product>(
-          value: _selectedProduct,
+          initialValue: _selectedProduct,
           isExpanded: true,
           decoration: const InputDecoration(
             labelText: 'Product',
@@ -186,7 +186,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -210,7 +210,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<Supplier>(
-          value: _selectedSupplier,
+          initialValue: _selectedSupplier,
           isExpanded: true,
           decoration: const InputDecoration(
             labelText: 'Supplier',
@@ -1108,7 +1108,7 @@ class _StockReceiptScannerViewState extends State<StockReceiptScannerView> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                color: _statusColor.withOpacity(0.12),
+                color: _statusColor.withValues(alpha: 0.12),
               ),
               child: Text(
                 _statusMessage,

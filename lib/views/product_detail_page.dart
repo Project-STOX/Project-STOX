@@ -10,7 +10,7 @@ class ProductDetailPage extends StatefulWidget {
   final List<Supplier> suppliers;
   final int roleId;
   final Function(Product) onSave;
-  final Function()? onDelete;
+  final Future<void> Function()? onDelete;
 
   const ProductDetailPage({
     super.key,
@@ -92,10 +92,21 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     }
   }
 
-  void _delete() {
-    if (widget.onDelete != null) {
-      widget.onDelete!();
+  Future<void> _delete() async {
+    if (widget.onDelete == null) return;
+
+    try {
+      await widget.onDelete!();
+      if (!mounted) return;
       Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Product deleted successfully')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Delete cancelled: $e')),
+      );
     }
   }
 
@@ -109,7 +120,9 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           if (!isNew)
             IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
-              onPressed: _delete,
+              onPressed: () {
+                _delete();
+              },
             ),
           IconButton(
             icon: const Icon(Icons.save),

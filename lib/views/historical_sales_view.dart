@@ -51,8 +51,14 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     });
 
     final hasPerm = await _authController.hasPermission(widget.user.roleId, 'Historical data');
+    if (!mounted) {
+      return;
+    }
     if (!hasPerm) {
       await _salesController.logUnauthorizedAccess(widget.user.userId);
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _hasAccess = false;
         _isLoading = false;
@@ -62,6 +68,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
 
     final products = await _salesController.getProductNames();
     final suppliers = await _salesController.getSupplierNames();
+    if (!mounted) return;
 
     setState(() {
       _hasAccess = true;
@@ -84,11 +91,17 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
         productQuery: _productQuery,
         supplierQuery: _supplierQuery,
       );
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _sales = sales;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) {
+        return;
+      }
       setState(() {
         _isLoading = false;
       });
@@ -155,7 +168,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   }
 
   String _getTopSellingProduct() {
-    if (_sales.isEmpty) return 'N/A';
+    if (_sales.isEmpty) {
+      return 'N/A';
+    }
     Map<String, int> productCounts = {};
     for (var s in _sales) {
       productCounts[s.productName] = (productCounts[s.productName] ?? 0) + s.quantitySold;
@@ -165,7 +180,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   }
 
   double _getAvgQuantity() {
-    if (_sales.isEmpty) return 0.0;
+    if (_sales.isEmpty) {
+      return 0.0;
+    }
     int totalQty = _sales.fold(0, (sum, item) => sum + item.quantitySold);
     return totalQty / _sales.length;
   }
@@ -259,7 +276,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
               child: Autocomplete<String>(
                 optionsBuilder: (TextEditingValue textEditingValue) {
                   _productQuery = textEditingValue.text;
-                  if (textEditingValue.text.isEmpty) { return const Iterable<String>.empty(); }
+                  if (textEditingValue.text.isEmpty) {
+                    return const Iterable<String>.empty();
+                  }
                   return _productNames.where((String option) =>
                       option.toLowerCase().contains(textEditingValue.text.toLowerCase()));
                 },
@@ -279,7 +298,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                     ),
                     onChanged: (val) {
                       _productQuery = val;
-                      if (val.isEmpty) _loadSalesData();
+                      if (val.isEmpty) {
+                        _loadSalesData();
+                      }
                     },
                     onSubmitted: (_) {
                       onFieldSubmitted();
@@ -294,7 +315,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
               child: Autocomplete<String>(
                 optionsBuilder: (TextEditingValue textEditingValue) {
                   _supplierQuery = textEditingValue.text;
-                  if (textEditingValue.text.isEmpty) { return const Iterable<String>.empty(); }
+                  if (textEditingValue.text.isEmpty) {
+                    return const Iterable<String>.empty();
+                  }
                   return _supplierNames.where((String option) =>
                       option.toLowerCase().contains(textEditingValue.text.toLowerCase()));
                 },
@@ -314,7 +337,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                     ),
                     onChanged: (val) {
                       _supplierQuery = val;
-                      if (val.isEmpty) _loadSalesData();
+                      if (val.isEmpty) {
+                        _loadSalesData();
+                      }
                     },
                     onSubmitted: (_) {
                       onFieldSubmitted();
@@ -360,7 +385,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
       child: Card(
         elevation: 3,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         margin: const EdgeInsets.symmetric(horizontal: 8),
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -380,7 +405,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   }
 
   Widget _buildBarChart() {
-    if (_sales.isEmpty) return const Center(child: Text('No data for bar chart'));
+    if (_sales.isEmpty) {
+      return const Center(child: Text('No data for bar chart'));
+    }
 
     // Group sales by product to get total quantity
     Map<String, int> productQty = {};
@@ -462,7 +489,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   }
 
   Widget _buildPieChart() {
-    if (_sales.isEmpty) return const Center(child: Text('No data for pie chart'));
+    if (_sales.isEmpty) {
+      return const Center(child: Text('No data for pie chart'));
+    }
 
     // Revenue contribution by product
     Map<String, double> productRev = {};
@@ -517,7 +546,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   }
 
   Widget _buildLineChart() {
-    if (_sales.isEmpty) return const Center(child: Text('No data for line chart'));
+    if (_sales.isEmpty) {
+      return const Center(child: Text('No data for line chart'));
+    }
 
     // Process data: group revenue by date (month/year)
     // For simplicity, grouping by exact date and sorting
@@ -620,7 +651,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
             Expanded(
               child: GestureDetector(
                 onHorizontalDragUpdate: (details) {
-                  if (maxStart <= 0) return;
+                  if (maxStart <= 0) {
+                    return;
+                  }
                   setState(() {
                     _lineChartOffset =
                         (_lineChartOffset - (details.primaryDelta ?? 0) / 24).clamp(0.0, maxStart);
@@ -779,7 +812,9 @@ class SalesDataSource extends DataTableSource {
 
   @override
   DataRow? getRow(int index) {
-    if (index >= sales.length) return null;
+    if (index >= sales.length) {
+      return null;
+    }
     final sale = sales[index];
     return DataRow(cells: [
       DataCell(Text(sale.saleId.toString())),

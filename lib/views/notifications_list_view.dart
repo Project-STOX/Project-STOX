@@ -16,6 +16,17 @@ class _NotificationsListViewState extends State<NotificationsListView> {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
 
+  DateTime? _parseSentAt(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is DateTime) return raw;
+    if (raw is String) return DateTime.tryParse(raw);
+    if (raw is int) {
+      final milliseconds = raw > 1000000000000 ? raw : raw * 1000;
+      return DateTime.fromMillisecondsSinceEpoch(milliseconds);
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -84,9 +95,12 @@ class _NotificationsListViewState extends State<NotificationsListView> {
                   itemCount: _notifications.length,
                   itemBuilder: (context, index) {
                     final note = _notifications[index];
-                    final String sender = note['sender']?['username'] ?? 'System';
-                    final DateTime? sentAt = note['sent_at'] != null ? DateTime.parse(note['sent_at']) : null;
-                    final String type = note['type'] ?? 'Message';
+                    final senderRaw = note['sender'];
+                    final String sender = senderRaw is Map<String, dynamic>
+                        ? senderRaw['username']?.toString() ?? 'System'
+                        : 'System';
+                    final DateTime? sentAt = _parseSentAt(note['sent_at']);
+                    final String type = note['type']?.toString() ?? 'Message';
                     
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -111,7 +125,7 @@ class _NotificationsListViewState extends State<NotificationsListView> {
                           children: [
                             Padding(
                               padding: const EdgeInsets.symmetric(vertical: 4.0),
-                              child: Text(note['message'] ?? ''),
+                              child: Text(note['message']?.toString() ?? ''),
                             ),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),

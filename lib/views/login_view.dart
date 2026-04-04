@@ -11,29 +11,39 @@ class LoginView extends StatefulWidget {
 
 class _LoginViewState extends State<LoginView> {
   final AuthController authController = AuthController();
-  final TextEditingController emailController = TextEditingController();
+  final TextEditingController identifierController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   void login() async {
     try {
       final user = await authController.signIn(
-        emailController.text.trim(),
-        passwordController.text.trim(),
+        identifierController.text.trim(),
+        passwordController.text,
       );
+
+      if (!mounted) return;
 
       if (user != null) {
         // Check if 2FA is enabled for this user
         final hasMFA = await authController.hasMFAEnabled(user.userId);
+        
+        if (!mounted) return;
+
         if (hasMFA) {
           // Send 2FA code via email
           try {
             await authController.generate2FA(user.userId);
+            
+            if (!mounted) return;
+
             Navigator.pushReplacement(
               context,
               MaterialPageRoute(builder: (_) => TwoFactorView(user: user)),
             );
           } catch (e) {
+            if (!mounted) return;
+
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text("Failed to send 2FA code: $e")),
             );
@@ -49,9 +59,11 @@ class _LoginViewState extends State<LoginView> {
       } else {
         // Check if account is deactivated
         final isDeactivated = await authController.isAccountDeactivated(
-          emailController.text.trim(),
-          passwordController.text.trim(),
+          identifierController.text.trim(),
+          passwordController.text,
         );
+
+        if (!mounted) return;
 
         if (isDeactivated) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -66,6 +78,8 @@ class _LoginViewState extends State<LoginView> {
         }
       }
     } catch (e) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Login error: $e")),
       );
@@ -87,9 +101,9 @@ class _LoginViewState extends State<LoginView> {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               TextField(
-                controller: emailController,
+                controller: identifierController,
                 decoration: const InputDecoration(
-                  labelText: "Email",
+                  labelText: "Email or Username",
                   border: OutlineInputBorder(),
                 ),
                 textAlign: TextAlign.center,

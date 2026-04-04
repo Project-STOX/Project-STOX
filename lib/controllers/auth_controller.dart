@@ -1,9 +1,115 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../services/supabase_service.dart';
 import '../models/user.dart';
+import '../utils/password_hasher.dart';
 
 class AuthController {
   final supabase = SupabaseService.client;
+
+  Future<Map<String, dynamic>?> _findUserByEmail(String email) async {
+    final rows = await supabase
+        .from('user')
+        .select()
+        .ilike('email', email)
+        .order('user_id', ascending: false)
+        .limit(1);
+
+    if (rows.isNotEmpty) {
+      return Map<String, dynamic>.from(rows.first as Map);
+    }
+
+    return null;
+  }
+
+  Future<void> _storeUserSessionToken(int userId, String token) async {
+    try {
+      await supabase.from('user_session').insert({
+        'user_id': userId,
+        'token': token,
+      });
+      return;
+    } catch (_) {
+      // Fallback path for schemas that enforce one active session row per user.
+    }
+
+    try {
+      await supabase
+          .from('user_session')
+          .update({'token': token})
+          .eq('user_id', userId);
+    } catch (_) {
+      // Do not block login if session persistence schema differs.
+    }
+  }
+
+  Future<UserModel?> _signInWithLocalPassword(String email, String password) async {
+    final response = await _findUserByEmail(email);
+    if (response == null) {
+      return null;
+    }
+
+    final user = UserModel.fromJson(response);
+    if (!user.isActive) {
+      return null;
+    }
+
+    final isValid = await PasswordHasher.verifyPassword(
+      password,
+      user.passwordHash,
+    );
+
+    if (!isValid) {
+      return null;
+    }
+
+    await _storeUserSessionToken(
+      user.userId,
+      'local:${DateTime.now().toUtc().millisecondsSinceEpoch}',
+    );
+
+    return user;
+  }
+
+  Future<String?> _resolveLoginEmail(String identifier) async {
+    final normalized = identifier.trim();
+    if (normalized.isEmpty) return null;
+
+    if (normalized.contains('@')) {
+      return normalized.toLowerCase();
+    }
+
+    final exactRows = await supabase
+        .from('user')
+        .select('email')
+        .eq('username', normalized)
+        .order('user_id', ascending: false)
+        .limit(1);
+
+    if (exactRows.isNotEmpty) {
+      final row = exactRows.first as Map;
+      final rowEmail = row['email'];
+      if (rowEmail != null) {
+        return rowEmail.toString().toLowerCase();
+      }
+    }
+
+    final caseInsensitiveRows = await supabase
+        .from('user')
+        .select('email')
+        .ilike('username', normalized)
+        .order('user_id', ascending: false)
+        .limit(1);
+
+    if (caseInsensitiveRows.isNotEmpty) {
+      final row = caseInsensitiveRows.first as Map;
+      final rowEmail = row['email'];
+      if (rowEmail != null) {
+        return rowEmail.toString().toLowerCase();
+      }
+    }
+
+    return null;
+  }
 
   // Sign up using Supabase Auth
   Future<void> signUp(String email, String password, String username, int roleId) async {
@@ -15,7 +121,6 @@ class AuthController {
     if (authResponse.user != null) {
       // Insert user data into custom table
       await supabase.from('user').insert({
-        'user_id': authResponse.user!.id, // Use auth user id
         'email': email,
         'username': username,
         'role_id': roleId,
@@ -24,40 +129,93 @@ class AuthController {
     }
   }
 
-  // Sign in using database (for existing users)
-  Future<UserModel?> signIn(String email, String password) async {
-    final response = await supabase
-        .from('user')
-        .select()
-        .eq('email', email)
-        .eq('password_hash', password)
-        .maybeSingle();
-
-    if (response != null) {
-      final user = UserModel.fromJson(response);
-      // Check if user is active
-      if (!user.isActive) {
-        return null; // User is deactivated, cannot login
-      }
-      return user;
+  // Sign in using Supabase Auth, then load the app user profile
+  Future<UserModel?> signIn(String identifier, String password) async {
+    final loginEmail = await _resolveLoginEmail(identifier);
+    if (loginEmail == null) {
+      return null;
     }
-    return null;
+
+    AuthResponse authResponse;
+    try {
+      authResponse = await supabase.auth.signInWithPassword(
+        email: loginEmail,
+        password: password,
+      );
+    } on AuthApiException catch (e) {
+      if (e.code == 'invalid_credentials') {
+        return _signInWithLocalPassword(loginEmail, password);
+      }
+      rethrow;
+    }
+
+    final authUser = authResponse.user;
+    if (authUser == null) {
+      return null;
+    }
+
+    final response = await _findUserByEmail(loginEmail);
+
+    if (response == null) {
+      await supabase.auth.signOut();
+      return null;
+    }
+
+    final user = UserModel.fromJson(response);
+    if (!user.isActive) {
+      await supabase.auth.signOut();
+      return null; // User is deactivated, cannot login
+    }
+
+    await _storeUserSessionToken(user.userId, authUser.id);
+
+    return user;
   }
 
   // Check if user credentials are valid but account is deactivated
-  Future<bool> isAccountDeactivated(String email, String password) async {
-    final response = await supabase
-        .from('user')
-        .select()
-        .eq('email', email)
-        .eq('password_hash', password)
-        .maybeSingle();
-
-    if (response != null) {
-      final user = UserModel.fromJson(response);
-      return !user.isActive; // Return true if account exists but is deactivated
+  Future<bool> isAccountDeactivated(String identifier, String password) async {
+    final loginEmail = await _resolveLoginEmail(identifier);
+    if (loginEmail == null) {
+      return false;
     }
-    return false; // Account doesn't exist or credentials are wrong
+
+    final localUserRow = await _findUserByEmail(loginEmail);
+    if (localUserRow != null) {
+      final localUser = UserModel.fromJson(localUserRow);
+      if (!localUser.isActive) {
+        final localPasswordMatch = await PasswordHasher.verifyPassword(
+          password,
+          localUser.passwordHash,
+        );
+        if (localPasswordMatch) {
+          return true;
+        }
+      }
+    }
+
+    AuthResponse authResponse;
+    try {
+      authResponse = await supabase.auth.signInWithPassword(
+        email: loginEmail,
+        password: password,
+      );
+    } on AuthApiException catch (e) {
+      if (e.code == 'invalid_credentials') {
+        return false;
+      }
+      rethrow;
+    }
+
+    final authUser = authResponse.user;
+    if (authUser == null) {
+      return false; // Account doesn't exist or credentials are wrong
+    }
+
+    final response = await _findUserByEmail(loginEmail);
+
+    final isDeactivated = response != null && !UserModel.fromJson(response).isActive;
+    await supabase.auth.signOut();
+    return isDeactivated; // Return true if account exists but is deactivated
   }
 
   // Enroll in MFA (TOTP)

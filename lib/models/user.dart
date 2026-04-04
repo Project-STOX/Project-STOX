@@ -18,8 +18,17 @@ class UserModel {
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) {
+    final rawUserId = json['user_id'];
+    final parsedUserId = rawUserId is int
+        ? rawUserId
+        : int.tryParse(rawUserId?.toString() ?? '');
+
+    if (parsedUserId == null) {
+      throw const FormatException('Invalid user_id value in user payload');
+    }
+
     return UserModel(
-      userId: json['user_id'],
+      userId: parsedUserId,
       username: json['username'],
       email: json['email'],
       passwordHash: json['password_hash'],

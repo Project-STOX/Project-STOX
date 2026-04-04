@@ -2,6 +2,7 @@ import '../models/product.dart';
 import '../models/supplier.dart';
 import '../services/supabase_service.dart';
 import 'auth_controller.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ProductController {
   final supabase = SupabaseService.client;
@@ -12,9 +13,9 @@ class ProductController {
     return (response as List).map((json) => json as Map<String, dynamic>).toList();
   }
     Future<void> addProduct(Product product, int roleId) async {
-    final allowed = await authController.hasPermission(roleId, "manage_products");
+    final allowed = await authController.hasPermission(roleId, "Manage Products");
     if (!allowed) {
-      throw Exception("Permission denied: manage_products");
+      throw Exception("Permission denied: Manage Products");
     }
 
     await supabase.from('product').insert({
@@ -30,9 +31,9 @@ class ProductController {
   }
 
   Future<void> updateProduct(Product product, int roleId) async {
-    final allowed = await authController.hasPermission(roleId, "manage_products");
+    final allowed = await authController.hasPermission(roleId, "Manage Products");
     if (!allowed) {
-      throw Exception("Permission denied: manage_products");
+      throw Exception("Permission denied: Manage Products");
     }
 
     await supabase.from('product').update({
@@ -48,12 +49,22 @@ class ProductController {
   }
 
   Future<void> deleteProduct(int productId, int roleId) async {
-    final allowed = await authController.hasPermission(roleId, "manage_products");
+    final allowed = await authController.hasPermission(roleId, "Manage Products");
     if (!allowed) {
-      throw Exception("Permission denied: manage_products");
+      throw Exception("Permission denied: Manage Products");
     }
 
-    await supabase.from('product').delete().eq('product_id', productId);
+    try {
+      await supabase.from('product').delete().eq('product_id', productId);
+    } on PostgrestException catch (e) {
+      final msg = e.message.toLowerCase();
+      if (e.code == '23503' && (msg.contains('stock_receipt') || msg.contains('foreign key'))) {
+        throw Exception(
+          'Cannot delete product because stock receipt records exist. Delete related stock receipts first.',
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<List<Supplier>> fetchSuppliers() async {

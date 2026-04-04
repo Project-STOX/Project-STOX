@@ -1,17 +1,41 @@
 # project_stox
 
-A new Flutter project.
+Flutter inventory management application with Supabase-backed authentication and data services.
 
-## Getting Started
+## Workspace Setup Status
 
-This project is a starting point for a Flutter application.
+- Flutter dependencies installed with `flutter pub get`.
+- VS Code task created at `.vscode/tasks.json`:
+	- `Flutter Analyze` -> runs `flutter analyze .`
+- `copilot-instructions.md` checklist tracked at `.github/copilot-instructions.md`.
 
-A few resources to get you started if this is your first Flutter project:
+## Run and Debug
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+1. Install Flutter SDK and platform toolchains (Android/iOS/Web/Desktop as needed).
+2. From workspace root, run:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter pub get
+flutter run
+```
+
+3. For static diagnostics, run:
+
+```bash
+flutter analyze .
+```
+
+## Supabase Configuration
+
+`lib/main.dart` reads these values using `String.fromEnvironment`:
+
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+
+You can provide them with `--dart-define`, for example:
+
+```bash
+flutter run --dart-define=SUPABASE_URL=<your_url> --dart-define=SUPABASE_ANON_KEY=<your_anon_key>
+```
+
+If no defines are passed, the current code includes fallback development defaults.

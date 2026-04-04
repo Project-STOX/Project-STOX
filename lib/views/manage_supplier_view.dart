@@ -33,27 +33,35 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
   void initState() {
     super.initState();
     _checkAccess();
-    loadSuppliers();
   }
 
-  void _checkAccess() async {
+  Future<void> _checkAccess() async {
     userRole = await authController.getUserRole(widget.roleId);
+    if (!mounted) return;
+
     if (!['SME Owner', 'Inventory Manager'].contains(userRole)) {
       // Deny access
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Access denied')));
+      return;
     }
+
+    loadSuppliers();
   }
 
   void loadSuppliers() async {
     try {
       final data = await controller.fetchSuppliers();
+      if (!mounted) return;
+
       setState(() {
         suppliers = data;
         filteredSuppliers = data;
         _sortSuppliers();
       });
     } catch (e) {
+      if (!mounted) return;
+
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading suppliers: $e')));
     }
   }
@@ -66,26 +74,30 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
         return s.supplierName.toLowerCase().contains(query) ||
             s.supplierId.toString().contains(query);
       }).toList();
-      _sortSuppliers();
+      _applySorting();
     });
+  }
+
+  void _applySorting() {
+    switch (selectedSort) {
+      case 'Name (A-Z)':
+        filteredSuppliers.sort((a, b) => a.supplierName.compareTo(b.supplierName));
+        break;
+      case 'Name (Z-A)':
+        filteredSuppliers.sort((a, b) => b.supplierName.compareTo(a.supplierName));
+        break;
+      case 'Lead Time (Ascending)':
+        filteredSuppliers.sort((a, b) => (a.leadTimeDays ?? 0).compareTo(b.leadTimeDays ?? 0));
+        break;
+      case 'Lead Time (Descending)':
+        filteredSuppliers.sort((a, b) => (b.leadTimeDays ?? 0).compareTo(a.leadTimeDays ?? 0));
+        break;
+    }
   }
 
   void _sortSuppliers() {
     setState(() {
-      switch (selectedSort) {
-        case 'Name (A-Z)':
-          filteredSuppliers.sort((a, b) => a.supplierName.compareTo(b.supplierName));
-          break;
-        case 'Name (Z-A)':
-          filteredSuppliers.sort((a, b) => b.supplierName.compareTo(a.supplierName));
-          break;
-        case 'Lead Time (Ascending)':
-          filteredSuppliers.sort((a, b) => (a.leadTimeDays ?? 0).compareTo(b.leadTimeDays ?? 0));
-          break;
-        case 'Lead Time (Descending)':
-          filteredSuppliers.sort((a, b) => (b.leadTimeDays ?? 0).compareTo(a.leadTimeDays ?? 0));
-          break;
-      }
+      _applySorting();
     });
   }
 
@@ -164,7 +176,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
               onChanged: (value) {
                 setState(() {
                   selectedSort = value!;
-                  _sortSuppliers();
+                  _applySorting();
                 });
               },
               isExpanded: true,

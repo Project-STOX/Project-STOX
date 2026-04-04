@@ -67,11 +67,14 @@ class NotificationController {
       final perm = await supabase
           .from('permission')
           .select()
-          .ilike('perm_name', 'Send message')
+          .eq('perm_name', 'Send message')
           .maybeSingle();
       
       if (perm == null) {
-        await supabase.from('permission').insert({'perm_name': 'Send message'});
+        await supabase.from('permission').insert({
+          'perm_id': 1,
+          'perm_name': 'Send message'
+        });
       }
     } catch (e) {
       print('Error ensuring permission exists: $e');
