@@ -1,10 +1,17 @@
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../services/supabase_service.dart';
 import '../models/user.dart';
 import '../utils/password_hasher.dart';
 
 class AuthController {
   final supabase = SupabaseService.client;
+  static const _rememberedSessionUuidKey = 'remembered_session_uuid';
+  final Uuid _uuid = const Uuid();
+  String? _latestSessionUuid;
+
+  String? get latestSessionUuid => _latestSessionUuid;
 
   Future<Map<String, dynamic>?> _findUserByEmail(String email) async {
     final rows = await supabase
@@ -42,6 +49,132 @@ class AuthController {
     }
   }
 
+  Future<void> persistSessionUuidLocally(String sessionUuid) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_rememberedSessionUuidKey, sessionUuid);
+  }
+
+  Future<String?> getRememberedSessionUuid() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_rememberedSessionUuidKey);
+  }
+
+  Future<void> clearRememberedSessionUuid() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove(_rememberedSessionUuidKey);
+  }
+
+  DateTime? _extractSessionTimestamp(Map<String, dynamic> row) {
+    const candidates = [
+      'created_at',
+      'updated_at',
+      'last_login',
+      'last_login_at',
+      'login_at',
+      'session_created_at',
+    ];
+
+    for (final field in candidates) {
+      final value = row[field];
+      if (value == null) {
+        continue;
+      }
+
+      if (value is DateTime) {
+        return value.toUtc();
+      }
+
+      final parsed = DateTime.tryParse(value.toString());
+      if (parsed != null) {
+        return parsed.toUtc();
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> invalidateRememberedSession({String? sessionUuid}) async {
+    final uuidToDelete = sessionUuid ?? await getRememberedSessionUuid();
+    if (uuidToDelete == null || uuidToDelete.isEmpty) {
+      await clearRememberedSessionUuid();
+      return;
+    }
+
+    try {
+      await supabase.from('user_session').delete().eq('token', uuidToDelete);
+    } catch (_) {
+      // Do not block logout if schema/policies reject delete.
+    }
+
+    await clearRememberedSessionUuid();
+  }
+
+  Future<UserModel?> tryAutoLoginWithRememberedSession({
+    Duration maxAge = const Duration(days: 7),
+  }) async {
+    final rememberedUuid = await getRememberedSessionUuid();
+    if (rememberedUuid == null || rememberedUuid.isEmpty) {
+      return null;
+    }
+
+    final rows = await supabase
+        .from('user_session')
+        .select()
+        .eq('token', rememberedUuid)
+        .limit(1);
+
+    if (rows.isEmpty) {
+      await clearRememberedSessionUuid();
+      return null;
+    }
+
+    final sessionRow = Map<String, dynamic>.from(rows.first as Map);
+    final sessionCreatedAt = _extractSessionTimestamp(sessionRow);
+    if (sessionCreatedAt == null || DateTime.now().toUtc().difference(sessionCreatedAt) > maxAge) {
+      await invalidateRememberedSession(sessionUuid: rememberedUuid);
+      return null;
+    }
+
+    final rawUserId = sessionRow['user_id'];
+    final userId = rawUserId is int
+        ? rawUserId
+        : int.tryParse(rawUserId?.toString() ?? '');
+
+    if (userId == null) {
+      await invalidateRememberedSession(sessionUuid: rememberedUuid);
+      return null;
+    }
+
+    final userRow = await supabase
+        .from('user')
+        .select()
+        .eq('user_id', userId)
+        .maybeSingle();
+
+    if (userRow == null) {
+      await invalidateRememberedSession(sessionUuid: rememberedUuid);
+      return null;
+    }
+
+    final user = UserModel.fromJson(Map<String, dynamic>.from(userRow));
+    if (!user.isActive) {
+      await invalidateRememberedSession(sessionUuid: rememberedUuid);
+      return null;
+    }
+
+    _latestSessionUuid = rememberedUuid;
+    return user;
+  }
+
+  Future<void> signOutAndInvalidateRememberedSession() async {
+    try {
+      await supabase.auth.signOut();
+    } catch (_) {
+      // Always continue to local/session invalidation.
+    }
+    await invalidateRememberedSession();
+  }
+
   Future<UserModel?> _signInWithLocalPassword(String email, String password) async {
     final response = await _findUserByEmail(email);
     if (response == null) {
@@ -62,10 +195,9 @@ class AuthController {
       return null;
     }
 
-    await _storeUserSessionToken(
-      user.userId,
-      'local:${DateTime.now().toUtc().millisecondsSinceEpoch}',
-    );
+    final sessionUuid = _uuid.v4();
+    await _storeUserSessionToken(user.userId, sessionUuid);
+    _latestSessionUuid = sessionUuid;
 
     return user;
   }
@@ -167,7 +299,9 @@ class AuthController {
       return null; // User is deactivated, cannot login
     }
 
-    await _storeUserSessionToken(user.userId, authUser.id);
+    final sessionUuid = _uuid.v4();
+    await _storeUserSessionToken(user.userId, sessionUuid);
+    _latestSessionUuid = sessionUuid;
 
     return user;
   }

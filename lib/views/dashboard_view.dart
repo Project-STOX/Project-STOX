@@ -39,8 +39,8 @@ class _DashboardViewState extends State<DashboardView> {
 
   void _logout(BuildContext context) async {
     try {
-      // Sign out from Supabase Auth (in case there's an active session from 2FA)
-      await authController.supabase.auth.signOut();
+      // Sign out and remove remembered mobile session token.
+      await authController.signOutAndInvalidateRememberedSession();
 
       // Navigate back to login page and clear navigation stack
       if (mounted) {

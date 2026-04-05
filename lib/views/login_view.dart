@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../controllers/auth_controller.dart';
 import 'two_factor_view.dart'; // import the 2FA screen
 
@@ -15,6 +16,59 @@ class _LoginViewState extends State<LoginView> {
   final TextEditingController passwordController = TextEditingController();
   bool _obscurePassword = true;
 
+  bool get _isMobilePlatform {
+    if (kIsWeb) {
+      return false;
+    }
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _attemptAutoLoginForMobile();
+  }
+
+  Future<void> _attemptAutoLoginForMobile() async {
+    if (!_isMobilePlatform) {
+      return;
+    }
+
+    try {
+      final user = await authController.tryAutoLoginWithRememberedSession();
+      if (!mounted || user == null) {
+        return;
+      }
+
+      final hasMFA = await authController.hasMFAEnabled(user.userId);
+      if (!mounted) {
+        return;
+      }
+
+      if (hasMFA) {
+        await authController.generate2FA(user.userId);
+        if (!mounted) {
+          return;
+        }
+
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => TwoFactorView(user: user)),
+        );
+        return;
+      }
+
+      Navigator.pushReplacementNamed(
+        context,
+        '/dashboard',
+        arguments: user,
+      );
+    } catch (_) {
+      // Keep user on login screen if auto-login check fails.
+    }
+  }
+
   void login() async {
     try {
       final user = await authController.signIn(
@@ -25,6 +79,13 @@ class _LoginViewState extends State<LoginView> {
       if (!mounted) return;
 
       if (user != null) {
+        if (_isMobilePlatform) {
+          final sessionUuid = authController.latestSessionUuid;
+          if (sessionUuid != null && sessionUuid.isNotEmpty) {
+            await authController.persistSessionUuidLocally(sessionUuid);
+          }
+        }
+
         // Check if 2FA is enabled for this user
         final hasMFA = await authController.hasMFAEnabled(user.userId);
         
