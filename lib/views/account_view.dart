@@ -28,6 +28,7 @@ class _AccountViewState extends State<AccountView> {
   bool _tfaActive = false;
   bool _isLoading = false;
   bool _useTfaForPasswordChange = false;
+  bool _verifyEmailChange = true;
   bool _isOldPasswordVisible = false;
   bool _isNewPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
@@ -60,16 +61,25 @@ class _AccountViewState extends State<AccountView> {
 
     setState(() => _isLoading = true);
     try {
+      final normalizedEmail = _emailController.text.trim().toLowerCase();
+      final normalizedUsername = _usernameController.text.trim();
+      final emailChanged = normalizedEmail != widget.user.email.trim().toLowerCase();
+      final verifyEmailChange = emailChanged && _verifyEmailChange;
+
       await _userController.updateUser(
         widget.user.userId,
-        username: _usernameController.text,
-        email: _emailController.text,
+        username: normalizedUsername,
+        email: normalizedEmail,
         tfaActive: _tfaActive,
+        verifyEmailChange: verifyEmailChange,
       );
 
       if (mounted) {
+        final message = verifyEmailChange
+            ? 'Profile updated. Verify the new email address to finish the change.'
+            : 'Profile updated successfully';
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Profile updated successfully')),
+          SnackBar(content: Text(message)),
         );
         // Update the user object if needed, but since it's passed by value, we might need to refresh
         Navigator.of(context).pop(); // Go back to dashboard
@@ -186,12 +196,23 @@ class _AccountViewState extends State<AccountView> {
                         border: OutlineInputBorder(),
                       ),
                       keyboardType: TextInputType.emailAddress,
+                      onChanged: (_) => setState(() {}),
                       validator: (value) {
                         if (value?.isEmpty ?? true) return 'Email is required';
                         if (!value!.contains('@')) return 'Invalid email format';
                         return null;
                       },
                     ),
+                    if (_emailController.text.trim().toLowerCase() != widget.user.email.trim().toLowerCase()) ...[
+                      const SizedBox(height: 16),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('Verify email change'),
+                        subtitle: const Text('Send a confirmation link to the new email address'),
+                        value: _verifyEmailChange,
+                        onChanged: (value) => setState(() => _verifyEmailChange = value),
+                      ),
+                    ],
                     const SizedBox(height: 16),
                     SwitchListTile(
                       title: const Text('Enable Two-Factor Authentication'),

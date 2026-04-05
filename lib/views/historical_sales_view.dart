@@ -6,7 +6,8 @@ import '../models/historical_sale.dart';
 import '../controllers/auth_controller.dart';
 import '../controllers/historical_sales_controller.dart';
 import '../utils/csv_export_stub.dart'
-  if (dart.library.html) '../utils/csv_export_web.dart' as csv_export;
+    if (dart.library.html) '../utils/csv_export_web.dart'
+    as csv_export;
 
 class HistoricalSalesView extends StatefulWidget {
   final UserModel user;
@@ -19,18 +20,27 @@ class HistoricalSalesView extends StatefulWidget {
 
 class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   final AuthController _authController = AuthController();
-  final HistoricalSalesController _salesController = HistoricalSalesController();
+  final HistoricalSalesController _salesController =
+      HistoricalSalesController();
 
   bool _isLoading = true;
   bool _hasAccess = false;
 
   List<HistoricalSale> _sales = [];
-  
+
   // Filters
   DateTime? _startDate;
   DateTime? _endDate;
   String _productQuery = '';
   String _supplierQuery = '';
+
+  // Column visibility controls for the records table.
+  bool _showIdColumn = true;
+  bool _showProductColumn = true;
+  bool _showDateColumn = true;
+  bool _showQuantityColumn = true;
+  bool _showRevenueColumn = true;
+  bool _showSupplierColumn = true;
 
   // Line chart viewport controls.
   double _lineChartZoom = 1.0;
@@ -50,7 +60,10 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
       _isLoading = true;
     });
 
-    final hasPerm = await _authController.hasPermission(widget.user.roleId, 'Historical data');
+    final hasPerm = await _authController.hasPermission(
+      widget.user.roleId,
+      'Historical data',
+    );
     if (!mounted) {
       return;
     }
@@ -75,7 +88,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
       _productNames = products;
       _supplierNames = suppliers;
     });
-    
+
     await _loadSalesData();
   }
 
@@ -105,16 +118,20 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
       setState(() {
         _isLoading = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error loading sales: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading sales: $e')));
     }
   }
 
   Future<void> _exportCsv() async {
     try {
-      final csvString = await _salesController.exportToCsv(_sales, widget.user.userId);
-      final fileName = 'historical_sales_${DateTime.now().millisecondsSinceEpoch}.csv';
+      final csvString = await _salesController.exportToCsv(
+        _sales,
+        widget.user.userId,
+      );
+      final fileName =
+          'historical_sales_${DateTime.now().millisecondsSinceEpoch}.csv';
       final savedPath = await csv_export.downloadCsvWeb(csvString, fileName);
 
       ScaffoldMessenger.of(context).showSnackBar(
@@ -127,9 +144,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export failed: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
     }
   }
 
@@ -167,15 +184,26 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     return _sales.fold(0.0, (sum, item) => sum + item.revenue);
   }
 
+  String _formatRs(double value) {
+    return 'Rs. ${value.toStringAsFixed(2)}';
+  }
+
+  String _formatRsCompact(double value) {
+    return 'Rs. ${NumberFormat.compact().format(value)}';
+  }
+
   String _getTopSellingProduct() {
     if (_sales.isEmpty) {
       return 'N/A';
     }
     Map<String, int> productCounts = {};
     for (var s in _sales) {
-      productCounts[s.productName] = (productCounts[s.productName] ?? 0) + s.quantitySold;
+      productCounts[s.productName] =
+          (productCounts[s.productName] ?? 0) + s.quantitySold;
     }
-    var topProduct = productCounts.entries.reduce((a, b) => a.value > b.value ? a : b);
+    var topProduct = productCounts.entries.reduce(
+      (a, b) => a.value > b.value ? a : b,
+    );
     return topProduct.key;
   }
 
@@ -190,9 +218,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (!_hasAccess) {
@@ -204,7 +230,10 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
             children: [
               Icon(Icons.error_outline, color: Colors.red, size: 60),
               SizedBox(height: 16),
-              Text('Access Denied', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+              Text(
+                'Access Denied',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
               SizedBox(height: 8),
               Text('You do not have permission to view historical data.'),
             ],
@@ -214,16 +243,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Historical Sales Data'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.download),
-            tooltip: 'Export CSV',
-            onPressed: _exportCsv,
-          ),
-        ],
-      ),
+      appBar: AppBar(title: const Text('Historical Sales Data')),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
@@ -234,24 +254,37 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
               const SizedBox(height: 16),
               _buildSummaryCards(),
               const SizedBox(height: 24),
-              const Text('Visual Insights', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              SizedBox(
-                height: 320,
-                child: _buildBarChart(),
+              const Text(
+                'Visual Insights',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 16),
-              SizedBox(
-                height: 360,
-                child: _buildPieChart(),
-              ),
+              SizedBox(height: 320, child: _buildBarChart()),
               const SizedBox(height: 16),
-              SizedBox(
-                height: 380,
-                child: _buildLineChart(),
-              ),
+              SizedBox(height: 360, child: _buildRevenueBarChart()),
+              const SizedBox(height: 16),
+              SizedBox(height: 380, child: _buildLineChart()),
               const SizedBox(height: 24),
-              const Text('Detailed Records', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      'Detailed Records',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.download),
+                    tooltip: 'Export CSV',
+                    onPressed: _exportCsv,
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              _buildRecordColumnFilters(),
               const SizedBox(height: 16),
               _buildDataTable(),
             ],
@@ -264,106 +297,133 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   Widget _buildFilters() {
     return Card(
       elevation: 2,
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Wrap(
-          spacing: 16,
-          runSpacing: 16,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          children: [
-            SizedBox(
-              width: 200,
-              child: Autocomplete<String>(
-                optionsBuilder: (TextEditingValue textEditingValue) {
-                  _productQuery = textEditingValue.text;
-                  if (textEditingValue.text.isEmpty) {
-                    return const Iterable<String>.empty();
-                  }
-                  return _productNames.where((String option) =>
-                      option.toLowerCase().contains(textEditingValue.text.toLowerCase()));
-                },
-                onSelected: (String selection) {
-                  _productQuery = selection;
-                  _loadSalesData();
-                },
-                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                  return TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    decoration: InputDecoration(
-                      labelText: 'Search Product',
-                      prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    onChanged: (val) {
-                      _productQuery = val;
-                      if (val.isEmpty) {
-                        _loadSalesData();
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 760;
+          final inputWidth = isNarrow ? constraints.maxWidth : 240.0;
+
+          return Padding(
+            padding: const EdgeInsets.all(12.0),
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                SizedBox(
+                  width: inputWidth,
+                  child: Autocomplete<String>(
+                    optionsBuilder: (TextEditingValue textEditingValue) {
+                      _productQuery = textEditingValue.text;
+                      if (textEditingValue.text.isEmpty) {
+                        return const Iterable<String>.empty();
                       }
+                      return _productNames.where(
+                        (String option) => option.toLowerCase().contains(
+                          textEditingValue.text.toLowerCase(),
+                        ),
+                      );
                     },
-                    onSubmitted: (_) {
-                      onFieldSubmitted();
+                    onSelected: (String selection) {
+                      _productQuery = selection;
                       _loadSalesData();
                     },
-                  );
-                },
-              ),
-            ),
-            SizedBox(
-              width: 200,
-              child: Autocomplete<String>(
-                optionsBuilder: (TextEditingValue textEditingValue) {
-                  _supplierQuery = textEditingValue.text;
-                  if (textEditingValue.text.isEmpty) {
-                    return const Iterable<String>.empty();
-                  }
-                  return _supplierNames.where((String option) =>
-                      option.toLowerCase().contains(textEditingValue.text.toLowerCase()));
-                },
-                onSelected: (String selection) {
-                  _supplierQuery = selection;
-                  _loadSalesData();
-                },
-                fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
-                  return TextField(
-                    controller: controller,
-                    focusNode: focusNode,
-                    decoration: InputDecoration(
-                      labelText: 'Search Supplier',
-                      prefixIcon: const Icon(Icons.business),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                    onChanged: (val) {
-                      _supplierQuery = val;
-                      if (val.isEmpty) {
-                        _loadSalesData();
+                    fieldViewBuilder:
+                        (context, controller, focusNode, onFieldSubmitted) {
+                          return TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Search Product',
+                              prefixIcon: const Icon(Icons.search),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                            ),
+                            onChanged: (val) {
+                              _productQuery = val;
+                              if (val.isEmpty) {
+                                _loadSalesData();
+                              }
+                            },
+                            onSubmitted: (_) {
+                              onFieldSubmitted();
+                              _loadSalesData();
+                            },
+                          );
+                        },
+                  ),
+                ),
+                SizedBox(
+                  width: inputWidth,
+                  child: Autocomplete<String>(
+                    optionsBuilder: (TextEditingValue textEditingValue) {
+                      _supplierQuery = textEditingValue.text;
+                      if (textEditingValue.text.isEmpty) {
+                        return const Iterable<String>.empty();
                       }
+                      return _supplierNames.where(
+                        (String option) => option.toLowerCase().contains(
+                          textEditingValue.text.toLowerCase(),
+                        ),
+                      );
                     },
-                    onSubmitted: (_) {
-                      onFieldSubmitted();
+                    onSelected: (String selection) {
+                      _supplierQuery = selection;
                       _loadSalesData();
                     },
-                  );
-                },
-              ),
+                    fieldViewBuilder:
+                        (context, controller, focusNode, onFieldSubmitted) {
+                          return TextField(
+                            controller: controller,
+                            focusNode: focusNode,
+                            decoration: InputDecoration(
+                              labelText: 'Search Supplier',
+                              prefixIcon: const Icon(Icons.business),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
+                            ),
+                            onChanged: (val) {
+                              _supplierQuery = val;
+                              if (val.isEmpty) {
+                                _loadSalesData();
+                              }
+                            },
+                            onSubmitted: (_) {
+                              onFieldSubmitted();
+                              _loadSalesData();
+                            },
+                          );
+                        },
+                  ),
+                ),
+                ElevatedButton.icon(
+                  icon: const Icon(Icons.date_range),
+                  label: Text(
+                    _startDate == null
+                        ? 'Select Date Range'
+                        : '${DateFormat('MMM d').format(_startDate!)} - ${DateFormat('MMM d').format(_endDate!)}',
+                  ),
+                  onPressed: () => _selectDateRange(context),
+                ),
+                ElevatedButton(
+                  onPressed: _loadSalesData,
+                  child: const Text('Apply Filter'),
+                ),
+                TextButton(
+                  onPressed: _clearFilters,
+                  child: const Text('Clear Filters'),
+                ),
+              ],
             ),
-            ElevatedButton.icon(
-              icon: const Icon(Icons.date_range),
-              label: Text(_startDate == null ? 'Select Date Range' : '${DateFormat('MMM d').format(_startDate!)} - ${DateFormat('MMM d').format(_endDate!)}'),
-              onPressed: () => _selectDateRange(context),
-            ),
-            ElevatedButton(
-              onPressed: _loadSalesData,
-              child: const Text('Apply Filter'),
-            ),
-            TextButton(
-              onPressed: _clearFilters,
-              child: const Text('Clear Filters'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -372,10 +432,30 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        _buildCard('Total Revenue', '\$${_getTotalRevenue().toStringAsFixed(2)}', Icons.attach_money, Colors.green),
-        _buildCard('Top Product', _getTopSellingProduct(), Icons.star, Colors.orange),
-        _buildCard('Avg Qty Sold', _getAvgQuantity().toStringAsFixed(1), Icons.bar_chart, Colors.blue),
-        _buildCard('Total Sales', '${_sales.length}', Icons.receipt_long, Colors.purple),
+        _buildCard(
+          'Total Revenue',
+          _formatRs(_getTotalRevenue()),
+          Icons.attach_money,
+          Colors.green,
+        ),
+        _buildCard(
+          'Top Product',
+          _getTopSellingProduct(),
+          Icons.star,
+          Colors.orange,
+        ),
+        _buildCard(
+          'Avg Qty Sold',
+          _getAvgQuantity().toStringAsFixed(1),
+          Icons.bar_chart,
+          Colors.blue,
+        ),
+        _buildCard(
+          'Total Sales',
+          '${_sales.length}',
+          Icons.receipt_long,
+          Colors.purple,
+        ),
       ],
     );
   }
@@ -394,9 +474,19 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
             children: [
               Icon(icon, size: 36, color: color),
               const SizedBox(height: 8),
-              Text(title, style: TextStyle(fontSize: 14, color: Colors.grey[700])),
+              Text(
+                title,
+                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+              ),
               const SizedBox(height: 4),
-              Text(value, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: color)),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
             ],
           ),
         ),
@@ -412,7 +502,8 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     // Group sales by product to get total quantity
     Map<String, int> productQty = {};
     for (var s in _sales) {
-      productQty[s.productName] = (productQty[s.productName] ?? 0) + s.quantitySold;
+      productQty[s.productName] =
+          (productQty[s.productName] ?? 0) + s.quantitySold;
     }
 
     var entries = productQty.entries.toList();
@@ -431,7 +522,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
               color: Colors.blueAccent,
               width: 20,
               borderRadius: BorderRadius.circular(4),
-            )
+            ),
           ],
         ),
       );
@@ -455,12 +546,18 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         getTitlesWidget: (value, meta) {
-                          if (value.toInt() >= 0 && value.toInt() < entries.length) {
+                          if (value.toInt() >= 0 &&
+                              value.toInt() < entries.length) {
                             String name = entries[value.toInt()].key;
-                            if (name.length > 8) name = '${name.substring(0, 8)}...';
+                            if (name.length > 8) {
+                              name = '${name.substring(0, 8)}...';
+                            }
                             return Padding(
                               padding: const EdgeInsets.only(top: 8),
-                              child: Text(name, style: const TextStyle(fontSize: 10)),
+                              child: Text(
+                                name,
+                                style: const TextStyle(fontSize: 10),
+                              ),
                             );
                           }
                           return const Text('');
@@ -471,11 +568,18 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                       sideTitles: SideTitles(
                         showTitles: true,
                         reservedSize: 40,
-                        getTitlesWidget: (value, meta) => Text(value.toInt().toString(), style: const TextStyle(fontSize: 10)),
+                        getTitlesWidget: (value, meta) => Text(
+                          value.toInt().toString(),
+                          style: const TextStyle(fontSize: 10),
+                        ),
                       ),
                     ),
-                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
                   ),
                   borderData: FlBorderData(show: false),
                   gridData: const FlGridData(show: false),
@@ -488,36 +592,37 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     );
   }
 
-  Widget _buildPieChart() {
+  Widget _buildRevenueBarChart() {
     if (_sales.isEmpty) {
-      return const Center(child: Text('No data for pie chart'));
+      return const Center(child: Text('No data for revenue chart'));
     }
 
-    // Revenue contribution by product
+    // Revenue contribution by product, shown as vertical columns for readability.
     Map<String, double> productRev = {};
     for (var s in _sales) {
-      productRev[s.productName] = (productRev[s.productName] ?? 0.0) + s.revenue;
+      productRev[s.productName] =
+          (productRev[s.productName] ?? 0.0) + s.revenue;
     }
 
     var entries = productRev.entries.toList();
     entries.sort((a, b) => b.value.compareTo(a.value));
-    if (entries.length > 5) {
-      double others = entries.sublist(5).fold(0.0, (sum, item) => sum + item.value);
-      entries = entries.sublist(0, 5);
-      entries.add(MapEntry('Others', others));
+    if (entries.length > 6) {
+      entries = entries.sublist(0, 6);
     }
 
-    final List<Color> colors = [Colors.blue, Colors.orange, Colors.green, Colors.purple, Colors.red, Colors.grey];
-    
-    List<PieChartSectionData> sections = [];
+    final barGroups = <BarChartGroupData>[];
     for (int i = 0; i < entries.length; i++) {
-      sections.add(
-        PieChartSectionData(
-          color: colors[i % colors.length],
-          value: entries[i].value,
-          title: '${entries[i].key}\n\$${entries[i].value.toStringAsFixed(0)}',
-          radius: 100,
-          titleStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+      barGroups.add(
+        BarChartGroupData(
+          x: i,
+          barRods: [
+            BarChartRodData(
+              toY: entries[i].value,
+              color: Colors.deepPurple,
+              width: 18,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ],
         ),
       );
     }
@@ -528,16 +633,133 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            const Text('Revenue Contribution'),
+            const Text('Revenue Distribution (Top Products)'),
             const SizedBox(height: 16),
             Expanded(
-              child: PieChart(
-                PieChartData(
-                  sections: sections,
-                  centerSpaceRadius: 40,
-                  sectionsSpace: 2,
+              child: BarChart(
+                BarChartData(
+                  alignment: BarChartAlignment.spaceAround,
+                  barGroups: barGroups,
+                  gridData: const FlGridData(show: true),
+                  borderData: FlBorderData(show: false),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false),
+                    ),
+                    bottomTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        getTitlesWidget: (value, meta) {
+                          final index = value.toInt();
+                          if (index < 0 || index >= entries.length) {
+                            return const SizedBox.shrink();
+                          }
+                          final raw = entries[index].key;
+                          final label = raw.length > 10
+                              ? '${raw.substring(0, 10)}...'
+                              : raw;
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 8.0),
+                            child: Text(
+                              label,
+                              style: const TextStyle(fontSize: 10),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                    leftTitles: AxisTitles(
+                      sideTitles: SideTitles(
+                        showTitles: true,
+                        reservedSize: 48,
+                        getTitlesWidget: (value, meta) => Text(
+                          _formatRsCompact(value),
+                          style: const TextStyle(fontSize: 10),
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _resetRecordColumns() {
+    setState(() {
+      _showIdColumn = true;
+      _showProductColumn = true;
+      _showDateColumn = true;
+      _showQuantityColumn = true;
+      _showRevenueColumn = true;
+      _showSupplierColumn = true;
+    });
+  }
+
+  Widget _buildRecordColumnFilters() {
+    return Card(
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Choose visible columns',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                FilterChip(
+                  label: const Text('ID'),
+                  selected: _showIdColumn,
+                  onSelected: (value) => setState(() => _showIdColumn = value),
+                ),
+                FilterChip(
+                  label: const Text('Product'),
+                  selected: _showProductColumn,
+                  onSelected: (value) =>
+                      setState(() => _showProductColumn = value),
+                ),
+                FilterChip(
+                  label: const Text('Date'),
+                  selected: _showDateColumn,
+                  onSelected: (value) =>
+                      setState(() => _showDateColumn = value),
+                ),
+                FilterChip(
+                  label: const Text('Quantity'),
+                  selected: _showQuantityColumn,
+                  onSelected: (value) =>
+                      setState(() => _showQuantityColumn = value),
+                ),
+                FilterChip(
+                  label: const Text('Revenue'),
+                  selected: _showRevenueColumn,
+                  onSelected: (value) =>
+                      setState(() => _showRevenueColumn = value),
+                ),
+                FilterChip(
+                  label: const Text('Supplier'),
+                  selected: _showSupplierColumn,
+                  onSelected: (value) =>
+                      setState(() => _showSupplierColumn = value),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            TextButton(
+              onPressed: _resetRecordColumns,
+              child: const Text('Reset Columns'),
             ),
           ],
         ),
@@ -563,6 +785,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     List<FlSpot> movingAvgSpots = [];
     double maxX = (sortedKeys.length - 1).toDouble();
     if (maxX < 1) maxX = 1;
+    List<FlSpot> smoothingSpots = [];
 
     for (int i = 0; i < sortedKeys.length; i++) {
       final revenue = dateRev[sortedKeys[i]]!;
@@ -578,6 +801,18 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
       movingAvgSpots.add(FlSpot(i.toDouble(), avg));
     }
 
+    // Exponential smoothing highlights trend while damping short-term noise.
+    const alpha = 0.35;
+    double? previousSmoothed;
+    for (int i = 0; i < sortedKeys.length; i++) {
+      final actual = dateRev[sortedKeys[i]]!;
+      final smoothed = previousSmoothed == null
+          ? actual
+          : (alpha * actual) + ((1 - alpha) * previousSmoothed);
+      previousSmoothed = smoothed;
+      smoothingSpots.add(FlSpot(i.toDouble(), smoothed));
+    }
+
     double maxY = 0;
     for (final spot in spots) {
       if (spot.y > maxY) maxY = spot.y;
@@ -585,7 +820,10 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     if (maxY <= 0) maxY = 1;
 
     final totalPoints = sortedKeys.length;
-    final visiblePoints = (totalPoints / _lineChartZoom).ceil().clamp(2, totalPoints);
+    final visiblePoints = (totalPoints / _lineChartZoom).ceil().clamp(
+      2,
+      totalPoints,
+    );
     final maxStart = (totalPoints - visiblePoints).toDouble();
     final currentOffset = _lineChartOffset.clamp(0.0, maxStart);
     final startIndex = currentOffset.floor();
@@ -608,7 +846,10 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
             const SizedBox(height: 16),
             Row(
               children: [
-                const Text('Zoom', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                const Text(
+                  'Zoom',
+                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                ),
                 Expanded(
                   child: Slider(
                     value: _lineChartZoom,
@@ -619,10 +860,15 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                     onChanged: (value) {
                       setState(() {
                         _lineChartZoom = value;
-                        final newVisiblePoints =
-                            (totalPoints / _lineChartZoom).ceil().clamp(2, totalPoints);
-                        final newMaxStart = (totalPoints - newVisiblePoints).toDouble();
-                        _lineChartOffset = _lineChartOffset.clamp(0.0, newMaxStart);
+                        final newVisiblePoints = (totalPoints / _lineChartZoom)
+                            .ceil()
+                            .clamp(2, totalPoints);
+                        final newMaxStart = (totalPoints - newVisiblePoints)
+                            .toDouble();
+                        _lineChartOffset = _lineChartOffset.clamp(
+                          0.0,
+                          newMaxStart,
+                        );
                       });
                     },
                   ),
@@ -645,6 +891,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
               children: [
                 _buildLegendItem(Colors.green, 'Revenue'),
                 _buildLegendItem(Colors.orange, '3-Point Moving Avg'),
+                _buildLegendItem(Colors.blue, 'Exponential Smoothing'),
               ],
             ),
             const SizedBox(height: 10),
@@ -656,7 +903,8 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                   }
                   setState(() {
                     _lineChartOffset =
-                        (_lineChartOffset - (details.primaryDelta ?? 0) / 24).clamp(0.0, maxStart);
+                        (_lineChartOffset - (details.primaryDelta ?? 0) / 24)
+                            .clamp(0.0, maxStart);
                   });
                 },
                 child: LineChart(
@@ -672,10 +920,16 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                         getTooltipItems: (touchedSpots) {
                           return touchedSpots.map((spot) {
                             final index = spot.x.toInt();
-                            final date =
-                                index >= 0 && index < sortedKeys.length ? sortedKeys[index] : 'Unknown';
+                            final date = index >= 0 && index < sortedKeys.length
+                                ? sortedKeys[index]
+                                : 'Unknown';
+                            final seriesName = spot.barIndex == 0
+                                ? 'Revenue'
+                                : spot.barIndex == 1
+                                ? '3-Point Moving Avg'
+                                : 'Exponential Smoothing';
                             return LineTooltipItem(
-                              '$date\n\$${spot.y.toStringAsFixed(2)}',
+                              '$seriesName\n$date\n${_formatRs(spot.y)}',
                               const TextStyle(
                                 color: Colors.white,
                                 fontWeight: FontWeight.bold,
@@ -696,8 +950,11 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                             int index = value.toInt();
                             if (index >= 0 && index < sortedKeys.length) {
                               final visibleSpan = endIndex - startIndex + 1;
-                              final step = visibleSpan > 12 ? (visibleSpan / 6).ceil() : 1;
-                              if ((index - startIndex) % step != 0 && index != endIndex) {
+                              final step = visibleSpan > 12
+                                  ? (visibleSpan / 6).ceil()
+                                  : 1;
+                              if ((index - startIndex) % step != 0 &&
+                                  index != endIndex) {
                                 return const Text('');
                               }
                               return Padding(
@@ -716,16 +973,24 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                         sideTitles: SideTitles(
                           showTitles: true,
                           reservedSize: 40,
-                          getTitlesWidget: (value, meta) =>
-                              Text(value.toInt().toString(), style: const TextStyle(fontSize: 10)),
+                          getTitlesWidget: (value, meta) => Text(
+                            value.toInt().toString(),
+                            style: const TextStyle(fontSize: 10),
+                          ),
                         ),
                       ),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                     ),
                     borderData: FlBorderData(
                       show: true,
-                      border: Border.all(color: Colors.grey.withValues(alpha: 0.5)),
+                      border: Border.all(
+                        color: Colors.grey.withValues(alpha: 0.5),
+                      ),
                     ),
                     lineBarsData: [
                       LineChartBarData(
@@ -744,6 +1009,15 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                         spots: movingAvgSpots,
                         isCurved: true,
                         color: Colors.orange,
+                        barWidth: 2,
+                        isStrokeCapRound: true,
+                        dotData: const FlDotData(show: false),
+                        belowBarData: BarAreaData(show: false),
+                      ),
+                      LineChartBarData(
+                        spots: smoothingSpots,
+                        isCurved: true,
+                        color: Colors.blue,
                         barWidth: 2,
                         isStrokeCapRound: true,
                         dotData: const FlDotData(show: false),
@@ -777,10 +1051,41 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
 
   Widget _buildDataTable() {
     if (_sales.isEmpty) {
-      return const Center(child: Padding(
-        padding: EdgeInsets.all(16.0),
-        child: Text('No historical sales match your criteria.'),
-      ));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('No historical sales match your criteria.'),
+        ),
+      );
+    }
+
+    final columns = <DataColumn>[];
+    if (_showIdColumn) {
+      columns.add(const DataColumn(label: Text('ID')));
+    }
+    if (_showProductColumn) {
+      columns.add(const DataColumn(label: Text('Product')));
+    }
+    if (_showDateColumn) {
+      columns.add(const DataColumn(label: Text('Date')));
+    }
+    if (_showQuantityColumn) {
+      columns.add(const DataColumn(label: Text('Quantity')));
+    }
+    if (_showRevenueColumn) {
+      columns.add(const DataColumn(label: Text('Revenue')));
+    }
+    if (_showSupplierColumn) {
+      columns.add(const DataColumn(label: Text('Supplier')));
+    }
+
+    if (columns.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16.0),
+          child: Text('Select at least one column to display records.'),
+        ),
+      );
     }
 
     return LayoutBuilder(
@@ -788,27 +1093,43 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
         return SingleChildScrollView(
           child: PaginatedDataTable(
             header: const Text('Sales Records'),
-            rowsPerPage: _sales.length > 10 ? 10 : (_sales.isEmpty ? 1 : _sales.length),
-            columns: const [
-              DataColumn(label: Text('ID')),
-              DataColumn(label: Text('Product')),
-              DataColumn(label: Text('Date')),
-              DataColumn(label: Text('Quantity')),
-              DataColumn(label: Text('Revenue')),
-              DataColumn(label: Text('Supplier')),
-            ],
-            source: SalesDataSource(_sales),
+            columnSpacing: 24,
+            rowsPerPage: _sales.length > 10 ? 10 : _sales.length,
+            columns: columns,
+            source: SalesDataSource(
+              sales: _sales,
+              showIdColumn: _showIdColumn,
+              showProductColumn: _showProductColumn,
+              showDateColumn: _showDateColumn,
+              showQuantityColumn: _showQuantityColumn,
+              showRevenueColumn: _showRevenueColumn,
+              showSupplierColumn: _showSupplierColumn,
+            ),
           ),
         );
-      }
+      },
     );
   }
 }
 
 class SalesDataSource extends DataTableSource {
   final List<HistoricalSale> sales;
+  final bool showIdColumn;
+  final bool showProductColumn;
+  final bool showDateColumn;
+  final bool showQuantityColumn;
+  final bool showRevenueColumn;
+  final bool showSupplierColumn;
 
-  SalesDataSource(this.sales);
+  SalesDataSource({
+    required this.sales,
+    required this.showIdColumn,
+    required this.showProductColumn,
+    required this.showDateColumn,
+    required this.showQuantityColumn,
+    required this.showRevenueColumn,
+    required this.showSupplierColumn,
+  });
 
   @override
   DataRow? getRow(int index) {
@@ -816,14 +1137,28 @@ class SalesDataSource extends DataTableSource {
       return null;
     }
     final sale = sales[index];
-    return DataRow(cells: [
-      DataCell(Text(sale.saleId.toString())),
-      DataCell(Text(sale.productName)),
-      DataCell(Text(DateFormat('yyyy-MM-dd HH:mm').format(sale.saleDate))),
-      DataCell(Text(sale.quantitySold.toString())),
-      DataCell(Text('\$${sale.revenue.toStringAsFixed(2)}')),
-      DataCell(Text(sale.supplier ?? '-')),
-    ]);
+
+    final cells = <DataCell>[];
+    if (showIdColumn) {
+      cells.add(DataCell(Text(sale.saleId.toString())));
+    }
+    if (showProductColumn) {
+      cells.add(DataCell(Text(sale.productName)));
+    }
+    if (showDateColumn) {
+      cells.add(DataCell(Text(DateFormat('yyyy-MM-dd').format(sale.saleDate))));
+    }
+    if (showQuantityColumn) {
+      cells.add(DataCell(Text(sale.quantitySold.toString())));
+    }
+    if (showRevenueColumn) {
+      cells.add(DataCell(Text('Rs. ${sale.revenue.toStringAsFixed(2)}')));
+    }
+    if (showSupplierColumn) {
+      cells.add(DataCell(Text(sale.supplier ?? '-')));
+    }
+
+    return DataRow(cells: cells);
   }
 
   @override

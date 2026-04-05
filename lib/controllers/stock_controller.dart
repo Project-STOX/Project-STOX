@@ -147,6 +147,8 @@ class StockController {
           'sku': sku,
           'unit_cost': 0,
           'current_qty': 0,
+          'lead_time_days': 0,
+          'safety_stock': 0,
           'reorder_point': 0,
           'serial_no': serialNo,
           'status_flag': 'In Stock',

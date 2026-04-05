@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../controllers/product_controller.dart';
 import '../models/product.dart';
@@ -19,6 +21,7 @@ class _ManageProductsViewState extends State<ManageProductsView> {
   String searchQuery = '';
   List<Supplier> suppliers = [];
   String selectedStatus = 'All';
+  Timer? _filterDebounce;
 
   @override
   void initState() {
@@ -27,38 +30,77 @@ class _ManageProductsViewState extends State<ManageProductsView> {
     loadSuppliers();
   }
 
+  @override
+  void dispose() {
+    _filterDebounce?.cancel();
+    super.dispose();
+  }
+
+  String _safeLower(dynamic value) {
+    return value?.toString().toLowerCase() ?? '';
+  }
+
+  String _safeText(dynamic value, {String fallback = 'N/A'}) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
+  void _scheduleFilter() {
+    _filterDebounce?.cancel();
+    _filterDebounce = Timer(const Duration(milliseconds: 180), _filterProducts);
+  }
+
   void loadProducts() async {
     try {
       final data = await controller.fetchProducts();
+      if (!mounted) return;
       setState(() {
         products = data;
         filteredProducts = data;
         _sortProducts();
       });
     } catch (e) {
+      if (!mounted) return;
       // Handle error, perhaps show snackbar
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading products: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading products: $e')));
     }
   }
 
   void loadSuppliers() async {
     try {
       final data = await controller.fetchSuppliers();
+      if (!mounted) return;
       setState(() => suppliers = data);
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading suppliers: $e')));
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading suppliers: $e')));
     }
   }
 
   void _filterProducts() {
+    if (!mounted) return;
     setState(() {
       filteredProducts = products.where((p) {
         final query = searchQuery.toLowerCase().trim();
-        final matchesSearch = p['product_name'].toLowerCase().contains(query) ||
-               p['sku'].toLowerCase().contains(query) ||
-               (p['supplier'] != null && p['supplier']['supplier_name'].toLowerCase().contains(query)) ||
-               (p['serial_no'] != null && p['serial_no'].toString().toLowerCase().contains(query));
-        final matchesStatus = selectedStatus == 'All' || p['status_flag'] == selectedStatus;
+        final productName = _safeLower(p['product_name']);
+        final sku = _safeLower(p['sku']);
+        final supplierName = _safeLower(
+          (p['supplier'] as Map?)?['supplier_name'],
+        );
+        final serialNo = _safeLower(p['serial_no']);
+        final statusFlag = _safeText(p['status_flag'], fallback: 'In Stock');
+
+        final matchesSearch =
+            productName.contains(query) ||
+            sku.contains(query) ||
+            supplierName.contains(query) ||
+            serialNo.contains(query);
+        final matchesStatus =
+            selectedStatus == 'All' || statusFlag == selectedStatus;
         return matchesSearch && matchesStatus;
       }).toList();
       _sortProducts();
@@ -66,7 +108,10 @@ class _ManageProductsViewState extends State<ManageProductsView> {
   }
 
   void _sortProducts() {
-    filteredProducts.sort((a, b) => a['status_flag'].compareTo(b['status_flag']));
+    filteredProducts.sort(
+      (a, b) =>
+          _safeText(a['status_flag']).compareTo(_safeText(b['status_flag'])),
+    );
   }
 
   void _showProductDetails(Map<String, dynamic> productData) {
@@ -82,7 +127,10 @@ class _ManageProductsViewState extends State<ManageProductsView> {
             loadProducts();
           },
           onDelete: () async {
-            await controller.deleteProduct(productData['product_id'], widget.roleId);
+            await controller.deleteProduct(
+              productData['product_id'],
+              widget.roleId,
+            );
             loadProducts();
           },
         ),
@@ -126,25 +174,30 @@ class _ManageProductsViewState extends State<ManageProductsView> {
               ),
               onChanged: (value) {
                 searchQuery = value;
-                _filterProducts();
+                _scheduleFilter();
               },
             ),
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: DropdownButton<String>(
+            child: DropdownButtonFormField<String>(
               value: selectedStatus,
-              items: ['All', 'Low Stock', 'In Stock', 'High Stock', 'Discontinued'].map((status) => DropdownMenuItem(
-                value: status,
-                child: Text('Filter by: $status'),
-              )).toList(),
+              decoration: const InputDecoration(labelText: 'Filter by status'),
+              items:
+                  ['All', 'Low Stock', 'In Stock', 'High Stock', 'Discontinued']
+                      .map(
+                        (status) => DropdownMenuItem(
+                          value: status,
+                          child: Text(status),
+                        ),
+                      )
+                      .toList(),
               onChanged: (value) {
                 setState(() {
                   selectedStatus = value!;
-                  _filterProducts();
                 });
+                _scheduleFilter();
               },
-              isExpanded: true,
             ),
           ),
           Expanded(
@@ -152,9 +205,26 @@ class _ManageProductsViewState extends State<ManageProductsView> {
               itemCount: filteredProducts.length,
               itemBuilder: (context, index) {
                 final data = filteredProducts[index];
+                final reorderPoint = data['reorder_point'] ?? 0;
+                final productName = _safeText(
+                  data['product_name'],
+                  fallback: 'Unnamed Product',
+                );
+                final sku = _safeText(data['sku']);
+                final supplierName = _safeText(
+                  (data['supplier'] as Map?)?['supplier_name'],
+                  fallback: 'Unknown',
+                );
+                final serialNo = _safeText(data['serial_no']);
+                final statusFlag = _safeText(
+                  data['status_flag'],
+                  fallback: 'In Stock',
+                );
                 return ListTile(
-                  title: Text(data['product_name']),
-                  subtitle: Text('SKU: ${data['sku']}, Supplier: ${data['supplier']?['supplier_name'] ?? 'Unknown'}, Serial: ${data['serial_no'] ?? 'N/A'}, Status: ${data['status_flag']}'),
+                  title: Text(productName),
+                  subtitle: Text(
+                    'SKU: $sku, Supplier: $supplierName, RP: $reorderPoint, Serial: $serialNo, Status: $statusFlag',
+                  ),
                   onTap: () => _showProductDetails(data),
                 );
               },

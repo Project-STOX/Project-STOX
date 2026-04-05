@@ -1,3 +1,5 @@
+import 'package:supabase_flutter/supabase_flutter.dart';
+
 import '../services/supabase_service.dart';
 import '../models/user.dart';
 import '../models/role.dart';
@@ -67,10 +69,22 @@ class UserController {
     int? roleId,
     bool? isActive,
     bool? tfaActive,
+    bool verifyEmailChange = false,
   }) async {
     final updates = <String, dynamic>{};
-    if (username != null) updates['username'] = username;
-    if (email != null) updates['email'] = email;
+    if (username != null) updates['username'] = username.trim();
+
+    final normalizedEmail = email?.trim().toLowerCase();
+    if (normalizedEmail != null) {
+      if (verifyEmailChange && supabase.auth.currentSession != null) {
+        await supabase.auth.updateUser(
+          UserAttributes(email: normalizedEmail),
+        );
+      }
+
+      updates['email'] = normalizedEmail;
+    }
+
     if (roleId != null) updates['role_id'] = roleId;
     if (isActive != null) updates['is_active'] = isActive;
     if (tfaActive != null) updates['tfa_active'] = tfaActive;

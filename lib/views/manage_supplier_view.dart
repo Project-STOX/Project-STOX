@@ -7,7 +7,11 @@ import 'supplier_detail_page.dart';
 class ManageSuppliersView extends StatefulWidget {
   final int roleId;
   final int userId;
-  const ManageSuppliersView({super.key, required this.roleId, required this.userId});
+  const ManageSuppliersView({
+    super.key,
+    required this.roleId,
+    required this.userId,
+  });
 
   @override
   _ManageSuppliersViewState createState() => _ManageSuppliersViewState();
@@ -42,7 +46,9 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
     if (!['SME Owner', 'Inventory Manager'].contains(userRole)) {
       // Deny access
       Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Access denied')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Access denied')));
       return;
     }
 
@@ -62,7 +68,9 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
     } catch (e) {
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error loading suppliers: $e')));
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error loading suppliers: $e')));
     }
   }
 
@@ -81,16 +89,24 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
   void _applySorting() {
     switch (selectedSort) {
       case 'Name (A-Z)':
-        filteredSuppliers.sort((a, b) => a.supplierName.compareTo(b.supplierName));
+        filteredSuppliers.sort(
+          (a, b) => a.supplierName.compareTo(b.supplierName),
+        );
         break;
       case 'Name (Z-A)':
-        filteredSuppliers.sort((a, b) => b.supplierName.compareTo(a.supplierName));
+        filteredSuppliers.sort(
+          (a, b) => b.supplierName.compareTo(a.supplierName),
+        );
         break;
       case 'Lead Time (Ascending)':
-        filteredSuppliers.sort((a, b) => (a.leadTimeDays ?? 0).compareTo(b.leadTimeDays ?? 0));
+        filteredSuppliers.sort(
+          (a, b) => (a.leadTimeDays ?? 0).compareTo(b.leadTimeDays ?? 0),
+        );
         break;
       case 'Lead Time (Descending)':
-        filteredSuppliers.sort((a, b) => (b.leadTimeDays ?? 0).compareTo(a.leadTimeDays ?? 0));
+        filteredSuppliers.sort(
+          (a, b) => (b.leadTimeDays ?? 0).compareTo(a.leadTimeDays ?? 0),
+        );
         break;
     }
   }
@@ -131,7 +147,11 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
           roleId: widget.roleId,
           userId: widget.userId,
           onSave: (newSupplier) async {
-            await controller.addSupplier(newSupplier, widget.roleId, widget.userId);
+            await controller.addSupplier(
+              newSupplier,
+              widget.roleId,
+              widget.userId,
+            );
             loadSuppliers();
           },
         ),
@@ -141,7 +161,8 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
 
   @override
   Widget build(BuildContext context) {
-    if (userRole == null || !['SME Owner', 'Inventory Manager'].contains(userRole)) {
+    if (userRole == null ||
+        !['SME Owner', 'Inventory Manager'].contains(userRole)) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return Scaffold(
@@ -167,19 +188,20 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
           ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
-            child: DropdownButton<String>(
+            child: DropdownButtonFormField<String>(
               value: selectedSort,
-              items: sortOptions.map((sort) => DropdownMenuItem(
-                value: sort,
-                child: Text('Sort by: $sort'),
-              )).toList(),
+              decoration: const InputDecoration(labelText: 'Sort by'),
+              items: sortOptions
+                  .map(
+                    (sort) => DropdownMenuItem(value: sort, child: Text(sort)),
+                  )
+                  .toList(),
               onChanged: (value) {
                 setState(() {
                   selectedSort = value!;
                   _applySorting();
                 });
               },
-              isExpanded: true,
             ),
           ),
           Expanded(
@@ -189,7 +211,9 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
                 final supplier = filteredSuppliers[index];
                 return ListTile(
                   title: Text(supplier.supplierName),
-                  subtitle: Text('Supplier ID: ${supplier.supplierId}, Address: ${supplier.address ?? 'N/A'}, Contact: ${supplier.contactInfo ?? 'N/A'}, Lead Time: ${supplier.leadTimeDays ?? 'N/A'} days'),
+                  subtitle: Text(
+                    'Supplier ID: ${supplier.supplierId}, Address: ${supplier.address ?? 'N/A'}, Contact: ${supplier.contactInfo ?? 'N/A'}, Lead Time: ${supplier.leadTimeDays ?? 'N/A'} days',
+                  ),
                   onTap: () => _showSupplierDetails(supplier),
                 );
               },
