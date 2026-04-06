@@ -10,6 +10,7 @@ import '../controllers/notification_controller.dart';
 import '../controllers/historical_sales_controller.dart';
 import '../controllers/stock_controller.dart';
 import 'historical_sales_view.dart';
+import 'import_data_view.dart';
 
 class DashboardView extends StatefulWidget {
   final UserModel user;
@@ -301,6 +302,19 @@ class _DashboardViewState extends State<DashboardView> {
                       );
                     }
                     return const SizedBox.shrink();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.file_upload),
+                  title: const Text('Import Data'),
+                  onTap: () {
+                    Navigator.pop(context); // Close drawer
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ImportDataView(user: widget.user),
+                      ),
+                    );
                   },
                 ),
                 const Divider(),
