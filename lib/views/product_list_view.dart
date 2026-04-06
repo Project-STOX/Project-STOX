@@ -20,8 +20,16 @@ class _ProductListViewState extends State<ProductListView> {
   }
 
   void loadProducts() async {
-    final data = await controller.fetchProducts();
-    setState(() => products = data.map((map) => Product.fromJson(map)).toList());
+    try {
+      final data = await controller.fetchProducts();
+      if (!mounted) return;
+      setState(() => products = data.map((map) => Product.fromJson(map)).toList());
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading products: $e')),
+      );
+    }
   }
 
   @override

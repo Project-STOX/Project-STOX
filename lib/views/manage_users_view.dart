@@ -1,3 +1,5 @@
+// ignore_for_file: unnecessary_cast
+
 import 'package:flutter/material.dart';
 import '../controllers/user_controller.dart';
 import '../controllers/auth_controller.dart';
@@ -196,7 +198,10 @@ class _ManageUsersViewState extends State<ManageUsersView> {
                   itemCount: _users.length,
                   itemBuilder: (context, index) {
                     final user = _users[index];
-                    final role = _roles.where((r) => r.roleId == user.roleId).firstOrNull;
+                    final Role? role = _roles.cast<Role?>().firstWhere(
+                      (r) => r?.roleId == user.roleId,
+                      orElse: () => null,
+                    );
 
                     return Card(
                       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -277,7 +282,6 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
   late int _selectedRoleId;
   bool _isActive = false;
   bool _tfaActive = false;
-  bool _showPassword = false;
   bool _isLoading = false;
 
   @override
@@ -361,23 +365,6 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
               controller: _emailController,
               decoration: const InputDecoration(labelText: 'Email'),
               keyboardType: TextInputType.emailAddress,
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                const Text('Password: '),
-                Expanded(
-                  child: Text(
-                    _showPassword ? widget.user.passwordHash : '••••••••',
-                    style: const TextStyle(fontFamily: 'monospace'),
-                  ),
-                ),
-                IconButton(
-                  icon: Icon(_showPassword ? Icons.visibility_off : Icons.visibility),
-                  onPressed: () => setState(() => _showPassword = !_showPassword),
-                  tooltip: _showPassword ? 'Hide Password' : 'Show Password',
-                ),
-              ],
             ),
             const SizedBox(height: 16),
             DropdownButtonFormField<int>(

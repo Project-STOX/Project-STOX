@@ -12,9 +12,9 @@ class SupplierController {
   }
 
   Future<void> addSupplier(Supplier supplier, int roleId, int userId) async {
-    final allowed = await authController.hasPermission(roleId, "manage_suppliers");
+    final allowed = await authController.hasPermission(roleId, "Manage suppliers");
     if (!allowed) {
-      throw Exception("Permission denied: manage_suppliers");
+      throw Exception("Permission denied: Manage suppliers");
     }
 
     await supabase.from('supplier').insert({
@@ -27,9 +27,9 @@ class SupplierController {
   }
 
   Future<void> updateSupplier(Supplier supplier, int roleId) async {
-    final allowed = await authController.hasPermission(roleId, "manage_suppliers");
+    final allowed = await authController.hasPermission(roleId, "Manage suppliers");
     if (!allowed) {
-      throw Exception("Permission denied: manage_suppliers");
+      throw Exception("Permission denied: Manage suppliers");
     }
 
     await supabase.from('supplier').update({
@@ -41,9 +41,9 @@ class SupplierController {
   }
 
   Future<void> deleteSupplier(int supplierId, int roleId) async {
-    final allowed = await authController.hasPermission(roleId, "manage_suppliers");
+    final allowed = await authController.hasPermission(roleId, "Manage suppliers");
     if (!allowed) {
-      throw Exception("Permission denied: manage_suppliers");
+      throw Exception("Permission denied: Manage suppliers");
     }
 
     await supabase.from('supplier').delete().eq('supplier_id', supplierId);

@@ -16,13 +16,27 @@ class NotificationModel {
   });
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
+    DateTime? parseSentAt(dynamic raw) {
+      if (raw == null) return null;
+      if (raw is DateTime) return raw;
+      if (raw is String) {
+        return DateTime.tryParse(raw);
+      }
+      if (raw is int) {
+        // Handle Unix timestamps in seconds or milliseconds.
+        final milliseconds = raw > 1000000000000 ? raw : raw * 1000;
+        return DateTime.fromMillisecondsSinceEpoch(milliseconds);
+      }
+      return null;
+    }
+
     return NotificationModel(
-      notificationId: json['notification_id'],
-      senderId: json['sender_id'],
-      recipientId: json['recipient_id'],
-      message: json['message'] ?? '',
-      type: json['type'] ?? 'Info',
-      sentAt: json['sent_at'] != null ? DateTime.parse(json['sent_at']) : null,
+      notificationId: (json['notification_id'] as num?)?.toInt(),
+      senderId: (json['sender_id'] as num?)?.toInt() ?? 0,
+      recipientId: (json['recipient_id'] as num?)?.toInt() ?? 0,
+      message: json['message']?.toString() ?? '',
+      type: json['type']?.toString() ?? 'Info',
+      sentAt: parseSentAt(json['sent_at']),
     );
   }
 

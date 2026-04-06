@@ -94,6 +94,25 @@ class HistoricalSalesController {
     }
   }
 
+  Future<List<HistoricalSale>> fetchSalesForProduct(int productId) async {
+    try {
+      final response = await supabase
+          .from('historical_sales')
+          .select(
+            '*, product!inner(product_name, supplier!inner(supplier_name))',
+          )
+          .eq('product_id', productId)
+          .order('sale_date', ascending: true);
+
+      return response
+          .map<HistoricalSale>((json) => HistoricalSale.fromJson(json))
+          .toList();
+    } catch (e) {
+      print('Error fetching product sales history: $e');
+      rethrow;
+    }
+  }
+
   // Log unauthorized access
   Future<void> logUnauthorizedAccess(int userId) async {
     try {

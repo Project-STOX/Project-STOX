@@ -5,6 +5,8 @@ class Product {
   final String sku;
   final double unitCost;
   final int currentQty;
+  final int? leadTimeDays;
+  final int safetyStock;
   final int reorderPoint;
   final String? serialNo;
   final String statusFlag;
@@ -16,6 +18,8 @@ class Product {
     required this.sku,
     required this.unitCost,
     required this.currentQty,
+    this.leadTimeDays,
+    required this.safetyStock,
     required this.reorderPoint,
     this.serialNo,
     required this.statusFlag,
@@ -29,7 +33,9 @@ class Product {
       sku: json['sku'],
       unitCost: double.parse(json['unit_cost'].toString()),
       currentQty: json['current_qty'],
-      reorderPoint: json['reorder_point'],
+      leadTimeDays: (json['lead_time_days'] as num?)?.toInt(),
+      safetyStock: (json['safety_stock'] as num?)?.toInt() ?? 0,
+      reorderPoint: (json['reorder_point'] as num?)?.toInt() ?? 0,
       serialNo: json['serial_no']?.toString(),
       statusFlag: json['status_flag'] ?? 'In Stock',
     );

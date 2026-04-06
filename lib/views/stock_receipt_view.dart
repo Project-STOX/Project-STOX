@@ -99,13 +99,14 @@ class _StockReceiptViewState extends State<StockReceiptView> {
   }
 
   String _receiptTitle(StockReceipt receipt) {
-    return receipt.productName ?? 'Receipt #${receipt.stockReceiptId}';
+    return 'Receipt ID: ${receipt.stockReceiptId}';
   }
 
   String _receiptSubtitle(StockReceipt receipt) {
-    return 'SKU: ${receipt.productSku ?? '-'} | Supplier: ${receipt.supplierName ?? '-'}\n'
-        'Received: ${receipt.quantityReceived} | Damaged: ${receipt.quantityDamaged}\n'
-        'Date: ${_formatDateTime(receipt.receiptDate)} | By: ${receipt.recordedByUsername ?? receipt.recordedBy.toString()}';
+    return 'Receipt Date: ${_formatDateTime(receipt.receiptDate)}\n'
+        'Product: ${receipt.productName ?? '-'} | SKU: ${receipt.productSku ?? '-'}\n'
+      'Supplier: ${receipt.supplierId} - ${receipt.supplierName ?? '-'}\n'
+        'Received: ${receipt.quantityReceived} | Damaged: ${receipt.quantityDamaged} | By: ${receipt.recordedByUsername ?? receipt.recordedBy.toString()}';
   }
 
   String _productDisplay(Product product) {
@@ -114,25 +115,6 @@ class _StockReceiptViewState extends State<StockReceiptView> {
 
   String _supplierDisplay(Supplier supplier) {
     return 'ID: ${supplier.supplierId} | ${supplier.supplierName}';
-  }
-
-  String _supplierDropdownLabel(Supplier? supplier) {
-    if (supplier == null) {
-      return 'Select supplier';
-    }
-    return _supplierDisplay(supplier);
-  }
-
-  bool _matchesProductQuery(Product product, String query) {
-    return product.productName.toLowerCase().contains(query) ||
-        product.sku.toLowerCase().contains(query) ||
-        (product.serialNo?.toLowerCase().contains(query) ?? false) ||
-        product.productId.toString().contains(query);
-  }
-
-  bool _matchesSupplierQuery(Supplier supplier, String query) {
-    return supplier.supplierName.toLowerCase().contains(query) ||
-        supplier.supplierId.toString().contains(query);
   }
 
   void _syncAutocompleteFields() {
@@ -177,7 +159,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
         ),
         const SizedBox(height: 12),
         DropdownButtonFormField<Product>(
-          value: _selectedProduct,
+          initialValue: _selectedProduct,
           isExpanded: true,
           decoration: const InputDecoration(
             labelText: 'Product',
@@ -204,7 +186,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant,
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
@@ -228,7 +210,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
         ),
         const SizedBox(height: 8),
         DropdownButtonFormField<Supplier>(
-          value: _selectedSupplier,
+          initialValue: _selectedSupplier,
           isExpanded: true,
           decoration: const InputDecoration(
             labelText: 'Supplier',
@@ -973,7 +955,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
                           controller: _searchController,
                           decoration: InputDecoration(
                             labelText:
-                                'Search by product, SKU, serial, or supplier',
+                              'Search by receipt ID, product, SKU, serial, supplier, or supplier ID',
                             prefixIcon: const Icon(Icons.search),
                             suffixIcon: _isSearching
                                 ? const SizedBox(
@@ -1126,7 +1108,7 @@ class _StockReceiptScannerViewState extends State<StockReceiptScannerView> {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(10),
-                color: _statusColor.withOpacity(0.12),
+                color: _statusColor.withValues(alpha: 0.12),
               ),
               child: Text(
                 _statusMessage,

@@ -12,10 +12,19 @@ import 'models/user.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  const supabaseUrl = String.fromEnvironment(
+    'SUPABASE_URL',
+    defaultValue: 'https://odowtpnnkxgdbmtnqphr.supabase.co',
+  );
+  const supabaseAnonKey = String.fromEnvironment(
+    'SUPABASE_ANON_KEY',
+    defaultValue: 'sb_publishable_vmL-vLqnAcwbDMrmOew7Ww_-KGRa6Hk',
+  );
+
   await Supabase.initialize(
-    url: 'https://odowtpnnkxgdbmtnqphr.supabase.co',
-    anonKey:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9kb3d0cG5ua3hnZGJtdG5xcGhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ2ODEwNjEsImV4cCI6MjA5MDI1NzA2MX0.jTGi-vgWnb6XmlaXuHK5CvsmirponTw3s0FHy-iFzig',
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
   );
   runApp(MyApp());
 }

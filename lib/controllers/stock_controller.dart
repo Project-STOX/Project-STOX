@@ -72,14 +72,23 @@ class StockController {
         .toList();
 
     final query = searchQuery?.trim().toLowerCase() ?? '';
+    final normalizedQuery = query.replaceAll(RegExp(r'[^a-z0-9]'), '');
     if (query.isNotEmpty) {
       receipts = receipts.where((receipt) {
+        final normalizedSupplierName = (receipt.supplierName ?? '')
+            .toLowerCase()
+            .replaceAll(RegExp(r'[^a-z0-9]'), '');
+        final supplierIdText = receipt.supplierId.toString();
+        final supplierKeyText = 'supplierid$supplierIdText';
+
         return receipt.stockReceiptId.toString().contains(query) ||
             receipt.productId.toString().contains(query) ||
             (receipt.productName ?? '').toLowerCase().contains(query) ||
             (receipt.productSku ?? '').toLowerCase().contains(query) ||
             (receipt.productSerialNo ?? '').toLowerCase().contains(query) ||
-            receipt.supplierId.toString().contains(query) ||
+            supplierIdText.contains(query) ||
+            supplierKeyText.contains(normalizedQuery) ||
+            normalizedSupplierName.contains(normalizedQuery) ||
             (receipt.supplierName ?? '').toLowerCase().contains(query) ||
             receipt.recordedBy.toString().contains(query) ||
             (receipt.recordedByUsername ?? '').toLowerCase().contains(query);
@@ -138,6 +147,8 @@ class StockController {
           'sku': sku,
           'unit_cost': 0,
           'current_qty': 0,
+          'lead_time_days': 0,
+          'safety_stock': 0,
           'reorder_point': 0,
           'serial_no': serialNo,
           'status_flag': 'In Stock',
