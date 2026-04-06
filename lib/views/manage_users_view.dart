@@ -90,6 +90,7 @@ class _ManageUsersViewState extends State<ManageUsersView> {
         onUserAdded: _refreshData,
         userController: _userController,
         roleController: _roleController,
+        adminId: widget.user.userId,
       ),
     );
   }
@@ -116,7 +117,10 @@ class _ManageUsersViewState extends State<ManageUsersView> {
 
     if (confirmed == true) {
       try {
-        await _userController.deleteUser(user.userId);
+        await _userController.deleteUser(
+          user.userId,
+          actorUserId: widget.user.userId,
+        );
         await _refreshData();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -136,7 +140,11 @@ class _ManageUsersViewState extends State<ManageUsersView> {
   Future<void> _toggleUserActive(UserModel user) async {
     try {
       final newStatus = !user.isActive;
-      await _userController.toggleUserActive(user.userId, newStatus);
+      await _userController.toggleUserActive(
+        user.userId,
+        newStatus,
+        actorUserId: widget.user.userId,
+      );
       
       // Send system notification to the user
       await _notificationController.sendNotifications(
@@ -311,6 +319,7 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
         roleId: _selectedRoleId,
         isActive: _isActive,
         tfaActive: _tfaActive,
+        actorUserId: widget.adminId,
       );
       // Check for changes to notify
       if (widget.user.roleId != _selectedRoleId) {
@@ -417,6 +426,7 @@ class AddUserDialog extends StatefulWidget {
   final VoidCallback onUserAdded;
   final UserController userController;
   final RoleController roleController;
+  final int adminId;
 
   const AddUserDialog({
     super.key,
@@ -424,6 +434,7 @@ class AddUserDialog extends StatefulWidget {
     required this.onUserAdded,
     required this.userController,
     required this.roleController,
+    required this.adminId,
   });
 
   @override
@@ -460,6 +471,7 @@ class _AddUserDialogState extends State<AddUserDialog> {
         _passwordController.text,
         _selectedRoleId!,
         verifyEmail: _verifyEmail,
+        actorUserId: widget.adminId,
       );
       widget.onUserAdded();
       if (mounted) {

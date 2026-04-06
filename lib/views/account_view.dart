@@ -72,6 +72,7 @@ class _AccountViewState extends State<AccountView> {
         email: normalizedEmail,
         tfaActive: _tfaActive,
         verifyEmailChange: verifyEmailChange,
+        actorUserId: widget.user.userId,
       );
 
       if (mounted) {
@@ -118,6 +119,7 @@ class _AccountViewState extends State<AccountView> {
         _oldPasswordController.text,
         _newPasswordController.text,
         tfaCode: _useTfaForPasswordChange ? _tfaCodeController.text : null,
+        actorUserId: widget.user.userId,
       );
 
       if (mounted) {

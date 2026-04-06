@@ -11,6 +11,8 @@ class LoginView extends StatefulWidget {
 }
 
 class _LoginViewState extends State<LoginView> {
+  static const String _loginLogoAssetPath = 'assets/images/stox_logo.png';
+
   final AuthController authController = AuthController();
   final TextEditingController identifierController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
@@ -111,6 +113,7 @@ class _LoginViewState extends State<LoginView> {
           }
         } else {
           // No 2FA, go straight to dashboard
+          await authController.logSuccessfulSystemEntry(user, viaMfa: false);
           Navigator.pushReplacementNamed(
             context,
             '/dashboard',
@@ -161,6 +164,32 @@ class _LoginViewState extends State<LoginView> {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              Container(
+                constraints: const BoxConstraints(maxWidth: 420),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Image.asset(
+                    _loginLogoAssetPath,
+                    fit: BoxFit.contain,
+                    errorBuilder: (_, __, ___) => const Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.image_not_supported_outlined,
+                          size: 46,
+                          color: Colors.blueGrey,
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          'Place logo at assets/images/stox_logo.png',
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               TextField(
                 controller: identifierController,
                 decoration: const InputDecoration(

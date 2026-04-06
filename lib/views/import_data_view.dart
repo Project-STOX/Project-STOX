@@ -12,7 +12,9 @@ import '../utils/csv_export_stub.dart'
   if (dart.library.html) '../utils/csv_export_web.dart' as csv_export;
 
 
+import '../controllers/auth_controller.dart';
 import '../models/user.dart';
+import '../services/audit_log_service.dart';
 
 class ImportDataView extends StatefulWidget {
   final UserModel user;
@@ -24,7 +26,12 @@ class ImportDataView extends StatefulWidget {
 }
 
 class _ImportDataViewState extends State<ImportDataView> {
+  final AuthController _authController = AuthController();
   final SupabaseClient _supabase = Supabase.instance.client;
+  final AuditLogService _auditLogService = AuditLogService();
+
+  bool _isLoading = true;
+  bool _hasAccess = false;
 
   // Expected headers for each data type
   static const Map<String, List<String>> _expectedHeaders = {
@@ -33,6 +40,42 @@ class _ImportDataViewState extends State<ImportDataView> {
     'Stock receipt': ['receipt id', 'receipt date', 'supplier id', 'product id', 'quantity received', 'qa check', 'quantitiy damage', 'remarks'],
     'Sales history': ['sales id', 'product id', 'sale date', 'quanitity sold', 'revenue'],
   };
+
+  @override
+  void initState() {
+    super.initState();
+    _checkAccess();
+  }
+
+  Future<void> _checkAccess() async {
+    final hasPermission = await _authController.hasPermission(
+      widget.user.roleId,
+      'Import data',
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (!hasPermission) {
+      await _auditLogService.logAction(
+        userId: widget.user.userId,
+        action: 'Unauthorized access attempt',
+        entityType: 'Page',
+        entityId: 0,
+        details: 'CSV import page access denied',
+      );
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _hasAccess = hasPermission;
+      _isLoading = false;
+    });
+  }
 
   Future<void> _pickFile(String dataType) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
@@ -417,6 +460,13 @@ class _ImportDataViewState extends State<ImportDataView> {
       final productData = _mapRowToProduct(headers, row);
       await _supabase.from('product').insert(productData);
     }
+
+    await _auditLogService.logAction(
+      userId: widget.user.userId,
+      action: 'Import CSV products',
+      entityType: 'Product',
+      details: 'Imported ${rows.length} product row(s) via CSV',
+    );
   }
 
   Future<void> _importSuppliers(List<String> headers, List<List<dynamic>> rows) async {
@@ -424,6 +474,13 @@ class _ImportDataViewState extends State<ImportDataView> {
       final supplierData = _mapRowToSupplier(headers, row);
       await _supabase.from('supplier').insert(supplierData);
     }
+
+    await _auditLogService.logAction(
+      userId: widget.user.userId,
+      action: 'Import CSV suppliers',
+      entityType: 'Supplier',
+      details: 'Imported ${rows.length} supplier row(s) via CSV',
+    );
   }
 
   Future<void> _importStockReceipts(List<String> headers, List<List<dynamic>> rows) async {
@@ -431,6 +488,13 @@ class _ImportDataViewState extends State<ImportDataView> {
       final receiptData = _mapRowToStockReceipt(headers, row, widget.user.userId);
       await _supabase.from('stock_receipt').insert(receiptData);
     }
+
+    await _auditLogService.logAction(
+      userId: widget.user.userId,
+      action: 'Import CSV stock receipts',
+      entityType: 'StockReceipt',
+      details: 'Imported ${rows.length} stock receipt row(s) via CSV',
+    );
   }
 
   Future<void> _importSalesHistory(List<String> headers, List<List<dynamic>> rows) async {
@@ -438,6 +502,13 @@ class _ImportDataViewState extends State<ImportDataView> {
       final saleData = _mapRowToSale(headers, row);
       await _supabase.from('sales').insert(saleData);
     }
+
+    await _auditLogService.logAction(
+      userId: widget.user.userId,
+      action: 'Import CSV sales history',
+      entityType: 'Sales',
+      details: 'Imported ${rows.length} sales row(s) via CSV',
+    );
   }
 
   // Helper methods to map CSV rows to database objects
@@ -588,6 +659,27 @@ class _ImportDataViewState extends State<ImportDataView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (!_hasAccess) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Import CSV Data')),
+        body: const Center(
+          child: Padding(
+            padding: EdgeInsets.all(24.0),
+            child: Text(
+              'Access denied: you do not have permission to use CSV import.',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(title: const Text('Import CSV Data')),
       body: SafeArea(

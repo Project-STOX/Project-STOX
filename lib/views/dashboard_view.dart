@@ -9,8 +9,10 @@ import 'notifications_list_view.dart';
 import '../controllers/notification_controller.dart';
 import '../controllers/historical_sales_controller.dart';
 import '../controllers/stock_controller.dart';
+import '../controllers/role_controller.dart';
 import 'historical_sales_view.dart';
 import 'import_data_view.dart';
+import 'audit_log_view.dart';
 
 class DashboardView extends StatefulWidget {
   final UserModel user;
@@ -28,6 +30,7 @@ class _DashboardViewState extends State<DashboardView> {
   final HistoricalSalesController historicalSalesController =
       HistoricalSalesController();
   final StockController stockController = StockController();
+  final RoleController roleController = RoleController();
 
   @override
   void initState() {
@@ -36,12 +39,15 @@ class _DashboardViewState extends State<DashboardView> {
     notificationController.ensureSendMessagePermission();
     historicalSalesController.ensureHistoricalDataPermission();
     stockController.ensureStockReceiptPermission();
+    roleController.ensurePermissionDictionary();
   }
 
   void _logout(BuildContext context) async {
     try {
       // Sign out and remove remembered mobile session token.
-      await authController.signOutAndInvalidateRememberedSession();
+      await authController.signOutAndInvalidateRememberedSession(
+        userId: widget.user.userId,
+      );
 
       // Navigate back to login page and clear navigation stack
       if (mounted) {
@@ -217,6 +223,7 @@ class _DashboardViewState extends State<DashboardView> {
                             MaterialPageRoute(
                               builder: (context) => ManageProductsView(
                                 roleId: widget.user.roleId,
+                                userId: widget.user.userId,
                               ),
                             ),
                           );
@@ -304,17 +311,56 @@ class _DashboardViewState extends State<DashboardView> {
                     return const SizedBox.shrink();
                   },
                 ),
-                ListTile(
-                  leading: const Icon(Icons.file_upload),
-                  title: const Text('Import Data'),
-                  onTap: () {
-                    Navigator.pop(context); // Close drawer
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => ImportDataView(user: widget.user),
-                      ),
-                    );
+                FutureBuilder<bool>(
+                  future: authController.hasPermission(
+                    widget.user.roleId,
+                    'View audit log',
+                  ),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data == true) {
+                      return ListTile(
+                        leading: const Icon(Icons.manage_history),
+                        title: const Text('Audit Log'),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => AuditLogView(
+                                user: widget.user,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink();
+                  },
+                ),
+                FutureBuilder<bool>(
+                  future: authController.hasPermission(
+                    widget.user.roleId,
+                    'Import data',
+                  ),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data == true) {
+                      return ListTile(
+                        leading: const Icon(Icons.file_upload),
+                        title: const Text('Import Data'),
+                        onTap: () {
+                          Navigator.pop(context); // Close drawer
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ImportDataView(
+                                user: widget.user,
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }
+                    return const SizedBox.shrink();
                   },
                 ),
                 const Divider(),

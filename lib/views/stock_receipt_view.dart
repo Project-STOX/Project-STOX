@@ -711,6 +711,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
         sku: result['sku'] as String,
         supplierId: _selectedSupplier!.supplierId,
         serialNo: result['serialNo'] as String?,
+        actorUserId: widget.user.userId,
       );
 
       await _loadCatalog();
@@ -837,6 +838,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
       await _controller.deleteStockReceipt(
         receipt.stockReceiptId,
         widget.user.roleId,
+        actorUserId: widget.user.userId,
       );
       await _loadReceipts(showLoading: false);
       if (_editingReceipt?.stockReceiptId == receipt.stockReceiptId) {

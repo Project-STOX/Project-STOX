@@ -8,7 +8,13 @@ import 'product_detail_page.dart';
 
 class ManageProductsView extends StatefulWidget {
   final int roleId;
-  const ManageProductsView({super.key, required this.roleId});
+  final int userId;
+
+  const ManageProductsView({
+    super.key,
+    required this.roleId,
+    required this.userId,
+  });
 
   @override
   _ManageProductsViewState createState() => _ManageProductsViewState();
@@ -123,13 +129,18 @@ class _ManageProductsViewState extends State<ManageProductsView> {
           suppliers: suppliers,
           roleId: widget.roleId,
           onSave: (updatedProduct) async {
-            await controller.updateProduct(updatedProduct, widget.roleId);
+            await controller.updateProduct(
+              updatedProduct,
+              widget.roleId,
+              actorUserId: widget.userId,
+            );
             loadProducts();
           },
           onDelete: () async {
             await controller.deleteProduct(
               productData['product_id'],
               widget.roleId,
+              actorUserId: widget.userId,
             );
             loadProducts();
           },
@@ -147,7 +158,11 @@ class _ManageProductsViewState extends State<ManageProductsView> {
           suppliers: suppliers,
           roleId: widget.roleId,
           onSave: (newProduct) async {
-            await controller.addProduct(newProduct, widget.roleId);
+            await controller.addProduct(
+              newProduct,
+              widget.roleId,
+              actorUserId: widget.userId,
+            );
             loadProducts();
           },
         ),
@@ -181,7 +196,7 @@ class _ManageProductsViewState extends State<ManageProductsView> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: DropdownButtonFormField<String>(
-              value: selectedStatus,
+              initialValue: selectedStatus,
               decoration: const InputDecoration(labelText: 'Filter by status'),
               items:
                   ['All', 'Low Stock', 'In Stock', 'High Stock', 'Discontinued']

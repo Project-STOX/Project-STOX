@@ -2,9 +2,11 @@ import '../services/supabase_service.dart';
 import '../models/role.dart';
 import '../models/permission.dart';
 import '../models/user.dart';
+import '../services/audit_log_service.dart';
 
 class RoleController {
   final supabase = SupabaseService.client;
+  final AuditLogService auditLogService = AuditLogService();
 
   static const List<Map<String, dynamic>> permissionDictionary = [
     {'perm_id': 1, 'perm_name': 'Manage users'},
@@ -16,6 +18,7 @@ class RoleController {
     {'perm_id': 8, 'perm_name': 'Send message'},
     {'perm_id': 9, 'perm_name': 'Historical data'},
     {'perm_id': 10, 'perm_name': 'View audit log'},
+    {'perm_id': 11, 'perm_name': 'Import data'},
   ];
 
   Future<void> ensurePermissionDictionary() async {
@@ -76,12 +79,25 @@ class RoleController {
   }
 
   // Create new role
-  Future<int> createRole(String roleName, String? description) async {
+  Future<int> createRole(
+    String roleName,
+    String? description, {
+    int? actorUserId,
+  }) async {
     final response = await supabase
         .from('role')
         .insert({'role_name': roleName, 'description': description})
         .select('role_id')
         .single();
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Create role',
+      entityType: 'Role',
+      entityId: (response['role_id'] as num).toInt(),
+      details: 'Created role $roleName',
+    );
+
     return response['role_id'];
   }
 
@@ -90,16 +106,32 @@ class RoleController {
     int roleId,
     String roleName,
     String? description,
+    {int? actorUserId}
   ) async {
     await supabase
         .from('role')
         .update({'role_name': roleName, 'description': description})
         .eq('role_id', roleId);
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Update role',
+      entityType: 'Role',
+      entityId: roleId,
+      details: 'Updated role to $roleName',
+    );
   }
 
   // Delete role
-  Future<void> deleteRole(int roleId) async {
+  Future<void> deleteRole(int roleId, {int? actorUserId}) async {
     await supabase.from('role').delete().eq('role_id', roleId);
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Delete role',
+      entityType: 'Role',
+      entityId: roleId,
+    );
   }
 
   // Check if role has users
@@ -138,20 +170,42 @@ class RoleController {
   }
 
   // Assign permission to role
-  Future<void> assignPermissionToRole(int roleId, int permId) async {
+  Future<void> assignPermissionToRole(
+    int roleId,
+    int permId, {
+    int? actorUserId,
+  }) async {
     await supabase.from('role_permission').insert({
       'role_id': roleId,
       'perm_id': permId,
     });
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Grant permission to role',
+      entityType: 'RolePermission',
+      details: 'Granted perm_id $permId to role_id $roleId',
+    );
   }
 
   // Remove permission from role
-  Future<void> removePermissionFromRole(int roleId, int permId) async {
+  Future<void> removePermissionFromRole(
+    int roleId,
+    int permId, {
+    int? actorUserId,
+  }) async {
     await supabase
         .from('role_permission')
         .delete()
         .eq('role_id', roleId)
         .eq('perm_id', permId);
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Revoke permission from role',
+      entityType: 'RolePermission',
+      details: 'Revoked perm_id $permId from role_id $roleId',
+    );
   }
 
   // Get users for a role
@@ -166,11 +220,23 @@ class RoleController {
   }
 
   // Assign user to role
-  Future<void> assignUserToRole(int userId, int roleId) async {
+  Future<void> assignUserToRole(
+    int userId,
+    int roleId, {
+    int? actorUserId,
+  }) async {
     await supabase
         .from('user')
         .update({'role_id': roleId})
         .eq('user_id', userId);
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Assign user to role',
+      entityType: 'UserRole',
+      entityId: userId,
+      details: 'Assigned user_id $userId to role_id $roleId',
+    );
   }
 
   // Check if role has permission

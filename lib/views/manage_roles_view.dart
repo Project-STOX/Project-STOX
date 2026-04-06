@@ -61,10 +61,15 @@ class _ManageRolesViewState extends State<ManageRolesView> {
       final roleId = await _roleController.createRole(
         result['name'],
         result['description'],
+        actorUserId: widget.user.userId,
       );
       // Assign permissions
       for (final perm in result['permissions']) {
-        await _roleController.assignPermissionToRole(roleId, perm.permId);
+        await _roleController.assignPermissionToRole(
+          roleId,
+          perm.permId,
+          actorUserId: widget.user.userId,
+        );
       }
       _loadData();
     }
@@ -84,6 +89,7 @@ class _ManageRolesViewState extends State<ManageRolesView> {
         role.roleId,
         result['name'],
         result['description'],
+        actorUserId: widget.user.userId,
       );
       // Update permissions
       final currentPerms = await _roleController.getPermissionsForRole(
@@ -101,11 +107,19 @@ class _ManageRolesViewState extends State<ManageRolesView> {
         // Actually update permissions in database
         // Remove permissions not in new set
         for (final permId in currentPermIds.difference(newPermIds)) {
-          await _roleController.removePermissionFromRole(role.roleId, permId);
+          await _roleController.removePermissionFromRole(
+            role.roleId,
+            permId,
+            actorUserId: widget.user.userId,
+          );
         }
         // Add new permissions
         for (final permId in newPermIds.difference(currentPermIds)) {
-          await _roleController.assignPermissionToRole(role.roleId, permId);
+          await _roleController.assignPermissionToRole(
+            role.roleId,
+            permId,
+            actorUserId: widget.user.userId,
+          );
         }
 
         if (userIds.isNotEmpty) {
@@ -173,7 +187,10 @@ class _ManageRolesViewState extends State<ManageRolesView> {
 
     if (confirm == true) {
       try {
-        await _roleController.deleteRole(role.roleId);
+        await _roleController.deleteRole(
+          role.roleId,
+          actorUserId: widget.user.userId,
+        );
         _loadData();
       } catch (e) {
         ScaffoldMessenger.of(
@@ -191,6 +208,7 @@ class _ManageRolesViewState extends State<ManageRolesView> {
           role: role,
           roleController: _roleController,
           userController: _userController,
+          adminUserId: widget.user.userId,
         ),
       ),
     );
@@ -382,12 +400,14 @@ class RoleUsersView extends StatefulWidget {
   final Role role;
   final RoleController roleController;
   final UserController userController;
+  final int adminUserId;
 
   const RoleUsersView({
     super.key,
     required this.role,
     required this.roleController,
     required this.userController,
+    required this.adminUserId,
   });
 
   @override
@@ -430,6 +450,7 @@ class _RoleUsersViewState extends State<RoleUsersView> {
       await widget.roleController.assignUserToRole(
         user.userId,
         widget.role.roleId,
+        actorUserId: widget.adminUserId,
       );
       _loadData();
     } catch (e) {

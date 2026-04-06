@@ -1,8 +1,10 @@
 import '../services/supabase_service.dart';
+import '../services/audit_log_service.dart';
 import '../models/historical_sale.dart';
 
 class HistoricalSalesController {
   final supabase = SupabaseService.client;
+  final AuditLogService auditLogService = AuditLogService();
 
   // Ensure "Historical data" permission exists
   Future<void> ensureHistoricalDataPermission() async {
@@ -116,12 +118,13 @@ class HistoricalSalesController {
   // Log unauthorized access
   Future<void> logUnauthorizedAccess(int userId) async {
     try {
-      await supabase.from('audit_log').insert({
-        'user_id': userId,
-        'action': 'Unauthorized access attempt to Historical Sales Data',
-        'entity_type': 'Page',
-        'entity_id': 0,
-      });
+      await auditLogService.logAction(
+        userId: userId,
+        action: 'Unauthorized access attempt',
+        entityType: 'Page',
+        entityId: 0,
+        details: 'Historical Sales Data page access denied',
+      );
     } catch (e) {
       print('Error logging unauthorized access: $e');
     }
@@ -179,6 +182,13 @@ class HistoricalSalesController {
         'status': 'Completed',
         'row_count': sales.length,
       });
+
+      await auditLogService.logAction(
+        userId: userId,
+        action: 'Export historical sales',
+        entityType: 'HistoricalSales',
+        details: 'Exported ${sales.length} rows to CSV',
+      );
 
       return csvData;
     } catch (e) {

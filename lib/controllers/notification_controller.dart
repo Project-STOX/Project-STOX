@@ -1,9 +1,11 @@
 import '../services/supabase_service.dart';
+import '../services/audit_log_service.dart';
 import '../models/notification.dart';
 import '../models/user.dart';
 
 class NotificationController {
   final supabase = SupabaseService.client;
+  final AuditLogService auditLogService = AuditLogService();
 
   // Get notifications for a user
   Future<List<NotificationModel>> getNotificationsForUser(int userId) async {
@@ -49,6 +51,14 @@ class NotificationController {
     }).toList();
 
     await supabase.from('notification').insert(notifications);
+
+    await auditLogService.logAction(
+      userId: senderId,
+      action: 'Send notification',
+      entityType: 'Notification',
+      details:
+          'Sent $type message to ${recipientIds.length} recipient(s).',
+    );
   }
 
   // Get all users (for recipient selection)

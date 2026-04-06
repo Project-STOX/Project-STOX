@@ -56,6 +56,7 @@ class _TwoFactorViewState extends State<TwoFactorView> {
     setState(() => isLoading = false);
 
     if (isValid) {
+      await authController.logSuccessfulSystemEntry(widget.user, viaMfa: true);
       Navigator.pushReplacementNamed(context, '/dashboard', arguments: widget.user);
     } else {
       ScaffoldMessenger.of(context).showSnackBar(

@@ -2,11 +2,13 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../services/supabase_service.dart';
+import '../services/audit_log_service.dart';
 import '../models/user.dart';
 import '../utils/password_hasher.dart';
 
 class AuthController {
   final supabase = SupabaseService.client;
+  final AuditLogService auditLogService = AuditLogService();
   static const _rememberedSessionUuidKey = 'remembered_session_uuid';
   final Uuid _uuid = const Uuid();
   String? _latestSessionUuid;
@@ -166,13 +168,36 @@ class AuthController {
     return user;
   }
 
-  Future<void> signOutAndInvalidateRememberedSession() async {
+  Future<void> signOutAndInvalidateRememberedSession({int? userId}) async {
     try {
       await supabase.auth.signOut();
     } catch (_) {
       // Always continue to local/session invalidation.
     }
     await invalidateRememberedSession();
+
+    await auditLogService.logAction(
+      userId: userId,
+      action: 'Logout',
+      entityType: 'Authentication',
+      entityId: userId,
+      details: 'User logged out',
+    );
+  }
+
+  Future<void> logSuccessfulSystemEntry(
+    UserModel user, {
+    bool viaMfa = false,
+  }) async {
+    await auditLogService.logAction(
+      userId: user.userId,
+      action: 'Login success',
+      entityType: 'Authentication',
+      entityId: user.userId,
+      details: viaMfa
+          ? 'User entered the dashboard after MFA verification'
+          : 'User entered the dashboard after credential verification',
+    );
   }
 
   Future<UserModel?> _signInWithLocalPassword(String email, String password) async {

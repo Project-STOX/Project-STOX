@@ -126,11 +126,19 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
           roleId: widget.roleId,
           userId: widget.userId,
           onSave: (updatedSupplier) async {
-            await controller.updateSupplier(updatedSupplier, widget.roleId);
+            await controller.updateSupplier(
+              updatedSupplier,
+              widget.roleId,
+              actorUserId: widget.userId,
+            );
             loadSuppliers();
           },
           onDelete: () async {
-            await controller.deleteSupplier(supplier.supplierId, widget.roleId);
+            await controller.deleteSupplier(
+              supplier.supplierId,
+              widget.roleId,
+              actorUserId: widget.userId,
+            );
             loadSuppliers();
           },
         ),
@@ -189,7 +197,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8.0),
             child: DropdownButtonFormField<String>(
-              value: selectedSort,
+              initialValue: selectedSort,
               decoration: const InputDecoration(labelText: 'Sort by'),
               items: sortOptions
                   .map(

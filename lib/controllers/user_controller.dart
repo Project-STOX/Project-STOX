@@ -4,10 +4,12 @@ import '../services/supabase_service.dart';
 import '../models/user.dart';
 import '../models/role.dart';
 import '../utils/password_hasher.dart';
+import '../services/audit_log_service.dart';
 import 'auth_controller.dart';
 
 class UserController {
   final supabase = SupabaseService.client;
+  final AuditLogService auditLogService = AuditLogService();
 
   // Get all users
   Future<List<UserModel>> getAllUsers() async {
@@ -34,7 +36,14 @@ class UserController {
   }
 
   // Create new user
-  Future<void> createUser(String username, String email, String password, int roleId, {bool verifyEmail = true}) async {
+  Future<void> createUser(
+    String username,
+    String email,
+    String password,
+    int roleId, {
+    bool verifyEmail = true,
+    int? actorUserId,
+  }) async {
     final normalizedEmail = email.trim().toLowerCase();
     final normalizedUsername = username.trim();
 
@@ -60,6 +69,14 @@ class UserController {
     };
 
     await supabase.from('user').insert(data);
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Create user',
+      entityType: 'User',
+      details:
+          'Created user $normalizedUsername with role_id $roleId (verify_email: $verifyEmail)',
+    );
   }
 
   // Update user
@@ -70,6 +87,7 @@ class UserController {
     bool? isActive,
     bool? tfaActive,
     bool verifyEmailChange = false,
+    int? actorUserId,
   }) async {
     final updates = <String, dynamic>{};
     if (username != null) updates['username'] = username.trim();
@@ -93,10 +111,24 @@ class UserController {
         .from('user')
         .update(updates)
         .eq('user_id', userId);
+
+    await auditLogService.logAction(
+      userId: actorUserId ?? userId,
+      action: 'Update user',
+      entityType: 'User',
+      entityId: userId,
+      details: 'Updated fields: ${updates.keys.join(', ')}',
+    );
   }
 
   // Update password with verification
-  Future<void> updatePassword(int userId, String oldPassword, String newPassword, {String? tfaCode}) async {
+  Future<void> updatePassword(
+    int userId,
+    String oldPassword,
+    String newPassword, {
+    String? tfaCode,
+    int? actorUserId,
+  }) async {
     // First, verify old password or 2FA
     final userResponse = await supabase
         .from('user')
@@ -128,10 +160,17 @@ class UserController {
         .from('user')
       .update({'password_hash': newPasswordHash})
         .eq('user_id', userId);
+
+    await auditLogService.logAction(
+      userId: actorUserId ?? userId,
+      action: 'Change password',
+      entityType: 'User',
+      entityId: userId,
+    );
   }
 
   // Delete user
-  Future<void> deleteUser(int userId) async {
+  Future<void> deleteUser(int userId, {int? actorUserId}) async {
     // Remove dependent notification records first to satisfy FK constraints.
     await supabase
       .from('notification')
@@ -153,14 +192,28 @@ class UserController {
         .from('user')
         .delete()
         .eq('user_id', userId);
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Delete user',
+      entityType: 'User',
+      entityId: userId,
+    );
   }
 
   // Toggle user active status
-  Future<void> toggleUserActive(int userId, bool isActive) async {
+  Future<void> toggleUserActive(int userId, bool isActive, {int? actorUserId}) async {
     await supabase
         .from('user')
         .update({'is_active': isActive})
         .eq('user_id', userId);
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: isActive ? 'Activate user' : 'Deactivate user',
+      entityType: 'User',
+      entityId: userId,
+    );
   }
 
   // Get all roles
@@ -174,15 +227,31 @@ class UserController {
   }
 
   // Create new role
-  Future<void> createRole(String roleName, String? description) async {
+  Future<void> createRole(
+    String roleName,
+    String? description, {
+    int? actorUserId,
+  }) async {
     await supabase.from('role').insert({
       'role_name': roleName,
       'description': description,
     });
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Create role',
+      entityType: 'Role',
+      details: 'Created role $roleName',
+    );
   }
 
   // Update role
-  Future<void> updateRole(int roleId, String roleName, String? description) async {
+  Future<void> updateRole(
+    int roleId,
+    String roleName,
+    String? description, {
+    int? actorUserId,
+  }) async {
     await supabase
         .from('role')
         .update({
@@ -190,13 +259,28 @@ class UserController {
           'description': description,
         })
         .eq('role_id', roleId);
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Update role',
+      entityType: 'Role',
+      entityId: roleId,
+      details: 'Updated role to $roleName',
+    );
   }
 
   // Delete role
-  Future<void> deleteRole(int roleId) async {
+  Future<void> deleteRole(int roleId, {int? actorUserId}) async {
     await supabase
         .from('role')
         .delete()
         .eq('role_id', roleId);
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Delete role',
+      entityType: 'Role',
+      entityId: roleId,
+    );
   }
 }

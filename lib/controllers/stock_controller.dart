@@ -1,12 +1,14 @@
 import '../models/product.dart';
 import '../models/stock_receipt.dart';
 import '../models/supplier.dart';
+import '../services/audit_log_service.dart';
 import '../services/supabase_service.dart';
 import 'auth_controller.dart';
 
 class StockController {
   final supabase = SupabaseService.client;
   final AuthController authController = AuthController();
+  final AuditLogService auditLogService = AuditLogService();
 
   Future<void> ensureStockReceiptPermission() async {
     try {
@@ -107,6 +109,14 @@ class StockController {
     await supabase
         .from('stock_receipt')
         .insert(receipt.toJson()..remove('receipt_id'));
+
+    await auditLogService.logAction(
+      userId: receipt.recordedBy,
+      action: 'Create stock receipt',
+      entityType: 'StockReceipt',
+      details:
+        'Recorded stock receipt for product ${receipt.productId} from supplier ${receipt.supplierId}',
+    );
   }
 
   Future<void> updateStockReceipt(StockReceipt receipt, int roleId) async {
@@ -119,9 +129,22 @@ class StockController {
         .from('stock_receipt')
         .update(receipt.toJson()..remove('receipt_id'))
         .eq('receipt_id', receipt.stockReceiptId);
+
+    await auditLogService.logAction(
+      userId: receipt.recordedBy,
+      action: 'Update stock receipt',
+      entityType: 'StockReceipt',
+      entityId: receipt.stockReceiptId,
+      details:
+        'Updated stock receipt for product ${receipt.productId} from supplier ${receipt.supplierId}',
+    );
   }
 
-  Future<void> deleteStockReceipt(int stockReceiptId, int roleId) async {
+  Future<void> deleteStockReceipt(
+    int stockReceiptId,
+    int roleId, {
+    int? actorUserId,
+  }) async {
     final allowed = await authController.hasPermission(roleId, 'Manage stock');
     if (!allowed) {
       throw Exception('Permission denied: Manage stock');
@@ -131,6 +154,13 @@ class StockController {
         .from('stock_receipt')
         .delete()
         .eq('receipt_id', stockReceiptId);
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Delete stock receipt',
+      entityType: 'StockReceipt',
+      entityId: stockReceiptId,
+    );
   }
 
   Future<int> quickCreateProduct({
@@ -138,6 +168,7 @@ class StockController {
     required String sku,
     required int supplierId,
     String? serialNo,
+    int? actorUserId,
   }) async {
     final response = await supabase
         .from('product')
@@ -155,6 +186,14 @@ class StockController {
         })
         .select('product_id')
         .single();
+
+    await auditLogService.logAction(
+      userId: actorUserId,
+      action: 'Quick create product',
+      entityType: 'Product',
+      entityId: (response['product_id'] as num).toInt(),
+      details: 'Quick-created product $productName (SKU: $sku)',
+    );
 
     return (response['product_id'] as num).toInt();
   }
@@ -177,6 +216,14 @@ class StockController {
         })
         .select('supplier_id')
         .single();
+
+    await auditLogService.logAction(
+      userId: createdByUserId,
+      action: 'Quick create supplier',
+      entityType: 'Supplier',
+      entityId: (response['supplier_id'] as num).toInt(),
+      details: 'Quick-created supplier $supplierName',
+    );
 
     return (response['supplier_id'] as num).toInt();
   }

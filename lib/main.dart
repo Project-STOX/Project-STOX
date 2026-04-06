@@ -8,6 +8,7 @@ import 'views/product_list_view.dart';
 import 'views/manage_users_view.dart';
 import 'views/manage_roles_view.dart';
 import 'views/stock_receipt_view.dart';
+import 'views/audit_log_view.dart';
 import 'models/user.dart';
 
 void main() async {
@@ -57,6 +58,10 @@ class MyApp extends StatelessWidget {
         '/stockReceipt': (context) {
           final user = ModalRoute.of(context)!.settings.arguments as UserModel;
           return StockReceiptView(user: user);
+        },
+        '/auditLog': (context) {
+          final user = ModalRoute.of(context)!.settings.arguments as UserModel;
+          return AuditLogView(user: user);
         },
       },
     );
