@@ -171,7 +171,7 @@ class _LoginViewState extends State<LoginView> {
                   child: Image.asset(
                     _loginLogoAssetPath,
                     fit: BoxFit.contain,
-                    errorBuilder: (_, __, ___) => const Column(
+                    errorBuilder: (_, _, _) => const Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(

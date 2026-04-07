@@ -8,6 +8,65 @@ class SupplierController {
   final AuthController authController = AuthController();
   final AuditLogService auditLogService = AuditLogService();
 
+  Future<void> _syncSupplierLeadTimeToReorderParameters(
+    int supplierId,
+    int? leadTimeDays, {
+    int? actorUserId,
+  }) async {
+    if (leadTimeDays == null) {
+      return;
+    }
+
+    final products = await supabase
+        .from('product')
+        .select('product_id')
+        .eq('supplier_id', supplierId);
+
+    final productIds = (products as List)
+        .map((row) => (row['product_id'] as num).toInt())
+        .toList();
+
+    if (productIds.isEmpty) {
+      return;
+    }
+
+    await supabase
+        .from('reorder_parameter')
+        .update({'lead_time_days': leadTimeDays})
+        .inFilter('product_id', productIds);
+
+    if (actorUserId == null) {
+      return;
+    }
+
+    final existingRows = await supabase
+        .from('reorder_parameter')
+        .select('product_id')
+        .inFilter('product_id', productIds);
+
+    final existingIds = (existingRows as List)
+        .map((row) => (row['product_id'] as num).toInt())
+        .toSet();
+
+    final missingIds = productIds.where((id) => !existingIds.contains(id)).toList();
+    if (missingIds.isEmpty) {
+      return;
+    }
+
+    await supabase.from('reorder_parameter').insert(
+      missingIds
+          .map(
+            (productId) => {
+              'product_id': productId,
+              'configured_by': actorUserId,
+              'safety_stock': 0,
+              'lead_time_days': leadTimeDays,
+            },
+          )
+          .toList(),
+    );
+  }
+
   Future<List<Supplier>> fetchSuppliers() async {
     final response = await supabase.from('supplier').select();
     return (response as List).map((json) => Supplier.fromJson(json)).toList();
@@ -51,6 +110,12 @@ class SupplierController {
       'contact_info': supplier.contactInfo,
       'lead_time_days': supplier.leadTimeDays,
     }).eq('supplier_id', supplier.supplierId);
+
+    await _syncSupplierLeadTimeToReorderParameters(
+      supplier.supplierId,
+      supplier.leadTimeDays,
+      actorUserId: actorUserId,
+    );
 
     await auditLogService.logAction(
       userId: actorUserId,

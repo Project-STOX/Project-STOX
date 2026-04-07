@@ -178,8 +178,6 @@ class StockController {
           'sku': sku,
           'unit_cost': 0,
           'current_qty': 0,
-          'lead_time_days': 0,
-          'safety_stock': 0,
           'reorder_point': 0,
           'serial_no': serialNo,
           'status_flag': 'In Stock',
@@ -187,15 +185,25 @@ class StockController {
         .select('product_id')
         .single();
 
+    final createdProductId = (response['product_id'] as num).toInt();
+    if (actorUserId != null) {
+      await supabase.from('reorder_parameter').insert({
+        'product_id': createdProductId,
+        'configured_by': actorUserId,
+        'safety_stock': 0,
+        'lead_time_days': 0,
+      });
+    }
+
     await auditLogService.logAction(
       userId: actorUserId,
       action: 'Quick create product',
       entityType: 'Product',
-      entityId: (response['product_id'] as num).toInt(),
+      entityId: createdProductId,
       details: 'Quick-created product $productName (SKU: $sku)',
     );
 
-    return (response['product_id'] as num).toInt();
+    return createdProductId;
   }
 
   Future<int> quickCreateSupplier({

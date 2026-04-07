@@ -10,10 +10,58 @@ class ProductController {
   final AuthController authController = AuthController();
   final AuditLogService auditLogService = AuditLogService();
 
+  Future<void> _syncSupplierLeadTime(
+    int supplierId,
+    int? leadTimeDays,
+  ) async {
+    if (leadTimeDays == null) {
+      return;
+    }
+
+    await supabase
+        .from('supplier')
+        .update({'lead_time_days': leadTimeDays})
+        .eq('supplier_id', supplierId);
+  }
+
+  Future<void> _saveReorderParameters(
+    int productId, {
+    required int safetyStock,
+    required int? leadTimeDays,
+    int? actorUserId,
+  }) async {
+    if (actorUserId == null) {
+      return;
+    }
+
+    final payload = {
+      'product_id': productId,
+      'configured_by': actorUserId,
+      'safety_stock': safetyStock,
+      'lead_time_days': leadTimeDays,
+    };
+
+    final existing = await supabase
+        .from('reorder_parameter')
+        .select('param_id')
+        .eq('product_id', productId)
+        .maybeSingle();
+
+    if (existing == null) {
+      await supabase.from('reorder_parameter').insert(payload);
+      return;
+    }
+
+    await supabase
+        .from('reorder_parameter')
+        .update(payload)
+        .eq('param_id', existing['param_id']);
+  }
+
   Future<List<Map<String, dynamic>>> fetchProducts() async {
     final response = await supabase
         .from('product')
-        .select('*, supplier(supplier_name)');
+        .select('*, supplier(supplier_name), reorder_parameter(lead_time_days, safety_stock)');
     return (response as List)
         .map((json) => json as Map<String, dynamic>)
         .toList();
@@ -32,18 +80,29 @@ class ProductController {
       throw Exception("Permission denied: Manage Products");
     }
 
-    await supabase.from('product').insert({
+    final response = await supabase
+        .from('product')
+        .insert({
       'supplier_id': product.supplierId,
       'product_name': product.productName,
       'sku': product.sku,
       'unit_cost': product.unitCost,
       'current_qty': product.currentQty,
-      'lead_time_days': product.leadTimeDays,
-      'safety_stock': product.safetyStock,
       'reorder_point': product.reorderPoint,
       'serial_no': product.serialNo,
       'status_flag': product.statusFlag,
-    });
+        })
+        .select('product_id')
+        .single();
+
+    final productId = (response['product_id'] as num).toInt();
+    await _saveReorderParameters(
+      productId,
+      safetyStock: product.safetyStock,
+      leadTimeDays: product.leadTimeDays,
+      actorUserId: actorUserId,
+    );
+    await _syncSupplierLeadTime(product.supplierId, product.leadTimeDays);
 
     await auditLogService.logAction(
       userId: actorUserId,
@@ -74,13 +133,19 @@ class ProductController {
           'sku': product.sku,
           'unit_cost': product.unitCost,
           'current_qty': product.currentQty,
-          'lead_time_days': product.leadTimeDays,
-          'safety_stock': product.safetyStock,
           'reorder_point': product.reorderPoint,
           'serial_no': product.serialNo,
           'status_flag': product.statusFlag,
         })
         .eq('product_id', product.productId);
+
+    await _saveReorderParameters(
+      product.productId,
+      safetyStock: product.safetyStock,
+      leadTimeDays: product.leadTimeDays,
+      actorUserId: actorUserId,
+    );
+    await _syncSupplierLeadTime(product.supplierId, product.leadTimeDays);
 
     await auditLogService.logAction(
       userId: actorUserId,
