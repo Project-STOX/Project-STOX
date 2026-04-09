@@ -94,6 +94,7 @@ class _ManageProductsViewState extends State<ManageProductsView> {
         final query = searchQuery.toLowerCase().trim();
         final productName = _safeLower(p['product_name']);
         final sku = _safeLower(p['sku']);
+        final productCode = _safeLower(p['product_code']);
         final supplierName = _safeLower(
           (p['supplier'] as Map?)?['supplier_name'],
         );
@@ -103,6 +104,7 @@ class _ManageProductsViewState extends State<ManageProductsView> {
         final matchesSearch =
             productName.contains(query) ||
             sku.contains(query) ||
+            productCode.contains(query) ||
             supplierName.contains(query) ||
             serialNo.contains(query);
         final matchesStatus =
@@ -220,12 +222,12 @@ class _ManageProductsViewState extends State<ManageProductsView> {
               itemCount: filteredProducts.length,
               itemBuilder: (context, index) {
                 final data = filteredProducts[index];
-                final reorderPoint = data['reorder_point'] ?? 0;
                 final productName = _safeText(
                   data['product_name'],
                   fallback: 'Unnamed Product',
                 );
                 final sku = _safeText(data['sku']);
+                final productCode = _safeText(data['product_code']);
                 final supplierName = _safeText(
                   (data['supplier'] as Map?)?['supplier_name'],
                   fallback: 'Unknown',
@@ -238,7 +240,7 @@ class _ManageProductsViewState extends State<ManageProductsView> {
                 return ListTile(
                   title: Text(productName),
                   subtitle: Text(
-                    'SKU: $sku, Supplier: $supplierName, RP: $reorderPoint, Serial: $serialNo, Status: $statusFlag',
+                    'Code: $productCode, SKU: $sku, Supplier: $supplierName, Serial: $serialNo, Status: $statusFlag',
                   ),
                   onTap: () => _showProductDetails(data),
                 );

@@ -41,6 +41,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   final ScrollController _forecastScrollController = ScrollController();
 
   late TextEditingController nameController;
+  late TextEditingController productCodeController;
   late TextEditingController skuController;
   late TextEditingController costController;
   late TextEditingController orderingCostController;
@@ -75,6 +76,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     final product = widget.product;
     if (product != null) {
       nameController = TextEditingController(text: product.productName);
+      productCodeController = TextEditingController(text: product.productCode);
       skuController = TextEditingController(text: product.sku);
       costController = TextEditingController(text: product.unitCost.toString());
       orderingCostController = TextEditingController(text: '50');
@@ -100,6 +102,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       _loadHistory();
     } else {
       nameController = TextEditingController();
+      productCodeController = TextEditingController();
       skuController = TextEditingController();
       costController = TextEditingController();
       orderingCostController = TextEditingController(text: '50');
@@ -126,6 +129,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
     _eoqScrollController.dispose();
     _forecastScrollController.dispose();
     nameController.dispose();
+    productCodeController.dispose();
     skuController.dispose();
     costController.dispose();
     orderingCostController.dispose();
@@ -808,6 +812,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         productId: widget.product?.productId ?? 0,
         supplierId: selectedSupplierId,
         productName: nameController.text,
+        productCode: productCodeController.text,
         sku: skuController.text,
         unitCost: double.parse(costController.text),
         currentQty: int.parse(qtyController.text),
@@ -869,6 +874,10 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
             TextField(
               controller: nameController,
               decoration: const InputDecoration(labelText: 'Product Name'),
+            ),
+            TextField(
+              controller: productCodeController,
+              decoration: const InputDecoration(labelText: 'Product Code'),
             ),
             TextField(
               controller: skuController,

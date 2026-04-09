@@ -6,15 +6,17 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show compute, kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../utils/csv_export_stub.dart'
   if (dart.library.html) '../utils/csv_export_web.dart' as csv_export;
 
 
 import '../controllers/auth_controller.dart';
+import '../controllers/historical_sales_controller.dart';
 import '../models/user.dart';
 import '../services/audit_log_service.dart';
+import '../services/api/inventory_api_service.dart';
+import '../services/api/reports_api_service.dart';
 
 class ImportDataView extends StatefulWidget {
   final UserModel user;
@@ -27,8 +29,10 @@ class ImportDataView extends StatefulWidget {
 
 class _ImportDataViewState extends State<ImportDataView> {
   final AuthController _authController = AuthController();
-  final SupabaseClient _supabase = Supabase.instance.client;
+  final InventoryApiService _inventoryApi = InventoryApiService();
+  final ReportsApiService _reportsApi = ReportsApiService();
   final AuditLogService _auditLogService = AuditLogService();
+  final HistoricalSalesController _historicalSalesController = HistoricalSalesController();
 
   bool _isLoading = true;
   bool _hasAccess = false;
@@ -209,13 +213,9 @@ class _ImportDataViewState extends State<ImportDataView> {
     final skus = rows.map((row) => row[skuIndex].toString()).where((sku) => sku.isNotEmpty).toList();
     if (skus.isEmpty) return null;
 
-    final response = await _supabase
-        .from('product')
-        .select('sku')
-        .inFilter('sku', skus);
-
-    if (response.isNotEmpty) {
-      final existingSkus = (response as List).map((p) => p['sku'] as String).toList();
+    final response = await _inventoryApi.listProducts();
+    final existingSkus = response.map((p) => p['sku']?.toString() ?? '').where((sku) => skus.contains(sku)).toList();
+    if (existingSkus.isNotEmpty) {
       return 'Warning: ${existingSkus.length} product(s) with these SKUs already exist: ${existingSkus.take(3).join(', ')}${existingSkus.length > 3 ? '...' : ''}';
     }
     return null;
@@ -228,13 +228,9 @@ class _ImportDataViewState extends State<ImportDataView> {
     final names = rows.map((row) => row[nameIndex].toString()).where((name) => name.isNotEmpty).toList();
     if (names.isEmpty) return null;
 
-    final response = await _supabase
-        .from('supplier')
-        .select('supplier_name')
-        .inFilter('supplier_name', names);
-
-    if (response.isNotEmpty) {
-      final existingNames = (response as List).map((s) => s['supplier_name'] as String).toList();
+    final response = await _inventoryApi.listSuppliers();
+    final existingNames = response.map((s) => s['name']?.toString() ?? '').where((name) => names.contains(name)).toList();
+    if (existingNames.isNotEmpty) {
       return 'Warning: ${existingNames.length} supplier(s) with these names already exist: ${existingNames.take(3).join(', ')}${existingNames.length > 3 ? '...' : ''}';
     }
     return null;
@@ -248,13 +244,9 @@ class _ImportDataViewState extends State<ImportDataView> {
     final ids = rows.map((row) => row[idIndex].toString()).where((id) => id.isNotEmpty).toList();
     if (ids.isEmpty) return null;
 
-    final response = await _supabase
-        .from('stock_receipt')
-        .select('receipt_id')
-        .inFilter('receipt_id', ids);
-
-    if (response.isNotEmpty) {
-      final existingIds = (response as List).map((r) => r['receipt_id'].toString()).toList();
+    final response = await _inventoryApi.listStockReceipts();
+    final existingIds = response.map((r) => (r['id'] ?? r['receipt_id']).toString()).where(ids.contains).toList();
+    if (existingIds.isNotEmpty) {
       return 'Warning: ${existingIds.length} stock receipt(s) with these IDs already exist: ${existingIds.take(3).join(', ')}${existingIds.length > 3 ? '...' : ''}';
     }
     return null;
@@ -280,20 +272,15 @@ class _ImportDataViewState extends State<ImportDataView> {
 
     if (salesToCheck.isEmpty) return null;
 
-    // Check for existing sales with same product_id and sale_date
-    int duplicateCount = 0;
-    for (final sale in salesToCheck) {
-      final response = await _supabase
-          .from('sales')
-          .select('sale_id')
-          .eq('product_id', sale['product_id'])
-          .eq('sale_date', sale['sale_date'])
-          .limit(1);
-
-      if (response.isNotEmpty) {
-        duplicateCount++;
-      }
-    }
+    final existingSales = await _historicalSalesController.fetchSales();
+    final existingKeys = existingSales
+        .map((sale) => '${sale.productId}|${sale.saleDate.toIso8601String().split('T').first}')
+        .toSet();
+    final duplicateCount = salesToCheck.where((sale) {
+      final saleDateText = sale['sale_date'].toString().split('T').first;
+      final key = '${sale['product_id']}|$saleDateText';
+      return existingKeys.contains(key);
+    }).length;
 
     if (duplicateCount > 0) {
       return 'Warning: $duplicateCount sale record(s) with same product and date combinations already exist.';
@@ -458,7 +445,15 @@ class _ImportDataViewState extends State<ImportDataView> {
   Future<void> _importProducts(List<String> headers, List<List<dynamic>> rows) async {
     for (final row in rows) {
       final productData = _mapRowToProduct(headers, row);
-      await _supabase.from('product').insert(productData);
+      await _inventoryApi.createProduct({
+        'sku': productData['sku'],
+        'name': productData['product_name'],
+        'supplier_id': productData['supplier_id'],
+        'current_qty': productData['current_qty'] ?? 0,
+        'reorder_level': productData['reorder_point'] ?? 0,
+        'overstock_level': productData['reorder_point'] ?? 0,
+        'unit_cost': productData['unit_cost'] ?? 0,
+      });
     }
 
     await _auditLogService.logAction(
@@ -472,7 +467,12 @@ class _ImportDataViewState extends State<ImportDataView> {
   Future<void> _importSuppliers(List<String> headers, List<List<dynamic>> rows) async {
     for (final row in rows) {
       final supplierData = _mapRowToSupplier(headers, row);
-      await _supabase.from('supplier').insert(supplierData);
+      await _inventoryApi.createSupplier({
+        'name': supplierData['supplier_name'],
+        'email': supplierData['contact_info'] != null && supplierData['contact_info'].toString().contains('@') ? supplierData['contact_info'] : null,
+        'phone': supplierData['contact_info'] != null && !supplierData['contact_info'].toString().contains('@') ? supplierData['contact_info'] : null,
+        'is_active': true,
+      });
     }
 
     await _auditLogService.logAction(
@@ -486,7 +486,14 @@ class _ImportDataViewState extends State<ImportDataView> {
   Future<void> _importStockReceipts(List<String> headers, List<List<dynamic>> rows) async {
     for (final row in rows) {
       final receiptData = _mapRowToStockReceipt(headers, row, widget.user.userId);
-      await _supabase.from('stock_receipt').insert(receiptData);
+      await _inventoryApi.createStockReceipt({
+        'product_id': receiptData['product_id'],
+        'supplier_id': receiptData['supplier_id'],
+        'quantity': receiptData['quantity_received'],
+        'unit_cost': 0,
+        'reference_no': receiptData['notes'],
+        'received_at': receiptData['receipt_date'],
+      });
     }
 
     await _auditLogService.logAction(
@@ -498,10 +505,8 @@ class _ImportDataViewState extends State<ImportDataView> {
   }
 
   Future<void> _importSalesHistory(List<String> headers, List<List<dynamic>> rows) async {
-    for (final row in rows) {
-      final saleData = _mapRowToSale(headers, row);
-      await _supabase.from('sales').insert(saleData);
-    }
+    final payload = rows.map((row) => _mapRowToSale(headers, row)).toList();
+    await _reportsApi.importHistoricalSales(payload);
 
     await _auditLogService.logAction(
       userId: widget.user.userId,

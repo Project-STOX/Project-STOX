@@ -1,12 +1,18 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
-import '../models/user.dart';
 
 class TwoFactorView extends StatefulWidget {
-  final UserModel user;
+  final String loginChallenge;
+  final String email;
+  final bool rememberMe;
 
-  const TwoFactorView({super.key, required this.user});
+  const TwoFactorView({
+    super.key,
+    required this.loginChallenge,
+    required this.email,
+    this.rememberMe = true,
+  });
 
   @override
   _TwoFactorViewState createState() => _TwoFactorViewState();
@@ -49,16 +55,18 @@ class _TwoFactorViewState extends State<TwoFactorView> {
     setState(() => isLoading = true);
 
     final enteredCode = codeController.text.trim();
-    final isValid = await authController.verify2FA(widget.user.userId, enteredCode);
-
-    if (!mounted) return;
-
-    setState(() => isLoading = false);
-
-    if (isValid) {
-      await authController.logSuccessfulSystemEntry(widget.user, viaMfa: true);
-      Navigator.pushReplacementNamed(context, '/dashboard', arguments: widget.user);
-    } else {
+    try {
+      final user = await authController.verify2FA(
+        widget.loginChallenge,
+        enteredCode,
+        rememberMe: widget.rememberMe,
+      );
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      Navigator.pushReplacementNamed(context, '/dashboard', arguments: user);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Invalid 2FA code")),
       );
@@ -67,20 +75,35 @@ class _TwoFactorViewState extends State<TwoFactorView> {
 
   void resendCode() async {
     setState(() => isLoading = true);
+    try {
+      await authController.generate2FAByEmail(widget.email);
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+        _remainingSeconds = 300;
+      });
+      _timer.cancel();
+      _startCountdown();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("A new 2FA code has been sent.")),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => isLoading = false);
+      
+      String displayMessage = "Error resending code: $e";
+      if (e.toString().contains("429") || e.toString().contains("limit exceeded")) {
+        displayMessage = "Supabase free limit exceeded. Please wait an hour or contact support.";
+      }
 
-    // Call your controller to resend the code
-    await authController.generate2FA(widget.user.userId);
-
-    _timer.cancel();
-    setState(() {
-      isLoading = false;
-      _remainingSeconds = 300; // reset countdown
-    });
-    _startCountdown();
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("A new code has been sent to your email.")),
-    );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(displayMessage),
+          backgroundColor: e.toString().contains("429") ? Colors.orange : null,
+          duration: const Duration(seconds: 5),
+        ),
+      );
+    }
   }
 
   String _formatTime(int seconds) {
@@ -100,7 +123,7 @@ class _TwoFactorViewState extends State<TwoFactorView> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-              "Enter the 6-digit code sent to ${widget.user.email}",
+              "Enter the 6-digit code for ${widget.email}",
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),

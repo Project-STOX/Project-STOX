@@ -66,7 +66,7 @@ class _AccountViewState extends State<AccountView> {
       final emailChanged = normalizedEmail != widget.user.email.trim().toLowerCase();
       final verifyEmailChange = emailChanged && _verifyEmailChange;
 
-      await _userController.updateUser(
+      final updatedUser = await _userController.updateUser(
         widget.user.userId,
         username: normalizedUsername,
         email: normalizedEmail,
@@ -82,8 +82,8 @@ class _AccountViewState extends State<AccountView> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
-        // Update the user object if needed, but since it's passed by value, we might need to refresh
-        Navigator.of(context).pop(); // Go back to dashboard
+        // Return updated user to the dashboard
+        Navigator.of(context).pop(updatedUser);
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -218,9 +218,22 @@ class _AccountViewState extends State<AccountView> {
                     const SizedBox(height: 16),
                     SwitchListTile(
                       title: const Text('Enable Two-Factor Authentication'),
+                      subtitle: const Text('Require a 2FA code for login'),
                       value: _tfaActive,
-                      onChanged: (value) => setState(() => _tfaActive = value),
+                      onChanged: (value) => setState(() {
+                        _tfaActive = value;
+                        if (!value) _useTfaForPasswordChange = false;
+                      }),
                     ),
+                    if (_tfaActive) ...[
+                      const SizedBox(height: 8),
+                      SwitchListTile(
+                        title: const Text('Require 2FA for Password Change'),
+                        subtitle: const Text('Use a verification code instead of current password'),
+                        value: _useTfaForPasswordChange,
+                        onChanged: (value) => setState(() => _useTfaForPasswordChange = value),
+                      ),
+                    ],
                     const SizedBox(height: 32),
                     ElevatedButton(
                       onPressed: _isLoading ? null : _saveProfile,
@@ -237,19 +250,6 @@ class _AccountViewState extends State<AccountView> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (_tfaActive) ...[
-                            Row(
-                              children: [
-                                const Text('Use 2FA code instead of old password'),
-                                const SizedBox(width: 8),
-                                Switch(
-                                  value: _useTfaForPasswordChange,
-                                  onChanged: (value) => setState(() => _useTfaForPasswordChange = value),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                          ],
                           if (!_useTfaForPasswordChange || !_tfaActive)
                             TextFormField(
                               controller: _oldPasswordController,

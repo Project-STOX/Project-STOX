@@ -106,7 +106,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
     return 'Receipt Date: ${_formatDateTime(receipt.receiptDate)}\n'
         'Product: ${receipt.productName ?? '-'} | SKU: ${receipt.productSku ?? '-'}\n'
       'Supplier: ${receipt.supplierId} - ${receipt.supplierName ?? '-'}\n'
-        'Received: ${receipt.quantityReceived} | Damaged: ${receipt.quantityDamaged} | By: ${receipt.recordedByUsername ?? receipt.recordedBy.toString()}';
+        'Received: ${receipt.quantityReceived} | Damaged: ${receipt.quantityDamaged} | By: ${receipt.recordedByUsername ?? 'Deleted User (ID: ${receipt.recordedBy})'}';
   }
 
   String _productDisplay(Product product) {
@@ -790,6 +790,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
       await _loadReceipts(showLoading: false);
       _resetForm();
       if (mounted) {
+        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -843,6 +844,16 @@ class _StockReceiptViewState extends State<StockReceiptView> {
       await _loadReceipts(showLoading: false);
       if (_editingReceipt?.stockReceiptId == receipt.stockReceiptId) {
         _resetForm();
+        if (mounted) {
+           // We might need to pop twice if we came from the editor modal, 
+           // but the first pop happened for the confirmation dialog.
+           // However, _deleteReceipt is called directly.
+           // If we are in the modal, we need to close it.
+           Navigator.of(context).popUntil((route) => route.isFirst || route.settings.name != null);
+           // Actually, standard way is to pop once if we are in a sub-view.
+           // Let's just pop once more if we are editing.
+           Navigator.pop(context);
+        }
       }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -1,0 +1,1 @@
+"""STOX backend application package."""

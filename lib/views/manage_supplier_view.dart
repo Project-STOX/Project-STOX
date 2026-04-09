@@ -43,15 +43,6 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
     userRole = await authController.getUserRole(widget.roleId);
     if (!mounted) return;
 
-    if (!['SME Owner', 'Inventory Manager'].contains(userRole)) {
-      // Deny access
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Access denied')));
-      return;
-    }
-
     loadSuppliers();
   }
 
@@ -169,8 +160,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
 
   @override
   Widget build(BuildContext context) {
-    if (userRole == null ||
-        !['SME Owner', 'Inventory Manager'].contains(userRole)) {
+    if (userRole == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return Scaffold(

@@ -1,93 +1,63 @@
-import '../services/supabase_service.dart';
-import '../services/audit_log_service.dart';
+import '../services/api/api_client.dart';
+import '../services/api/api_config.dart';
 import '../models/notification.dart';
 import '../models/user.dart';
 
 class NotificationController {
-  final supabase = SupabaseService.client;
-  final AuditLogService auditLogService = AuditLogService();
+  NotificationController({ApiClient? apiClient})
+      : _api = apiClient ?? ApiClient(baseUrl: ApiConfig.baseUrl);
+
+  final ApiClient _api;
 
   // Get notifications for a user
   Future<List<NotificationModel>> getNotificationsForUser(int userId) async {
-    try {
-      final response = await supabase
-          .from('notification')
-          .select()
-          .eq('recipient_id', userId)
-          .order('sent_at', ascending: false);
-
-      return (response as List).map((json) => NotificationModel.fromJson(json)).toList();
-    } catch (e) {
-      print('Error fetching notifications: $e');
-      return [];
+    final response = await _api.get('/notifications/me', authorized: true);
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map((json) => NotificationModel.fromJson(json))
+          .toList();
     }
+    return [];
   }
 
   // Get notifications with sender name
   Future<List<Map<String, dynamic>>> getNotificationsWithSender(int userId) async {
-    try {
-      final response = await supabase
-          .from('notification')
-          .select('*, sender:user!sender_id(username)')
-          .eq('recipient_id', userId)
-          .order('sent_at', ascending: false);
-
-      return (response as List).cast<Map<String, dynamic>>();
-    } catch (e) {
-      print('Error fetching notifications with sender: $e');
-      return [];
+    final response = await _api.get('/notifications/me', authorized: true);
+    if (response is List) {
+      return response.whereType<Map<String, dynamic>>().toList();
     }
+    return [];
   }
 
   // Send notifications to multiple users
   Future<void> sendNotifications(int senderId, List<int> recipientIds, String message, String type) async {
     if (recipientIds.isEmpty) return;
-
-    final notifications = recipientIds.map((id) => {
-      'sender_id': senderId,
-      'recipient_id': id,
-      'message': message,
-      'type': type,
-    }).toList();
-
-    await supabase.from('notification').insert(notifications);
-
-    await auditLogService.logAction(
-      userId: senderId,
-      action: 'Send notification',
-      entityType: 'Notification',
-      details:
-          'Sent $type message to ${recipientIds.length} recipient(s).',
+    await _api.post(
+      '/notifications/send',
+      body: {
+        'recipient_ids': recipientIds,
+        'message': message,
+        'type': type,
+      },
+      authorized: true,
     );
   }
 
   // Get all users (for recipient selection)
   Future<List<UserModel>> getAllUsers() async {
-    final response = await supabase
-        .from('user')
-        .select()
-        .order('username');
-    
-    return (response as List).map((json) => UserModel.fromJson(json)).toList();
+    final response = await _api.get('/notifications/recipients', authorized: true);
+    if (response is List) {
+      return response
+          .whereType<Map<String, dynamic>>()
+          .map((json) => UserModel.fromJson(json))
+          .toList();
+    }
+    return [];
   }
 
   // Ensure "Send message" permission exists in the database
   Future<void> ensureSendMessagePermission() async {
-    try {
-      final perm = await supabase
-          .from('permission')
-          .select()
-          .eq('perm_name', 'Send message')
-          .maybeSingle();
-      
-      if (perm == null) {
-        await supabase.from('permission').insert({
-          'perm_id': 1,
-          'perm_name': 'Send message'
-        });
-      }
-    } catch (e) {
-      print('Error ensuring permission exists: $e');
-    }
+    return;
   }
 }

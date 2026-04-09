@@ -8,9 +8,16 @@ class Permission {
   });
 
   factory Permission.fromJson(Map<String, dynamic> json) {
+    int parseInt(dynamic value) {
+      if (value is num) {
+        return value.toInt();
+      }
+      return int.tryParse(value?.toString() ?? '') ?? 0;
+    }
+
     return Permission(
-      permId: json['perm_id'],
-      permName: json['perm_name'],
+      permId: parseInt(json['perm_id'] ?? json['id']),
+      permName: (json['perm_name'] ?? json['action_name'] ?? '').toString(),
     );
   }
 }

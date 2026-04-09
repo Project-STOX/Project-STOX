@@ -476,7 +476,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
               const SizedBox(height: 8),
               Text(
                 title,
-                style: TextStyle(fontSize: 14, color: Colors.grey[700]),
+                style: TextStyle(fontSize: 14, color: Theme.of(context).hintColor),
               ),
               const SizedBox(height: 4),
               Text(
@@ -556,7 +556,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                               padding: const EdgeInsets.only(top: 8),
                               child: Text(
                                 name,
-                                style: const TextStyle(fontSize: 10),
+                                style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color),
                               ),
                             );
                           }
@@ -570,7 +570,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                         reservedSize: 40,
                         getTitlesWidget: (value, meta) => Text(
                           value.toInt().toString(),
-                          style: const TextStyle(fontSize: 10),
+                          style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color),
                         ),
                       ),
                     ),
@@ -665,7 +665,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                             padding: const EdgeInsets.only(top: 8.0),
                             child: Text(
                               label,
-                              style: const TextStyle(fontSize: 10),
+                              style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color),
                             ),
                           );
                         },
@@ -677,7 +677,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                         reservedSize: 48,
                         getTitlesWidget: (value, meta) => Text(
                           _formatRsCompact(value),
-                          style: const TextStyle(fontSize: 10),
+                          style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color),
                         ),
                       ),
                     ),
@@ -1143,7 +1143,7 @@ class SalesDataSource extends DataTableSource {
       cells.add(DataCell(Text(sale.saleId.toString())));
     }
     if (showProductColumn) {
-      cells.add(DataCell(Text(sale.productName)));
+      cells.add(DataCell(Text(sale.productCode != null && sale.productCode!.isNotEmpty ? '${sale.productName} (${sale.productCode})' : sale.productName)));
     }
     if (showDateColumn) {
       cells.add(DataCell(Text(DateFormat('yyyy-MM-dd').format(sale.saleDate))));

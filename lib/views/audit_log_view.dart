@@ -96,7 +96,15 @@ class _AuditLogViewState extends State<AuditLogView> {
           ? _isLoginSessionLog(log)
           : !_isLoginSessionLog(log);
 
-      final searchMatch = q.isEmpty || action.contains(q) || entityType.contains(q);
+      final username = (log.username ?? 'deleted user').toLowerCase();
+      final details = (log.details ?? '').toLowerCase();
+
+      final searchMatch =
+          q.isEmpty ||
+          action.contains(q) ||
+          entityType.contains(q) ||
+          username.contains(q) ||
+          details.contains(q);
 
       final dateMatch =
           (_fromDateTime == null && _toDateTime == null) ||
@@ -199,7 +207,9 @@ class _AuditLogViewState extends State<AuditLogView> {
           ? const Center(child: CircularProgressIndicator())
           : !_hasPermission
           ? const Center(
-              child: Text('Access denied: you do not have permission to view audit logs.'),
+              child: Text(
+                'Access denied: you do not have permission to view audit logs.',
+              ),
             )
           : Column(
               children: [
@@ -207,7 +217,7 @@ class _AuditLogViewState extends State<AuditLogView> {
                   padding: const EdgeInsets.all(12.0),
                   child: TextField(
                     decoration: const InputDecoration(
-                      labelText: 'Search by action or entity_type',
+                      labelText: 'Search by action, entity type or by user',
                       prefixIcon: Icon(Icons.search),
                     ),
                     onChanged: (value) => setState(() => _query = value),
@@ -266,31 +276,34 @@ class _AuditLogViewState extends State<AuditLogView> {
                 Expanded(
                   child: logs.isEmpty
                       ? const Center(
-                          child: Text('No audit records found for this filter.'),
+                          child: Text(
+                            'No audit records found for this filter.',
+                          ),
                         )
                       : ListView.builder(
                           itemCount: logs.length,
                           itemBuilder: (context, index) {
                             final log = logs[index];
-                            final userText = log.username?.trim().isNotEmpty == true
+                            final userText =
+                                log.username?.trim().isNotEmpty == true
                                 ? log.username!
                                 : (log.userId != null
-                                      ? 'User #${log.userId}'
-                                      : 'System');
+                                      ? 'Deleted User (#${log.userId})'
+                                      : 'Deleted User');
 
-                            final subtitle = StringBuffer()
-                              ..write('User: $userText')
-                              ..write('\nEntity: ${log.entityType}')
-                              ..write(
-                                log.entityId != null
-                                    ? ' #${log.entityId}'
-                                    : '',
-                              )
-                              ..write('\nTime: ${_formatTimestamp(log.occurredAt)}');
+                            final bool hasDetails =
+                                log.details != null &&
+                                log.details!.trim().isNotEmpty;
 
-                            if (log.details != null &&
-                                log.details!.trim().isNotEmpty) {
-                              subtitle.write('\nDetails: ${log.details}');
+                            Color actionColor = Colors.blueGrey;
+                            if (log.action.contains('INSERT')) {
+                              actionColor = Colors.green;
+                            }
+                            if (log.action.contains('UPDATE')) {
+                              actionColor = Colors.orange;
+                            }
+                            if (log.action.contains('DELETE')) {
+                              actionColor = Colors.red;
                             }
 
                             return Card(
@@ -298,11 +311,115 @@ class _AuditLogViewState extends State<AuditLogView> {
                                 horizontal: 12,
                                 vertical: 6,
                               ),
-                              child: ListTile(
-                                leading: const Icon(Icons.fact_check_outlined),
-                                title: Text(log.action),
-                                subtitle: Text(subtitle.toString()),
-                                isThreeLine: true,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 8.0,
+                                ),
+                                child: ListTile(
+                                  leading: Container(
+                                    width: 42,
+                                    height: 42,
+                                    decoration: BoxDecoration(
+                                      color: actionColor.withOpacity(0.1),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      Icons.history_edu,
+                                      color: actionColor,
+                                    ),
+                                  ),
+                                  title: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        log.action,
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: actionColor,
+                                          fontSize: 15,
+                                        ),
+                                      ),
+                                      Text(
+                                        _formatTimestamp(log.occurredAt),
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: Theme.of(context).hintColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  subtitle: Padding(
+                                    padding: const EdgeInsets.only(top: 4.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Wrap(
+                                          spacing: 12,
+                                          runSpacing: 4,
+                                          crossAxisAlignment:
+                                              WrapCrossAlignment.center,
+                                          children: [
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                  Icons.person_outline,
+                                                  size: 14,
+                                                  color: Colors.grey,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  userText,
+                                                  style: const TextStyle(
+                                                    fontWeight: FontWeight.w500,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                const Icon(
+                                                  Icons.category_outlined,
+                                                  size: 14,
+                                                  color: Colors.grey,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  '${log.entityType}${log.entityId != null ? " #${log.entityId}" : ""}',
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                        if (hasDetails) ...[
+                                          const SizedBox(height: 6),
+                                          Container(
+                                            padding: const EdgeInsets.all(8),
+                                            decoration: BoxDecoration(
+                                              color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                              borderRadius:
+                                                  BorderRadius.circular(8),
+                                            ),
+                                            child: Text(
+                                              log.details!,
+                                              style: TextStyle(
+                                                fontSize: 13,
+                                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                ),
                               ),
                             );
                           },

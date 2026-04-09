@@ -34,27 +34,29 @@ class AuditLogEntry {
 
   factory AuditLogEntry.fromJson(Map<String, dynamic> json) {
     final userJson = (json['user'] as Map?)?.cast<String, dynamic>();
+    final logId = _parseInt(json['audit_log_id']) ?? _parseInt(json['log_id']) ?? _parseInt(json['id']);
+    final entityId = _parseInt(json['entity_id']);
 
     return AuditLogEntry(
-      logId:
-          _parseInt(json['audit_log_id']) ??
-          _parseInt(json['log_id']) ??
-          _parseInt(json['id']),
+      logId: logId,
       userId: _parseInt(json['user_id']),
       username:
           userJson?['username']?.toString() ?? json['username']?.toString(),
       action: json['action']?.toString() ?? 'Unknown action',
       entityType: json['entity_type']?.toString() ?? 'System',
-      entityId: _parseInt(json['entity_id']),
+      entityId: entityId,
       details:
           json['details']?.toString() ??
           json['description']?.toString() ??
           json['metadata']?.toString(),
       occurredAt:
+          _parseTimestamp(json['occurred_at']) ??
+          _parseTimestamp(json['occurredAt']) ??
+          _parseTimestamp(json['timestamp']) ??
           _parseTimestamp(json['created_at']) ??
+          _parseTimestamp(json['createdAt']) ??
           _parseTimestamp(json['logged_at']) ??
-          _parseTimestamp(json['action_time']) ??
-          _parseTimestamp(json['timestamp']),
+          _parseTimestamp(json['action_time']),
     );
   }
 }

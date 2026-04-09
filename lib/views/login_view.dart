@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../controllers/auth_controller.dart';
+import '../models/user.dart';
 import 'two_factor_view.dart'; // import the 2FA screen
 
 class LoginView extends StatefulWidget {
@@ -14,133 +14,73 @@ class _LoginViewState extends State<LoginView> {
   static const String _loginLogoAssetPath = 'assets/images/stox_logo.png';
 
   final AuthController authController = AuthController();
-  final TextEditingController identifierController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool _obscurePassword = true;
-
-  bool get _isMobilePlatform {
-    if (kIsWeb) {
-      return false;
-    }
-    return defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS;
-  }
+  bool _rememberMe = true;
+  bool _isAutoLoggingIn = true;
 
   @override
   void initState() {
     super.initState();
-    _attemptAutoLoginForMobile();
+    _checkAutoLogin();
   }
 
-  Future<void> _attemptAutoLoginForMobile() async {
-    if (!_isMobilePlatform) {
-      return;
-    }
-
-    try {
-      final user = await authController.tryAutoLoginWithRememberedSession();
-      if (!mounted || user == null) {
-        return;
-      }
-
-      final hasMFA = await authController.hasMFAEnabled(user.userId);
-      if (!mounted) {
-        return;
-      }
-
-      if (hasMFA) {
-        await authController.generate2FA(user.userId);
-        if (!mounted) {
-          return;
-        }
-
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => TwoFactorView(user: user)),
-        );
-        return;
-      }
-
+  Future<void> _checkAutoLogin() async {
+    final user = await authController.tryAutoLogin();
+    if (user != null && mounted) {
       Navigator.pushReplacementNamed(
         context,
         '/dashboard',
         arguments: user,
       );
-    } catch (_) {
-      // Keep user on login screen if auto-login check fails.
+    } else {
+      if (mounted) {
+        setState(() => _isAutoLoggingIn = false);
+      }
     }
   }
 
   void login() async {
     try {
-      final user = await authController.signIn(
-        identifierController.text.trim(),
+      final loginResponse = await authController.signIn(
+        emailController.text.trim(),
         passwordController.text,
+        rememberMe: _rememberMe,
       );
 
       if (!mounted) return;
 
-      if (user != null) {
-        if (_isMobilePlatform) {
-          final sessionUuid = authController.latestSessionUuid;
-          if (sessionUuid != null && sessionUuid.isNotEmpty) {
-            await authController.persistSessionUuidLocally(sessionUuid);
-          }
+      final accessToken = loginResponse['access_token']?.toString();
+      final refreshToken = loginResponse['refresh_token']?.toString();
+      if (accessToken != null && accessToken.isNotEmpty && refreshToken != null && refreshToken.isNotEmpty) {
+        final userPayload = loginResponse['user'] as Map<String, dynamic>?;
+        if (userPayload == null) {
+          throw Exception('Login response missing user payload');
         }
-
-        // Check if 2FA is enabled for this user
-        final hasMFA = await authController.hasMFAEnabled(user.userId);
-        
-        if (!mounted) return;
-
-        if (hasMFA) {
-          // Send 2FA code via email
-          try {
-            await authController.generate2FA(user.userId);
-            
-            if (!mounted) return;
-
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(builder: (_) => TwoFactorView(user: user)),
-            );
-          } catch (e) {
-            if (!mounted) return;
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text("Failed to send 2FA code: $e")),
-            );
-          }
-        } else {
-          // No 2FA, go straight to dashboard
-          await authController.logSuccessfulSystemEntry(user, viaMfa: false);
-          Navigator.pushReplacementNamed(
-            context,
-            '/dashboard',
-            arguments: user,
-          );
-        }
-      } else {
-        // Check if account is deactivated
-        final isDeactivated = await authController.isAccountDeactivated(
-          identifierController.text.trim(),
-          passwordController.text,
+        Navigator.pushReplacementNamed(
+          context,
+          '/dashboard',
+          arguments: UserModel.fromJson(userPayload),
         );
-
-        if (!mounted) return;
-
-        if (isDeactivated) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text("Account is deactivated. Please contact your administrator."),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Invalid credentials")),
-          );
-        }
+        return;
       }
+
+      final loginChallenge = loginResponse['login_challenge']?.toString();
+      if (loginChallenge == null || loginChallenge.isEmpty) {
+        throw Exception('Invalid login response');
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TwoFactorView(
+            loginChallenge: loginChallenge,
+            email: emailController.text.trim(),
+            rememberMe: _rememberMe,
+          ),
+        ),
+      );
     } catch (e) {
       if (!mounted) return;
 
@@ -152,6 +92,14 @@ class _LoginViewState extends State<LoginView> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isAutoLoggingIn) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("STOX - Login"),
@@ -191,9 +139,9 @@ class _LoginViewState extends State<LoginView> {
               ),
               const SizedBox(height: 24),
               TextField(
-                controller: identifierController,
+                controller: emailController,
                 decoration: const InputDecoration(
-                  labelText: "Email or Username",
+                  labelText: "Email",
                   border: OutlineInputBorder(),
                 ),
                 textAlign: TextAlign.center,
@@ -218,7 +166,18 @@ class _LoginViewState extends State<LoginView> {
                 obscureText: _obscurePassword,
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 30),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Checkbox(
+                    value: _rememberMe,
+                    onChanged: (val) => setState(() => _rememberMe = val ?? false),
+                  ),
+                  const Text("Remember Me"),
+                ],
+              ),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: login,
                 child: const Text("Login"),

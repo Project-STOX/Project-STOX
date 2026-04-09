@@ -100,7 +100,13 @@ class _ManageUsersViewState extends State<ManageUsersView> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete User'),
-        content: Text('Are you sure you want to delete ${user.username}?'),
+        content: Text(
+          'Are you sure you want to delete ${user.username}?\n\n'
+          'WARNING: This is a permanent removal. While activity logs and inventory '
+          'records will be preserved for history (as "Deleted User"), the user\'s '
+          'personal data (sessions, and notifications) will be deleted.',
+          style: const TextStyle(color: Colors.redAccent),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -146,13 +152,15 @@ class _ManageUsersViewState extends State<ManageUsersView> {
         actorUserId: widget.user.userId,
       );
       
-      // Send system notification to the user
-      await _notificationController.sendNotifications(
+      // Send system notification to the user (non-blocking, fire-and-forget)
+      _notificationController.sendNotifications(
         widget.user.userId, // The admin performing the action
         [user.userId],
         'System: Your account has been ${newStatus ? 'activated' : 'deactivated'} by the administrator.',
         'System',
-      );
+      ).catchError((error) {
+        debugPrint('Failed to send activation notification: $error');
+      });
 
       await _refreshData();
       if (mounted) {
@@ -324,20 +332,20 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
       // Check for changes to notify
       if (widget.user.roleId != _selectedRoleId) {
         final newRole = widget.roles.firstWhere((r) => r.roleId == _selectedRoleId).roleName;
-        await widget.notificationController.sendNotifications(
+        widget.notificationController.sendNotifications(
           widget.adminId,
           [widget.user.userId],
           'System: Your role has been changed to $newRole.',
           'System',
-        );
+        ).catchError((e) => debugPrint('Notification error: $e'));
       }
       if (widget.user.isActive != _isActive) {
-        await widget.notificationController.sendNotifications(
+        widget.notificationController.sendNotifications(
           widget.adminId,
           [widget.user.userId],
           'System: Your account status has been changed to ${_isActive ? 'Active' : 'Inactive'}.',
           'System',
-        );
+        ).catchError((e) => debugPrint('Notification error: $e'));
       }
 
       widget.onUpdate();
