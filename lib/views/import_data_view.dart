@@ -39,10 +39,10 @@ class _ImportDataViewState extends State<ImportDataView> {
 
   // Expected headers for each data type
   static const Map<String, List<String>> _expectedHeaders = {
-    'Product details': ['product id', 'product name', 'supplier id', 'sku', 'unit cost', 'serial number'],
+    'Product details': ['product code', 'product name', 'supplier id', 'sku', 'unit cost', 'serial number'],
     'Supplier details': ['supplier id', 'supplier name', 'contact info', 'leadtime days', 'address'],
-    'Stock receipt': ['receipt id', 'receipt date', 'supplier id', 'product id', 'quantity received', 'qa check', 'quantitiy damage', 'remarks'],
-    'Sales history': ['sales id', 'product id', 'sale date', 'quanitity sold', 'revenue'],
+    'Stock receipt': ['receipt id', 'receipt date', 'supplier id', 'product code', 'quantity received', 'qa check', 'quantitiy damage', 'remarks'],
+    'Sales history': ['sales id', 'product code', 'sale date', 'quanitity sold', 'revenue'],
   };
 
   @override
@@ -253,18 +253,18 @@ class _ImportDataViewState extends State<ImportDataView> {
   }
 
   Future<String?> _checkSalesDuplicates(List<String> headers, List<List<dynamic>> rows) async {
-    // For sales, check combination of product_id and sale_date
-    final productIdIndex = headers.indexOf('product id');
+    // For sales, check combination of product_code and sale_date
+    final productCodeIndex = headers.indexOf('product code');
     final dateIndex = headers.indexOf('sale date');
-    if (productIdIndex == -1 || dateIndex == -1) return null;
+    if (productCodeIndex == -1 || dateIndex == -1) return null;
 
     List<Map<String, dynamic>> salesToCheck = [];
     for (final row in rows) {
-      final productId = row[productIdIndex].toString();
+      final productCode = row[productCodeIndex].toString();
       final saleDate = row[dateIndex].toString();
-      if (productId.isNotEmpty && saleDate.isNotEmpty) {
+      if (productCode.isNotEmpty && saleDate.isNotEmpty) {
         salesToCheck.add({
-          'product_id': int.tryParse(productId) ?? 0,
+          'product_code': _normalizeProductCode(productCode),
           'sale_date': saleDate,
         });
       }
@@ -274,11 +274,11 @@ class _ImportDataViewState extends State<ImportDataView> {
 
     final existingSales = await _historicalSalesController.fetchSales();
     final existingKeys = existingSales
-        .map((sale) => '${sale.productId}|${sale.saleDate.toIso8601String().split('T').first}')
+        .map((sale) => '${_normalizeProductCode(sale.productCode ?? '')}|${sale.saleDate.toIso8601String().split('T').first}')
         .toSet();
     final duplicateCount = salesToCheck.where((sale) {
       final saleDateText = sale['sale_date'].toString().split('T').first;
-      final key = '${sale['product_id']}|$saleDateText';
+      final key = '${sale['product_code']}|$saleDateText';
       return existingKeys.contains(key);
     }).length;
 
@@ -446,6 +446,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     for (final row in rows) {
       final productData = _mapRowToProduct(headers, row);
       await _inventoryApi.createProduct({
+        'product_code': productData['product_code'],
         'sku': productData['sku'],
         'name': productData['product_name'],
         'supplier_id': productData['supplier_id'],
@@ -484,8 +485,14 @@ class _ImportDataViewState extends State<ImportDataView> {
   }
 
   Future<void> _importStockReceipts(List<String> headers, List<List<dynamic>> rows) async {
+    final productCodeToId = await _fetchProductCodeToIdMap();
+
     for (final row in rows) {
-      final receiptData = _mapRowToStockReceipt(headers, row, widget.user.userId);
+      final receiptData = _mapRowToStockReceipt(headers, row, widget.user.userId, productCodeToId);
+      if ((receiptData['product_id'] ?? 0) <= 0) {
+        throw Exception('Unknown product code: ${receiptData['product_code'] ?? ''}');
+      }
+
       await _inventoryApi.createStockReceipt({
         'product_id': receiptData['product_id'],
         'supplier_id': receiptData['supplier_id'],
@@ -524,6 +531,9 @@ class _ImportDataViewState extends State<ImportDataView> {
       final value = row[i];
 
       switch (header) {
+        case 'product_code':
+          data['product_code'] = value.toString();
+          break;
         case 'supplier_id':
           data['supplier_id'] = int.tryParse(value.toString()) ?? 0;
           break;
@@ -579,7 +589,12 @@ class _ImportDataViewState extends State<ImportDataView> {
     return data;
   }
 
-  Map<String, dynamic> _mapRowToStockReceipt(List<String> headers, List<dynamic> row, int userId) {
+  Map<String, dynamic> _mapRowToStockReceipt(
+    List<String> headers,
+    List<dynamic> row,
+    int userId,
+    Map<String, int> productCodeToId,
+  ) {
     final Map<String, dynamic> data = {};
     for (int i = 0; i < headers.length && i < row.length; i++) {
       final header = headers[i].toLowerCase().replaceAll(' ', '_');
@@ -592,8 +607,10 @@ class _ImportDataViewState extends State<ImportDataView> {
         case 'supplier_id':
           data['supplier_id'] = int.tryParse(value.toString()) ?? 0;
           break;
-        case 'product_id':
-          data['product_id'] = int.tryParse(value.toString()) ?? 0;
+        case 'product_code':
+          final normalizedCode = _normalizeProductCode(value.toString());
+          data['product_code'] = value.toString();
+          data['product_id'] = productCodeToId[normalizedCode] ?? 0;
           break;
         case 'quantity_received':
           data['quantity_received'] = int.tryParse(value.toString()) ?? 0;
@@ -622,8 +639,8 @@ class _ImportDataViewState extends State<ImportDataView> {
       final value = row[i];
 
       switch (header) {
-        case 'product_id':
-          data['product_id'] = int.tryParse(value.toString()) ?? 0;
+        case 'product_code':
+          data['product_code'] = value.toString();
           break;
         case 'sale_date':
           data['sale_date'] = value.toString();
@@ -638,6 +655,29 @@ class _ImportDataViewState extends State<ImportDataView> {
       }
     }
     return data;
+  }
+
+  String _normalizeProductCode(String value) {
+    return value.trim().toUpperCase();
+  }
+
+  Future<Map<String, int>> _fetchProductCodeToIdMap() async {
+    final response = await _inventoryApi.listProducts();
+    final productCodeToId = <String, int>{};
+
+    for (final product in response) {
+      final productCode = (product['product_code'] ?? '').toString();
+      final rawId = product['id'];
+      final productId = rawId is num
+          ? rawId.toInt()
+          : int.tryParse(rawId?.toString() ?? '') ?? 0;
+
+      if (productCode.trim().isNotEmpty && productId > 0) {
+        productCodeToId[_normalizeProductCode(productCode)] = productId;
+      }
+    }
+
+    return productCodeToId;
   }
 
   Future<void> _downloadTemplate(String templateName) async {
