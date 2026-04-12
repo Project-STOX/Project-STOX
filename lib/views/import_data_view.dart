@@ -512,8 +512,32 @@ class _ImportDataViewState extends State<ImportDataView> {
   }
 
   Future<void> _importSalesHistory(List<String> headers, List<List<dynamic>> rows) async {
+    final validProductCodes = await _fetchKnownProductCodes();
+
+    for (final row in rows) {
+      final saleData = _mapRowToSale(headers, row);
+      final code = _normalizeProductCode((saleData['product_code'] ?? '').toString());
+      if (code.isEmpty || !validProductCodes.contains(code)) {
+        throw Exception('Invalid product code in Sales History CSV: ${saleData['product_code'] ?? ''}');
+      }
+    }
+
     final payload = rows.map((row) => _mapRowToSale(headers, row)).toList();
-    await _reportsApi.importHistoricalSales(payload);
+    final result = await _reportsApi.importHistoricalSales(payload);
+    final insertedRows = _toInt(result['inserted_rows']);
+    final rejectedRows = _toInt(result['rejected_rows']);
+
+    if (rejectedRows > 0) {
+      final errors = (result['errors'] as List?)?.whereType<Map>().take(3).map((e) {
+        final rowNo = e['row_number']?.toString() ?? '?';
+        final reason = e['reason']?.toString() ?? 'Unknown reason';
+        return 'row $rowNo: $reason';
+      }).join('; ');
+      throw Exception(
+        'Sales import finished with $insertedRows inserted and $rejectedRows rejected'
+        '${errors != null && errors.isNotEmpty ? ' ($errors)' : ''}.',
+      );
+    }
 
     await _auditLogService.logAction(
       userId: widget.user.userId,
@@ -659,6 +683,25 @@ class _ImportDataViewState extends State<ImportDataView> {
 
   String _normalizeProductCode(String value) {
     return value.trim().toUpperCase();
+  }
+
+  int _toInt(dynamic value) {
+    if (value is num) return value.toInt();
+    return int.tryParse(value?.toString() ?? '') ?? 0;
+  }
+
+  Future<Set<String>> _fetchKnownProductCodes() async {
+    final response = await _inventoryApi.listProducts();
+    final productCodes = <String>{};
+
+    for (final product in response) {
+      final code = _normalizeProductCode((product['product_code'] ?? '').toString());
+      if (code.isNotEmpty) {
+        productCodes.add(code);
+      }
+    }
+
+    return productCodes;
   }
 
   Future<Map<String, int>> _fetchProductCodeToIdMap() async {

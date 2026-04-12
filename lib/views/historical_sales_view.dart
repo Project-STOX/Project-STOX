@@ -35,9 +35,6 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   String _supplierQuery = '';
 
   // Column visibility controls for the records table.
-  bool _showIdColumn = true;
-  bool _showProductColumn = true;
-  bool _showDateColumn = true;
   bool _showQuantityColumn = true;
   bool _showRevenueColumn = true;
   bool _showSupplierColumn = true;
@@ -693,9 +690,6 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
 
   void _resetRecordColumns() {
     setState(() {
-      _showIdColumn = true;
-      _showProductColumn = true;
-      _showDateColumn = true;
       _showQuantityColumn = true;
       _showRevenueColumn = true;
       _showSupplierColumn = true;
@@ -721,20 +715,18 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
               children: [
                 FilterChip(
                   label: const Text('ID'),
-                  selected: _showIdColumn,
-                  onSelected: (value) => setState(() => _showIdColumn = value),
+                  selected: true,
+                  onSelected: null,
                 ),
                 FilterChip(
                   label: const Text('Product'),
-                  selected: _showProductColumn,
-                  onSelected: (value) =>
-                      setState(() => _showProductColumn = value),
+                  selected: true,
+                  onSelected: null,
                 ),
                 FilterChip(
                   label: const Text('Date'),
-                  selected: _showDateColumn,
-                  onSelected: (value) =>
-                      setState(() => _showDateColumn = value),
+                  selected: true,
+                  onSelected: null,
                 ),
                 FilterChip(
                   label: const Text('Quantity'),
@@ -1060,15 +1052,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     }
 
     final columns = <DataColumn>[];
-    if (_showIdColumn) {
-      columns.add(const DataColumn(label: Text('ID')));
-    }
-    if (_showProductColumn) {
-      columns.add(const DataColumn(label: Text('Product')));
-    }
-    if (_showDateColumn) {
-      columns.add(const DataColumn(label: Text('Date')));
-    }
+    columns.add(const DataColumn(label: Text('ID')));
+    columns.add(const DataColumn(label: Text('Product')));
+    columns.add(const DataColumn(label: Text('Date')));
     if (_showQuantityColumn) {
       columns.add(const DataColumn(label: Text('Quantity')));
     }
@@ -1098,9 +1084,9 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
             columns: columns,
             source: SalesDataSource(
               sales: _sales,
-              showIdColumn: _showIdColumn,
-              showProductColumn: _showProductColumn,
-              showDateColumn: _showDateColumn,
+              showIdColumn: true,
+              showProductColumn: true,
+              showDateColumn: true,
               showQuantityColumn: _showQuantityColumn,
               showRevenueColumn: _showRevenueColumn,
               showSupplierColumn: _showSupplierColumn,

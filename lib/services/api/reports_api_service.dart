@@ -47,8 +47,13 @@ class ReportsApiService {
     return [];
   }
 
-  Future<void> importHistoricalSales(List<Map<String, dynamic>> rows) async {
-    await _api.post('/reports/historical-sales/import', body: {'items': rows}, authorized: true);
+  Future<Map<String, dynamic>> importHistoricalSales(List<Map<String, dynamic>> rows) async {
+    final response = await _api.post(
+      '/reports/historical-sales/import',
+      body: {'items': rows},
+      authorized: true,
+    );
+    return response is Map<String, dynamic> ? response : <String, dynamic>{};
   }
 
   Future<void> logAction({

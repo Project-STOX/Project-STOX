@@ -3,7 +3,8 @@ from decimal import Decimal
 from datetime import date
 
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import func, select, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditLog
@@ -15,6 +16,22 @@ from app.schemas.reports import AuditLogRead, HistoricalSaleImportRow, Historica
 
 
 class ReportService:
+    @staticmethod
+    def _sync_historical_sales_sequence(db: Session) -> None:
+        # Keep PostgreSQL sequence aligned with existing rows to avoid duplicate PK on insert.
+        db.execute(
+            text(
+                """
+            SELECT setval(
+                pg_get_serial_sequence('historical_sales', 'sale_id'),
+                COALESCE((SELECT MAX(sale_id) FROM historical_sales), 1),
+                true
+            )
+            """
+            )
+        )
+        db.commit()
+
     @staticmethod
     def list_audit_logs(db: Session, limit: int = 500) -> list[AuditLogRead]:
         rows = db.execute(
@@ -90,7 +107,10 @@ class ReportService:
         rejected = []
 
         for index, row in enumerate(rows, start=1):
-            product = db.scalar(select(Product).where(Product.product_code == row.product_code))
+            normalized_code = row.product_code.strip().lower()
+            product = db.scalar(
+                select(Product).where(func.lower(Product.product_code) == normalized_code)
+            )
             if product is None:
                 rejected.append({"row_number": index, "reason": f"Product code {row.product_code} not found"})
                 continue
@@ -107,17 +127,47 @@ class ReportService:
 
             quantity_sold = int(row.quantity_sold)
             revenue = Decimal(str(row.revenue))
-            db.add(
-                HistoricalSale(
-                    product_id=product.id,
-                    sale_date=row.sale_date,
-                    quantity_sold=quantity_sold,
-                    revenue=revenue,
+            try:
+                db.add(
+                    HistoricalSale(
+                        product_id=product.id,
+                        sale_date=row.sale_date,
+                        quantity_sold=quantity_sold,
+                        revenue=revenue,
+                    )
                 )
-            )
-            inserted += 1
+                db.commit()
+                inserted += 1
+            except IntegrityError as exc:
+                db.rollback()
+                details = str(getattr(exc, "orig", exc)).lower()
 
-        db.commit()
+                # Auto-recover from out-of-sync sequence, then retry once.
+                if "historical_sales_pkey" in details or "duplicate key value" in details:
+                    try:
+                        ReportService._sync_historical_sales_sequence(db)
+                        db.add(
+                            HistoricalSale(
+                                product_id=product.id,
+                                sale_date=row.sale_date,
+                                quantity_sold=quantity_sold,
+                                revenue=revenue,
+                            )
+                        )
+                        db.commit()
+                        inserted += 1
+                        continue
+                    except Exception as retry_exc:
+                        db.rollback()
+                        retry_msg = str(getattr(retry_exc, "orig", retry_exc))
+                        rejected.append({"row_number": index, "reason": f"Insert failed: {retry_msg}"})
+                        continue
+
+                rejected.append({"row_number": index, "reason": f"Insert failed: {str(getattr(exc, 'orig', exc))}"})
+            except Exception as exc:
+                db.rollback()
+                rejected.append({"row_number": index, "reason": f"Insert failed: {exc.__class__.__name__}"})
+
         return {
             "inserted_rows": inserted,
             "rejected_rows": len(rejected),

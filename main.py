@@ -30,6 +30,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, debug=settings.debug)
 
+app.add_middleware(AuditMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
@@ -37,7 +38,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-app.add_middleware(AuditMiddleware)
 
 
 @app.exception_handler(HTTPException)
