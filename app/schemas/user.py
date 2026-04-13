@@ -14,6 +14,7 @@ class UserRead(BaseModel):
     role_id: int
     username: str
     is_active: bool
+    tfa_active: bool
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -27,4 +28,5 @@ class UserRead(BaseModel):
             role_id=user.role_id,
             username=user.full_name,
             is_active=user.is_active,
+            tfa_active=user.tfa_active,
         )

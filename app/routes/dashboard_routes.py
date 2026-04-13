@@ -19,7 +19,7 @@ def get_dashboard_summary(
     supplier_id: int | None = Query(default=None, ge=1),
     activity_limit: int = Query(default=10, ge=1, le=100),
     db: Session = Depends(get_db),
-    _: User = Depends(require_any_permissions("Manage products", "Manage suppliers", "Manage stock")),
+    _: User = Depends(require_any_permissions("Manage products", "Manage suppliers", "Manage stock", "View forecasts")),
 ) -> DashboardSummaryResponse:
     return DashboardService.get_summary(db, supplier_id=supplier_id, activity_limit=activity_limit)
 
@@ -45,6 +45,6 @@ def get_dashboard_alerts(
     supplier_id: int | None = Query(default=None, ge=1),
     limit: int = Query(default=50, ge=1, le=100),
     db: Session = Depends(get_db),
-    _: User = Depends(require_any_permissions("Manage products", "Manage suppliers", "Manage stock")),
+    _: User = Depends(require_any_permissions("Manage products", "Manage suppliers", "Manage stock", "View forecasts")),
 ) -> DashboardAlertsResponse:
     return DashboardService.get_alerts(db, supplier_id=supplier_id, limit=limit)

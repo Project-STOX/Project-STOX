@@ -20,7 +20,7 @@ def list_suppliers(
     name: str | None = Query(default=None),
     is_active: bool | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: User = Depends(require_any_permissions("Manage suppliers", "Manage products", "Manage stock")),
+    _: User = Depends(require_any_permissions("Manage suppliers", "Manage products", "Manage stock", "View forecasts")),
 ) -> list[SupplierRead]:
     return SupplierService.list_suppliers(db, limit=limit, offset=offset, name=name, is_active=is_active)
 
@@ -38,7 +38,7 @@ def create_supplier(
 def get_supplier(
     supplier_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_any_permissions("Manage suppliers", "Manage products", "Manage stock")),
+    _: User = Depends(require_any_permissions("Manage suppliers", "Manage products", "Manage stock", "View forecasts")),
 ) -> SupplierRead:
     return SupplierService.get_supplier(db, supplier_id)
 
@@ -73,7 +73,7 @@ def list_products(
     status_flag: str | None = Query(default=None),
     search: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: User = Depends(require_any_permissions("Manage products", "Manage stock", "Manage suppliers")),
+    _: User = Depends(require_any_permissions("Manage products", "Manage stock", "Manage suppliers", "View forecasts")),
 ) -> list[ProductRead]:
     return ProductService.list_products(
         db,
@@ -98,7 +98,7 @@ def create_product(
 def get_product(
     product_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_any_permissions("Manage products", "Manage stock", "Manage suppliers")),
+    _: User = Depends(require_any_permissions("Manage products", "Manage stock", "Manage suppliers", "View forecasts")),
 ) -> ProductRead:
     return ProductService.get_product(db, product_id)
 
@@ -133,7 +133,7 @@ def list_stock_receipts(
     supplier_id: int | None = Query(default=None, ge=1),
     reference_no: str | None = Query(default=None),
     db: Session = Depends(get_db),
-    _: User = Depends(require_any_permissions("Manage stock", "Manage products", "Manage suppliers")),
+    _: User = Depends(require_any_permissions("Manage stock", "Manage products", "Manage suppliers", "View forecasts")),
 ) -> list[StockReceiptRead]:
     return StockReceiptService.list_receipts(
         db,
@@ -158,7 +158,7 @@ def create_stock_receipt(
 def get_stock_receipt(
     receipt_id: int,
     db: Session = Depends(get_db),
-    _: User = Depends(require_any_permissions("Manage stock", "Manage products", "Manage suppliers")),
+    _: User = Depends(require_any_permissions("Manage stock", "Manage products", "Manage suppliers", "View forecasts")),
 ) -> StockReceiptRead:
     return StockReceiptService.get_receipt(db, receipt_id)
 

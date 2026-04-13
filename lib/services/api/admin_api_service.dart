@@ -64,11 +64,11 @@ class AdminApiService {
     bool? tfaActive,
   }) async {
     final payload = <String, dynamic>{
-      'username': ?username,
-      'email': ?email,
-      'role_id': ?roleId,
-      'is_active': ?isActive,
-      'tfa_active': ?tfaActive,
+      if (username != null) 'username': username,
+      if (email != null) 'email': email,
+      if (roleId != null) 'role_id': roleId,
+      if (isActive != null) 'is_active': isActive,
+      if (tfaActive != null) 'tfa_active': tfaActive,
     };
     final data = await _api.put(
       '/admin/users/$userId',
