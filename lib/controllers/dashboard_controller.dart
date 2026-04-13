@@ -37,4 +37,20 @@ class DashboardController {
       throw Exception('Failed to fetch alerts: $e');
     }
   }
+
+  Future<Map<String, dynamic>> generateForecast({double alpha = 0.3, List<int> windows = const [30, 60]}) async {
+    try {
+      final response = await _apiClient.post(
+        '/forecast/generate',
+        body: {
+          'alpha': alpha,
+          'windows': windows,
+        },
+        authorized: true,
+      );
+      return response as Map<String, dynamic>;
+    } catch (e) {
+      throw Exception('Failed to generate forecast: $e');
+    }
+  }
 }

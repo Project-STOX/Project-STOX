@@ -10,7 +10,7 @@ class ReportsApiService {
   final ApiClient _api;
 
   Future<List<HistoricalSale>> getHistoricalSales({
-    int limit = 500,
+    int limit = 1000,
     DateTime? startDate,
     DateTime? endDate,
     int? productId,

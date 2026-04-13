@@ -122,28 +122,57 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   }
 
   Future<void> _exportCsv() async {
+    // We show a loading indicator during fetching and exporting.
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+    
+    // We create a temporary overlay or just show a snackbar if it's fast.
+    // For simplicity, we'll just use the existing loading state or a snackbar.
+    scaffoldMessenger.showSnackBar(
+      const SnackBar(
+        content: Text('Preparing CSV export...'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+
     try {
+      // Fetch ALL matching sales (up to 1 million) instead of just the paged results.
+      final allSales = await _salesController.fetchSales(
+        startDate: _startDate,
+        endDate: _endDate,
+        productQuery: _productQuery,
+        supplierQuery: _supplierQuery,
+        limit: 1000000,
+      );
+
+      if (allSales.isEmpty) {
+        scaffoldMessenger.showSnackBar(
+          const SnackBar(content: Text('No records found to export.')),
+        );
+        return;
+      }
+
       final csvString = await _salesController.exportToCsv(
-        _sales,
+        allSales,
         widget.user.userId,
       );
       final fileName =
           'historical_sales_${DateTime.now().millisecondsSinceEpoch}.csv';
       final savedPath = await csv_export.downloadCsvWeb(csvString, fileName);
 
-      ScaffoldMessenger.of(context).showSnackBar(
+      scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text(
             savedPath == null
-                ? 'Data exported successfully!'
-                : 'Data exported successfully to $savedPath',
+                ? 'Data exported successfully (${allSales.length} records)!'
+                : 'Data exported successfully to $savedPath (${allSales.length} records)',
           ),
         ),
       );
     } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Export failed: $e')));
+      if (!mounted) return;
+      scaffoldMessenger.showSnackBar(
+        SnackBar(content: Text('Export failed: $e')),
+      );
     }
   }
 

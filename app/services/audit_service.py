@@ -1,8 +1,11 @@
-from datetime import UTC, datetime
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
 from app.models.audit_log import AuditLog
+
+# Define Indian Standard Time (IST) offset: UTC +5:30
+IST = timezone(timedelta(hours=5, minutes=30))
 
 
 class AuditService:
@@ -23,7 +26,7 @@ class AuditService:
             action=action,
             entity_type=entity_type,
             entity_id=entity_id or 0,
-            timestamp=datetime.now(UTC).replace(tzinfo=None),
+            timestamp=datetime.now(IST).replace(tzinfo=None),
         )
         db.add(log)
         db.commit()

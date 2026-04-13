@@ -34,8 +34,12 @@ class _DashboardContentState extends State<DashboardContent> {
   String _forecastError = '';
 
   // EOQ calculator — NOT persisted to database
-  final TextEditingController _holdingCostCtrl = TextEditingController(text: '10');
-  final TextEditingController _orderingCostCtrl = TextEditingController(text: '50');
+  final TextEditingController _holdingCostCtrl = TextEditingController(
+    text: '10',
+  );
+  final TextEditingController _orderingCostCtrl = TextEditingController(
+    text: '50',
+  );
   double? _calculatedEoq;
 
   @override
@@ -67,7 +71,8 @@ class _DashboardContentState extends State<DashboardContent> {
   void _computeEoq() {
     final fd = _forecastData;
     if (fd == null) return;
-    final dailyEs = double.tryParse(fd['daily_demand_es']?.toString() ?? '0') ?? 0;
+    final dailyEs =
+        double.tryParse(fd['daily_demand_es']?.toString() ?? '0') ?? 0;
     final annualDemand = dailyEs * 365;
     final ordering = double.tryParse(_orderingCostCtrl.text) ?? 0;
     final holding = double.tryParse(_holdingCostCtrl.text) ?? 0;
@@ -75,7 +80,46 @@ class _DashboardContentState extends State<DashboardContent> {
       setState(() => _calculatedEoq = null);
       return;
     }
-    setState(() => _calculatedEoq = _sqrt(2 * annualDemand * ordering / holding));
+    setState(
+      () => _calculatedEoq = _sqrt(2 * annualDemand * ordering / holding),
+    );
+  }
+
+  bool _isGeneratingForecast = false;
+
+  Future<void> _generateAndRefresh() async {
+    if (!mounted) return;
+    setState(() {
+      _isGeneratingForecast = true;
+    });
+    try {
+      if (widget.canViewForecasts) {
+        try {
+          await _dashboardController.generateForecast();
+        } catch (e) {
+          debugPrint('Forecast generation warning: $e');
+        }
+      }
+      await Future.wait([_loadSummary(), _loadAlerts()]);
+      if (_selectedProduct != null) {
+        await _fetchForecast();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to refresh data: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isGeneratingForecast = false;
+        });
+      }
+    }
   }
 
   Future<void> _loadSummary() async {
@@ -127,7 +171,10 @@ class _DashboardContentState extends State<DashboardContent> {
     });
     try {
       final productId = _selectedProduct!['product_id'] as int;
-      final forecast = await _dashboardController.getForecast(productId, _selectedWindow);
+      final forecast = await _dashboardController.getForecast(
+        productId,
+        _selectedWindow,
+      );
       setState(() {
         _forecastData = forecast;
         _isLoadingForecast = false;
@@ -141,7 +188,12 @@ class _DashboardContentState extends State<DashboardContent> {
     }
   }
 
-  Widget _buildSummaryCard(String title, String subtitle, IconData icon, Color color) {
+  Widget _buildSummaryCard(
+    String title,
+    String subtitle,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       elevation: 2,
       child: Padding(
@@ -159,10 +211,23 @@ class _DashboardContentState extends State<DashboardContent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                   Text(title, style: TextStyle(fontSize: 14, color: Theme.of(context).hintColor)),
-                   const SizedBox(height: 4),
-                   Text(subtitle, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold), 
-                        softWrap: true, overflow: TextOverflow.visible),
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).hintColor,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                  ),
                 ],
               ),
             ),
@@ -172,7 +237,11 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
-  Widget _buildProductImportanceCard(String label, Map<String, dynamic>? data, Color color) {
+  Widget _buildProductImportanceCard(
+    String label,
+    Map<String, dynamic>? data,
+    Color color,
+  ) {
     if (data == null) {
       return Card(
         child: ListTile(
@@ -185,10 +254,13 @@ class _DashboardContentState extends State<DashboardContent> {
     final isMost = label.contains('Most');
     return Card(
       child: ListTile(
-        leading: Icon(isMost ? Icons.arrow_upward : Icons.arrow_downward, color: color),
+        leading: Icon(
+          isMost ? Icons.arrow_upward : Icons.arrow_downward,
+          color: color,
+        ),
         title: Text('$label: ${data['name']}'),
         subtitle: Text(
-          'Supplier: ${data['supplier_name']}\nReorder Pt: ${data['reorder_point']} | EOQ: ${data['eoq'] ?? 'N/A'}'
+          'Supplier: ${data['supplier_name']}\nReorder Pt: ${data['reorder_point']} | EOQ: ${data['eoq'] ?? 'N/A'}',
         ),
         isThreeLine: true,
       ),
@@ -196,8 +268,10 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildTopSummary() {
-    if (_isLoadingSummary) return const Center(child: CircularProgressIndicator());
-    if (_summaryError.isNotEmpty) return Center(child: Text('Error: $_summaryError'));
+    if (_isLoadingSummary)
+      return const Center(child: CircularProgressIndicator());
+    if (_summaryError.isNotEmpty)
+      return Center(child: Text('Error: $_summaryError'));
     if (_summaryData == null) return const SizedBox.shrink();
 
     return Padding(
@@ -205,9 +279,40 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Expanded(
+                child: Text(
+                  'Dashboard Summary',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              const SizedBox(width: 8),
+              ElevatedButton.icon(
+                onPressed: _isGeneratingForecast ? null : _generateAndRefresh,
+                icon: _isGeneratingForecast
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh),
+                label: Text(
+                  _isGeneratingForecast ? 'Refreshing...' : 'Refresh',
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
           LayoutBuilder(
             builder: (context, constraints) {
-              int crossAxisCount = constraints.maxWidth < 600 ? 1 : constraints.maxWidth < 900 ? 2 : 4;
+              int crossAxisCount = constraints.maxWidth < 600
+                  ? 1
+                  : constraints.maxWidth < 900
+                  ? 2
+                  : 4;
               return GridView.count(
                 crossAxisCount: crossAxisCount,
                 crossAxisSpacing: 16,
@@ -216,21 +321,53 @@ class _DashboardContentState extends State<DashboardContent> {
                 physics: const NeverScrollableScrollPhysics(),
                 childAspectRatio: constraints.maxWidth < 600 ? 3 : 2,
                 children: [
-                  _buildSummaryCard('Total Inventory Worth', 'Rs. ${_summaryData!['stock_value']}', Icons.account_balance_wallet, Colors.teal),
-                  _buildSummaryCard('Active Receipts Worth', 'Rs. ${_summaryData!['receipts_value']}', Icons.receipt_long, Colors.blue),
-                  _buildSummaryCard('Forecast Worth (30d)', 'Rs. ${_summaryData!['forecast_worth_30d']}', Icons.auto_graph, Colors.green),
-                  _buildSummaryCard('Forecast Worth (60d)', 'Rs. ${_summaryData!['forecast_worth_60d']}', Icons.auto_graph_outlined, Colors.orange),
+                  _buildSummaryCard(
+                    'Total Inventory Worth',
+                    'Rs. ${_summaryData!['stock_value']}',
+                    Icons.account_balance_wallet,
+                    Colors.teal,
+                  ),
+                  _buildSummaryCard(
+                    'Active Receipts Worth',
+                    'Rs. ${_summaryData!['receipts_value']}',
+                    Icons.receipt_long,
+                    Colors.blue,
+                  ),
+                  _buildSummaryCard(
+                    'Forecast Worth (30d)',
+                    'Rs. ${_summaryData!['forecast_worth_30d']}',
+                    Icons.auto_graph,
+                    Colors.green,
+                  ),
+                  _buildSummaryCard(
+                    'Forecast Worth (60d)',
+                    'Rs. ${_summaryData!['forecast_worth_60d']}',
+                    Icons.auto_graph_outlined,
+                    Colors.orange,
+                  ),
                 ],
               );
-            }
+            },
           ),
           const SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(child: _buildProductImportanceCard('Most Important', _summaryData!['most_important_product'], Colors.amber)),
+              Expanded(
+                child: _buildProductImportanceCard(
+                  'Most Important',
+                  _summaryData!['most_important_product'],
+                  Colors.amber,
+                ),
+              ),
               const SizedBox(width: 16),
-              Expanded(child: _buildProductImportanceCard('Least Important', _summaryData!['least_important_product'], Colors.blueGrey)),
+              Expanded(
+                child: _buildProductImportanceCard(
+                  'Least Important',
+                  _summaryData!['least_important_product'],
+                  Colors.blueGrey,
+                ),
+              ),
             ],
           ),
         ],
@@ -245,17 +382,39 @@ class _DashboardContentState extends State<DashboardContent> {
     // Do not show the graph if they don't have access to view forecasts
     if (!widget.canViewForecasts) return const SizedBox.shrink();
 
-    final historicalData = _summaryData!['total_inventory_historical_sales'] as List<dynamic>? ?? [];
-    final futureData30 = _summaryData!['total_inventory_forecast_30d'] as List<dynamic>? ?? [];
-    final futureData60 = _summaryData!['total_inventory_forecast_60d'] as List<dynamic>? ?? [];
-    if (historicalData.isEmpty && futureData30.isEmpty && futureData60.isEmpty) {
+    final historicalData =
+        _summaryData!['total_inventory_historical_sales'] as List<dynamic>? ??
+        [];
+    final futureData30 =
+        _summaryData!['total_inventory_forecast_30d'] as List<dynamic>? ?? [];
+    final futureData60 =
+        _summaryData!['total_inventory_forecast_60d'] as List<dynamic>? ?? [];
+    if (historicalData.isEmpty &&
+        futureData30.isEmpty &&
+        futureData60.isEmpty) {
       return const SizedBox.shrink();
     }
 
-    final predictedMa30 = double.tryParse(_summaryData!['predicted_total_ma_30d']?.toString() ?? '0') ?? 0;
-    final predictedEs30 = double.tryParse(_summaryData!['predicted_total_es_30d']?.toString() ?? '0') ?? 0;
-    final predictedMa60 = double.tryParse(_summaryData!['predicted_total_ma_60d']?.toString() ?? '0') ?? 0;
-    final predictedEs60 = double.tryParse(_summaryData!['predicted_total_es_60d']?.toString() ?? '0') ?? 0;
+    final predictedMa30 =
+        double.tryParse(
+          _summaryData!['predicted_total_ma_30d']?.toString() ?? '0',
+        ) ??
+        0;
+    final predictedEs30 =
+        double.tryParse(
+          _summaryData!['predicted_total_es_30d']?.toString() ?? '0',
+        ) ??
+        0;
+    final predictedMa60 =
+        double.tryParse(
+          _summaryData!['predicted_total_ma_60d']?.toString() ?? '0',
+        ) ??
+        0;
+    final predictedEs60 =
+        double.tryParse(
+          _summaryData!['predicted_total_es_60d']?.toString() ?? '0',
+        ) ??
+        0;
 
     List<FlSpot> historicalSpots = [];
     List<FlSpot> maSpots = [];
@@ -264,7 +423,9 @@ class _DashboardContentState extends State<DashboardContent> {
     List<FlSpot> esSpots60 = [];
 
     final int historicalLen = historicalData.length;
-    final int maxForecastLen = futureData60.isNotEmpty ? futureData60.length : futureData30.length;
+    final int maxForecastLen = futureData60.isNotEmpty
+        ? futureData60.length
+        : futureData30.length;
     double maxX = (historicalLen + maxForecastLen - 1).toDouble();
     if (maxX < 0) maxX = 0;
     double maxY = 0.0;
@@ -278,8 +439,10 @@ class _DashboardContentState extends State<DashboardContent> {
 
     for (int i = 0; i < futureData30.length; i++) {
       final point = futureData30[i];
-      final maQty = double.tryParse(point['moving_average_qty'].toString()) ?? 0.0;
-      final esQty = double.tryParse(point['exponential_smoothing_qty'].toString()) ?? 0.0;
+      final maQty =
+          double.tryParse(point['moving_average_qty'].toString()) ?? 0.0;
+      final esQty =
+          double.tryParse(point['exponential_smoothing_qty'].toString()) ?? 0.0;
 
       maSpots.add(FlSpot((historicalLen + i).toDouble(), maQty));
       esSpots.add(FlSpot((historicalLen + i).toDouble(), esQty));
@@ -290,8 +453,10 @@ class _DashboardContentState extends State<DashboardContent> {
 
     for (int i = 0; i < futureData60.length; i++) {
       final point = futureData60[i];
-      final maQty = double.tryParse(point['moving_average_qty'].toString()) ?? 0.0;
-      final esQty = double.tryParse(point['exponential_smoothing_qty'].toString()) ?? 0.0;
+      final maQty =
+          double.tryParse(point['moving_average_qty'].toString()) ?? 0.0;
+      final esQty =
+          double.tryParse(point['exponential_smoothing_qty'].toString()) ?? 0.0;
 
       maSpots60.add(FlSpot((historicalLen + i).toDouble(), maQty));
       esSpots60.add(FlSpot((historicalLen + i).toDouble(), esQty));
@@ -307,16 +472,39 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Total Inventory Demand Forecast (Historical + 30/60 Days)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text(
+            'Total Inventory Demand Forecast (Historical + 30/60 Days)',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 10,
             runSpacing: 10,
             children: [
-              _buildStatChip(Icons.multiline_chart, 'MA Next 30d', '${predictedMa30.toStringAsFixed(0)} units', Colors.blue),
-              _buildStatChip(Icons.show_chart, 'ES Next 30d', '${predictedEs30.toStringAsFixed(0)} units', Colors.deepOrange),
-              _buildStatChip(Icons.timeline, 'MA Next 60d', '${predictedMa60.toStringAsFixed(0)} units', Colors.indigo),
-              _buildStatChip(Icons.insights, 'ES Next 60d', '${predictedEs60.toStringAsFixed(0)} units', Colors.green),
+              _buildStatChip(
+                Icons.multiline_chart,
+                'MA Next 30d',
+                '${predictedMa30.toStringAsFixed(0)} units',
+                Colors.blue,
+              ),
+              _buildStatChip(
+                Icons.show_chart,
+                'ES Next 30d',
+                '${predictedEs30.toStringAsFixed(0)} units',
+                Colors.deepOrange,
+              ),
+              _buildStatChip(
+                Icons.timeline,
+                'MA Next 60d',
+                '${predictedMa60.toStringAsFixed(0)} units',
+                Colors.indigo,
+              ),
+              _buildStatChip(
+                Icons.insights,
+                'ES Next 60d',
+                '${predictedEs60.toStringAsFixed(0)} units',
+                Colors.green,
+              ),
             ],
           ),
           const SizedBox(height: 16),
@@ -353,7 +541,10 @@ class _DashboardContentState extends State<DashboardContent> {
                       gridData: FlGridData(show: true, drawVerticalLine: false),
                       titlesData: FlTitlesData(
                         bottomTitles: AxisTitles(
-                          axisNameWidget: const Text('Timeline (MM/DD)', style: TextStyle(fontSize: 12)),
+                          axisNameWidget: const Text(
+                            'Timeline (MM/DD)',
+                            style: TextStyle(fontSize: 12),
+                          ),
                           sideTitles: SideTitles(
                             showTitles: true,
                             reservedSize: 30,
@@ -362,37 +553,83 @@ class _DashboardContentState extends State<DashboardContent> {
                               int index = value.toInt();
                               String dateStr = '';
                               if (index >= 0 && index < historicalData.length) {
-                                dateStr = historicalData[index]['sale_date']?.toString() ?? '';
+                                dateStr =
+                                    historicalData[index]['sale_date']
+                                        ?.toString() ??
+                                    '';
                               } else {
-                                final forecastIndex = index - historicalData.length;
-                                if (forecastIndex >= 0 && forecastIndex < futureData60.length) {
-                                  dateStr = futureData60[forecastIndex]['future_date']?.toString() ?? '';
-                                } else if (forecastIndex >= 0 && forecastIndex < futureData30.length) {
-                                  dateStr = futureData30[forecastIndex]['future_date']?.toString() ?? '';
+                                final forecastIndex =
+                                    index - historicalData.length;
+                                if (forecastIndex >= 0 &&
+                                    forecastIndex < futureData60.length) {
+                                  dateStr =
+                                      futureData60[forecastIndex]['future_date']
+                                          ?.toString() ??
+                                      '';
+                                } else if (forecastIndex >= 0 &&
+                                    forecastIndex < futureData30.length) {
+                                  dateStr =
+                                      futureData30[forecastIndex]['future_date']
+                                          ?.toString() ??
+                                      '';
                                 }
                               }
-                              if (dateStr.isEmpty) return const SizedBox.shrink();
+                              if (dateStr.isEmpty)
+                                return const SizedBox.shrink();
                               final date = DateTime.tryParse(dateStr);
                               if (date == null) return const SizedBox.shrink();
                               return Padding(
                                 padding: const EdgeInsets.only(top: 8.0),
-                                child: Text('${date.month}/${date.day}', style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color)),
+                                child: Text(
+                                  '${date.month}/${date.day}',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    color: Theme.of(
+                                      context,
+                                    ).textTheme.bodySmall?.color,
+                                  ),
+                                ),
                               );
                             },
                           ),
                         ),
-                        topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                        rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                        topTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
+                        rightTitles: AxisTitles(
+                          sideTitles: SideTitles(showTitles: false),
+                        ),
                         leftTitles: AxisTitles(
-                          axisNameWidget: Text('Total Qty', style: TextStyle(fontSize: 12, color: Theme.of(context).textTheme.bodySmall?.color)),
+                          axisNameWidget: Text(
+                            'Total Qty',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.color,
+                            ),
+                          ),
                           sideTitles: SideTitles(
-                            showTitles: true, 
+                            showTitles: true,
                             reservedSize: 40,
-                            getTitlesWidget: (val, meta) => Text(val.toInt().toString(), style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color)),
+                            getTitlesWidget: (val, meta) => Text(
+                              val.toInt().toString(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: Theme.of(
+                                  context,
+                                ).textTheme.bodySmall?.color,
+                              ),
+                            ),
                           ),
                         ),
                       ),
-                      borderData: FlBorderData(show: true, border: Border.all(color: Theme.of(context).dividerColor)),
+                      borderData: FlBorderData(
+                        show: true,
+                        border: Border.all(
+                          color: Theme.of(context).dividerColor,
+                        ),
+                      ),
                       lineBarsData: [
                         if (historicalSpots.isNotEmpty)
                           LineChartBarData(
@@ -400,7 +637,9 @@ class _DashboardContentState extends State<DashboardContent> {
                             isCurved: true,
                             color: Colors.teal,
                             barWidth: 2.2,
-                            dotData: FlDotData(show: historicalSpots.length <= 35),
+                            dotData: FlDotData(
+                              show: historicalSpots.length <= 35,
+                            ),
                           ),
                         if (maSpots.isNotEmpty)
                           LineChartBarData(
@@ -471,7 +710,10 @@ class _DashboardContentState extends State<DashboardContent> {
             const Expanded(
               child: Text(
                 'Forecast view is disabled to the role, please contact the administrator.',
-                style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.red,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -484,7 +726,10 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Demand Forecasting Analysis', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text(
+            'Demand Forecasting Analysis',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 16),
           Row(
             children: [
@@ -493,21 +738,31 @@ class _DashboardContentState extends State<DashboardContent> {
                 child: DropdownSearch<Map<String, dynamic>>(
                   popupProps: const PopupProps.menu(
                     showSearchBox: true,
-                    searchFieldProps: TextFieldProps(decoration: InputDecoration(hintText: 'Search product...')),
+                    searchFieldProps: TextFieldProps(
+                      decoration: InputDecoration(
+                        hintText: 'Search product...',
+                      ),
+                    ),
                   ),
                   items: _products,
                   itemAsString: (item) {
-                     final name = item['product_name'] ?? 'Unknown';
-                     final code = item['product_code'] ?? 'N/A';
-                     final sku = item['sku'] ?? 'N/A';
-                     return '$name (Code: $code, SKU: $sku)';
+                    final name = item['product_name'] ?? 'Unknown';
+                    final code = item['product_code'] ?? 'N/A';
+                    final sku = item['sku'] ?? 'N/A';
+                    return '$name (Code: $code, SKU: $sku)';
                   },
                   filterFn: (item, filter) {
                     final query = filter.toLowerCase();
-                    final name = (item['product_name'] ?? '').toString().toLowerCase();
-                    final code = (item['product_code'] ?? '').toString().toLowerCase();
+                    final name = (item['product_name'] ?? '')
+                        .toString()
+                        .toLowerCase();
+                    final code = (item['product_code'] ?? '')
+                        .toString()
+                        .toLowerCase();
                     final sku = (item['sku'] ?? '').toString().toLowerCase();
-                    return name.contains(query) || code.contains(query) || sku.contains(query);
+                    return name.contains(query) ||
+                        code.contains(query) ||
+                        sku.contains(query);
                   },
                   dropdownDecoratorProps: const DropDownDecoratorProps(
                     dropdownSearchDecoration: InputDecoration(
@@ -548,14 +803,19 @@ class _DashboardContentState extends State<DashboardContent> {
               ),
             ],
           ),
-           const SizedBox(height: 24),
+          const SizedBox(height: 24),
           _buildForecastAnalyticsPanel(),
         ],
       ),
     );
   }
 
-  Widget _buildStockGauge(String status, int current, int reorder, int overstock) {
+  Widget _buildStockGauge(
+    String status,
+    int current,
+    int reorder,
+    int overstock,
+  ) {
     Color gaugeColor;
     IconData gaugeIcon;
     String gaugeLabel;
@@ -565,7 +825,9 @@ class _DashboardContentState extends State<DashboardContent> {
       gaugeColor = Colors.red;
       gaugeIcon = Icons.arrow_downward;
       gaugeLabel = 'Low Stock';
-      fillFraction = reorder > 0 ? (current / reorder).clamp(0.0, 1.0) * 0.33 : 0.1;
+      fillFraction = reorder > 0
+          ? (current / reorder).clamp(0.0, 1.0) * 0.33
+          : 0.1;
     } else if (status == 'Overstock') {
       gaugeColor = Colors.orange;
       gaugeIcon = Icons.arrow_upward;
@@ -575,7 +837,9 @@ class _DashboardContentState extends State<DashboardContent> {
       gaugeColor = Colors.green;
       gaugeIcon = Icons.check_circle;
       gaugeLabel = 'Normal';
-      fillFraction = overstock > 0 ? (current / overstock).clamp(0.33, 0.85) : 0.6;
+      fillFraction = overstock > 0
+          ? (current / overstock).clamp(0.33, 0.85)
+          : 0.6;
     }
 
     return Container(
@@ -592,8 +856,14 @@ class _DashboardContentState extends State<DashboardContent> {
             children: [
               Icon(gaugeIcon, color: gaugeColor, size: 28),
               const SizedBox(width: 8),
-              Text(gaugeLabel,
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: gaugeColor)),
+              Text(
+                gaugeLabel,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: gaugeColor,
+                ),
+              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -610,11 +880,20 @@ class _DashboardContentState extends State<DashboardContent> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Low Stock\n≤$reorder', textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 10, color: Colors.red)),
-              Text('Qty: $current', style: const TextStyle(fontWeight: FontWeight.bold)),
-              Text('Overstock\n≥$overstock', textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 10, color: Colors.orange)),
+              Text(
+                'Low Stock\n≤$reorder',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 10, color: Colors.red),
+              ),
+              Text(
+                'Qty: $current',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              Text(
+                'Overstock\n≥$overstock',
+                textAlign: TextAlign.center,
+                style: const TextStyle(fontSize: 10, color: Colors.orange),
+              ),
             ],
           ),
         ],
@@ -623,12 +902,21 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildForecastAnalyticsPanel() {
-
     if (_isLoadingForecast) {
-      return const Center(child: Padding(padding: EdgeInsets.all(32), child: CircularProgressIndicator()));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(),
+        ),
+      );
     }
     if (_forecastError.isNotEmpty) {
-      return Center(child: Padding(padding: const EdgeInsets.all(32), child: Text('Error: $_forecastError')));
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Text('Error: $_forecastError'),
+        ),
+      );
     }
     if (_forecastData == null) {
       return const Center(
@@ -652,20 +940,25 @@ class _DashboardContentState extends State<DashboardContent> {
     final suggestedOrderQty = fd['suggested_order_qty'] as int? ?? 0;
     final safetyStock = fd['safety_stock_suggestion'] as int? ?? 0;
     final histPoints = fd['historical_data_points'] as int? ?? 0;
-    final predictedMa = double.tryParse(fd['predicted_demand_ma']?.toString() ?? '0') ?? 0;
-    final predictedEs = double.tryParse(fd['predicted_demand_es']?.toString() ?? '0') ?? 0;
-    final dailyEs = double.tryParse(fd['daily_demand_es']?.toString() ?? '0') ?? 0;
+    final predictedMa =
+        double.tryParse(fd['predicted_demand_ma']?.toString() ?? '0') ?? 0;
+    final predictedEs =
+        double.tryParse(fd['predicted_demand_es']?.toString() ?? '0') ?? 0;
+    final dailyEs =
+        double.tryParse(fd['daily_demand_es']?.toString() ?? '0') ?? 0;
 
     // ── Build chart spots ─────────────────────────────────────────────────
     List<FlSpot> histSpots = [];
     List<FlSpot> maSpots = [];
     List<FlSpot> esSpots = [];
-    double maxX = historicalData.length.toDouble() + futureData.length.toDouble() - 1;
+    double maxX =
+        historicalData.length.toDouble() + futureData.length.toDouble() - 1;
     if (maxX < 0) maxX = 0;
     double maxY = currentQty.toDouble();
 
     for (int i = 0; i < historicalData.length; i++) {
-      final qty = double.tryParse(historicalData[i]['quantity_sold'].toString()) ?? 0.0;
+      final qty =
+          double.tryParse(historicalData[i]['quantity_sold'].toString()) ?? 0.0;
       histSpots.add(FlSpot(i.toDouble(), qty));
       if (qty > maxY) maxY = qty;
     }
@@ -677,8 +970,14 @@ class _DashboardContentState extends State<DashboardContent> {
     }
 
     for (int i = 0; i < futureData.length; i++) {
-      final maQty = double.tryParse(futureData[i]['moving_average_qty'].toString()) ?? 0.0;
-      final esQty = double.tryParse(futureData[i]['exponential_smoothing_qty'].toString()) ?? 0.0;
+      final maQty =
+          double.tryParse(futureData[i]['moving_average_qty'].toString()) ??
+          0.0;
+      final esQty =
+          double.tryParse(
+            futureData[i]['exponential_smoothing_qty'].toString(),
+          ) ??
+          0.0;
       maSpots.add(FlSpot((offset + i).toDouble(), maQty));
       esSpots.add(FlSpot((offset + i).toDouble(), esQty));
       if (maQty > maxY) maxY = maQty;
@@ -689,10 +988,13 @@ class _DashboardContentState extends State<DashboardContent> {
     IconData trendIcon = trend == 'upward'
         ? Icons.trending_up
         : trend == 'downward'
-            ? Icons.trending_down
-            : Icons.trending_flat;
-    Color trendColor =
-        trend == 'upward' ? Colors.green : trend == 'downward' ? Colors.red : Colors.blue;
+        ? Icons.trending_down
+        : Icons.trending_flat;
+    Color trendColor = trend == 'upward'
+        ? Colors.green
+        : trend == 'downward'
+        ? Colors.red
+        : Colors.blue;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -706,12 +1008,42 @@ class _DashboardContentState extends State<DashboardContent> {
           spacing: 12,
           runSpacing: 12,
           children: [
-            _buildStatChip(Icons.shopify, 'Daily Demand (ES)', '${dailyEs.toStringAsFixed(2)} units/day', Colors.deepPurple),
-            _buildStatChip(Icons.multiline_chart, 'MA Demand (${fd['window']}d)', '${predictedMa.toStringAsFixed(0)} units', Colors.blue),
-            _buildStatChip(Icons.show_chart, 'ES Demand (${fd['window']}d)', '${predictedEs.toStringAsFixed(0)} units', Colors.orange),
-            _buildStatChip(Icons.bar_chart, 'Std Deviation', '±${stdDev.toStringAsFixed(2)}', Colors.grey),
-            _buildStatChip(trendIcon, 'Demand Trend', trend[0].toUpperCase() + trend.substring(1), trendColor),
-            _buildStatChip(Icons.data_usage, 'History Points', '$histPoints records', Colors.teal),
+            _buildStatChip(
+              Icons.shopify,
+              'Daily Demand (ES)',
+              '${dailyEs.toStringAsFixed(2)} units/day',
+              Colors.deepPurple,
+            ),
+            _buildStatChip(
+              Icons.multiline_chart,
+              'MA Demand (${fd['window']}d)',
+              '${predictedMa.toStringAsFixed(0)} units',
+              Colors.blue,
+            ),
+            _buildStatChip(
+              Icons.show_chart,
+              'ES Demand (${fd['window']}d)',
+              '${predictedEs.toStringAsFixed(0)} units',
+              Colors.orange,
+            ),
+            _buildStatChip(
+              Icons.bar_chart,
+              'Std Deviation',
+              '±${stdDev.toStringAsFixed(2)}',
+              Colors.grey,
+            ),
+            _buildStatChip(
+              trendIcon,
+              'Demand Trend',
+              trend[0].toUpperCase() + trend.substring(1),
+              trendColor,
+            ),
+            _buildStatChip(
+              Icons.data_usage,
+              'History Points',
+              '$histPoints records',
+              Colors.teal,
+            ),
           ],
         ),
         const SizedBox(height: 20),
@@ -720,22 +1052,46 @@ class _DashboardContentState extends State<DashboardContent> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.1),
+            color: Theme.of(
+              context,
+            ).colorScheme.primaryContainer.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Theme.of(context).colorScheme.primaryContainer),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.primaryContainer,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Reorder Recommendations',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.indigo)),
+              const Text(
+                'Reorder Recommendations',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.indigo,
+                ),
+              ),
               const SizedBox(height: 12),
-              _buildRecommendationRow('Reorder Now (Lead Time Cover)', '$reorderSuggestion units',
-                  reorderSuggestion > 0 ? Colors.red : Colors.green),
-              _buildRecommendationRow('Full Window Order Qty', '$suggestedOrderQty units', Colors.indigo),
-              _buildRecommendationRow('Safety Stock Buffer (95% SL)', '$safetyStock units', Colors.teal),
-              _buildRecommendationRow('Current Stock', '$currentQty units',
-                  currentQty <= reorderLevel ? Colors.red : Colors.green),
+              _buildRecommendationRow(
+                'Reorder Now (Lead Time Cover)',
+                '$reorderSuggestion units',
+                reorderSuggestion > 0 ? Colors.red : Colors.green,
+              ),
+              _buildRecommendationRow(
+                'Full Window Order Qty',
+                '$suggestedOrderQty units',
+                Colors.indigo,
+              ),
+              _buildRecommendationRow(
+                'Safety Stock Buffer (95% SL)',
+                '$safetyStock units',
+                Colors.teal,
+              ),
+              _buildRecommendationRow(
+                'Current Stock',
+                '$currentQty units',
+                currentQty <= reorderLevel ? Colors.red : Colors.green,
+              ),
             ],
           ),
         ),
@@ -745,15 +1101,21 @@ class _DashboardContentState extends State<DashboardContent> {
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.1),
+            color: Theme.of(
+              context,
+            ).colorScheme.secondaryContainer.withOpacity(0.1),
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: Theme.of(context).colorScheme.secondaryContainer),
+            border: Border.all(
+              color: Theme.of(context).colorScheme.secondaryContainer,
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('EOQ Calculator (Economic Order Quantity)',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const Text(
+                'EOQ Calculator (Economic Order Quantity)',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
               const SizedBox(height: 4),
               const Text(
                 'Formula: EOQ = √(2 × Annual Demand × Ordering Cost / Holding Cost/unit/yr)  — values not saved',
@@ -804,7 +1166,10 @@ class _DashboardContentState extends State<DashboardContent> {
                     Text(
                       'EOQ = ${_calculatedEoq!.toStringAsFixed(0)} units per order',
                       style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
+                      ),
                     ),
                   ],
                 ),
@@ -816,8 +1181,10 @@ class _DashboardContentState extends State<DashboardContent> {
               if (_calculatedEoq == null)
                 const Padding(
                   padding: EdgeInsets.only(top: 8),
-                  child: Text('Enter valid costs to calculate EOQ',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  child: Text(
+                    'Enter valid costs to calculate EOQ',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
                 ),
             ],
           ),
@@ -854,8 +1221,10 @@ class _DashboardContentState extends State<DashboardContent> {
                     gridData: FlGridData(show: true, drawVerticalLine: false),
                     titlesData: FlTitlesData(
                       bottomTitles: AxisTitles(
-                        axisNameWidget:
-                            const Text('Date (MM/DD)', style: TextStyle(fontSize: 11)),
+                        axisNameWidget: const Text(
+                          'Date (MM/DD)',
+                          style: TextStyle(fontSize: 11),
+                        ),
                         sideTitles: SideTitles(
                           showTitles: true,
                           reservedSize: 36,
@@ -865,32 +1234,61 @@ class _DashboardContentState extends State<DashboardContent> {
                             DateTime? date;
                             if (index < historicalData.length) {
                               date = DateTime.tryParse(
-                                  historicalData[index]['sale_date']?.toString() ?? '');
+                                historicalData[index]['sale_date']
+                                        ?.toString() ??
+                                    '',
+                              );
                             } else {
                               int fi = index - historicalData.length;
                               if (fi < futureData.length) {
                                 date = DateTime.tryParse(
-                                    futureData[fi]['future_date']?.toString() ?? '');
+                                  futureData[fi]['future_date']?.toString() ??
+                                      '',
+                                );
                               }
                             }
                             if (date == null) return const SizedBox.shrink();
                             return Padding(
                               padding: const EdgeInsets.only(top: 6),
-                              child: Text('${date.month}/${date.day}',
-                                  style: TextStyle(fontSize: 9, color: Theme.of(context).textTheme.bodySmall?.color)),
+                              child: Text(
+                                '${date.month}/${date.day}',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: Theme.of(
+                                    context,
+                                  ).textTheme.bodySmall?.color,
+                                ),
+                              ),
                             );
                           },
                         ),
                       ),
-                      topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                      rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                      topTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
+                      rightTitles: const AxisTitles(
+                        sideTitles: SideTitles(showTitles: false),
+                      ),
                       leftTitles: AxisTitles(
-                        axisNameWidget:
-                            Text('Qty', style: TextStyle(fontSize: 11, color: Theme.of(context).textTheme.bodySmall?.color)),
+                        axisNameWidget: Text(
+                          'Qty',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                          ),
+                        ),
                         sideTitles: SideTitles(
-                          showTitles: true, 
+                          showTitles: true,
                           reservedSize: 40,
-                          getTitlesWidget: (val, meta) => Text(val.toInt().toString(), style: TextStyle(fontSize: 10, color: Theme.of(context).textTheme.bodySmall?.color)),
+                          getTitlesWidget: (val, meta) => Text(
+                            val.toInt().toString(),
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.color,
+                            ),
+                          ),
                         ),
                       ),
                     ),
@@ -905,7 +1303,10 @@ class _DashboardContentState extends State<DashboardContent> {
                             show: true,
                             alignment: Alignment.topRight,
                             labelResolver: (_) => 'Reorder ($reorderLevel)',
-                            style: const TextStyle(color: Colors.red, fontSize: 9),
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontSize: 9,
+                            ),
                           ),
                         ),
                         HorizontalLine(
@@ -917,7 +1318,10 @@ class _DashboardContentState extends State<DashboardContent> {
                             show: true,
                             alignment: Alignment.topRight,
                             labelResolver: (_) => 'Overstock ($overstockLevel)',
-                            style: const TextStyle(color: Colors.orange, fontSize: 9),
+                            style: const TextStyle(
+                              color: Colors.orange,
+                              fontSize: 9,
+                            ),
                           ),
                         ),
                         HorizontalLine(
@@ -929,13 +1333,18 @@ class _DashboardContentState extends State<DashboardContent> {
                             show: true,
                             alignment: Alignment.topLeft,
                             labelResolver: (_) => 'Current ($currentQty)',
-                            style: const TextStyle(color: Colors.teal, fontSize: 9),
+                            style: const TextStyle(
+                              color: Colors.teal,
+                              fontSize: 9,
+                            ),
                           ),
                         ),
                       ],
                     ),
-                    borderData:
-                        FlBorderData(show: true, border: Border.all(color: Colors.grey.shade300)),
+                    borderData: FlBorderData(
+                      show: true,
+                      border: Border.all(color: Colors.grey.shade300),
+                    ),
                     lineBarsData: [
                       if (histSpots.isNotEmpty)
                         LineChartBarData(
@@ -974,7 +1383,12 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
-  Widget _buildStatChip(IconData icon, String label, String value, Color color) {
+  Widget _buildStatChip(
+    IconData icon,
+    String label,
+    String value,
+    Color color,
+  ) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -991,7 +1405,14 @@ class _DashboardContentState extends State<DashboardContent> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label, style: TextStyle(fontSize: 10, color: color)),
-              Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
             ],
           ),
         ],
@@ -1013,8 +1434,14 @@ class _DashboardContentState extends State<DashboardContent> {
               borderRadius: BorderRadius.circular(6),
               border: Border.all(color: color.withOpacity(0.4)),
             ),
-            child: Text(value,
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
           ),
         ],
       ),
@@ -1024,11 +1451,7 @@ class _DashboardContentState extends State<DashboardContent> {
   Widget _buildLegendItem(String name, Color color) {
     return Row(
       children: [
-        Container(
-          width: 16,
-          height: 4,
-          color: color,
-        ),
+        Container(width: 16, height: 4, color: color),
         const SizedBox(width: 8),
         Text(name, style: const TextStyle(fontSize: 12)),
       ],
@@ -1036,8 +1459,10 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildAlertsSection() {
-    if (_isLoadingAlerts) return const Center(child: CircularProgressIndicator());
-    if (_alertsError.isNotEmpty) return Center(child: Text('Error loading alerts: $_alertsError'));
+    if (_isLoadingAlerts)
+      return const Center(child: CircularProgressIndicator());
+    if (_alertsError.isNotEmpty)
+      return Center(child: Text('Error loading alerts: $_alertsError'));
     if (_alertsData == null) return const SizedBox.shrink();
 
     final stockouts = _alertsData!['stockout_risks'] as List<dynamic>? ?? [];
@@ -1046,7 +1471,10 @@ class _DashboardContentState extends State<DashboardContent> {
     if (stockouts.isEmpty && overstocks.isEmpty) {
       return const Padding(
         padding: EdgeInsets.all(16.0),
-        child: Text('No critical inventory alerts at this time.', textAlign: TextAlign.center),
+        child: Text(
+          'No critical inventory alerts at this time.',
+          textAlign: TextAlign.center,
+        ),
       );
     }
 
@@ -1055,34 +1483,66 @@ class _DashboardContentState extends State<DashboardContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Inventory Alerts', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text(
+            'Inventory Alerts',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
           const SizedBox(height: 16),
           if (stockouts.isNotEmpty) ...[
-            const Text('Low Stock Risks', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.red)),
-            const SizedBox(height: 8),
-            ...stockouts.take(5).map((p) => Card(
-              color: Colors.red.shade50,
-              child: ListTile(
-                leading: const Icon(Icons.warning, color: Colors.red),
-                title: Text('${p['name']} (${p['product_code']})'),
-                subtitle: Text('Qty: ${p['current_qty']} (Target: ${p['reorder_level']})'),
-                trailing: Text(p['sku']),
+            const Text(
+              'Low Stock Risks',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.red,
               ),
-            )),
+            ),
+            const SizedBox(height: 8),
+            ...stockouts
+                .take(5)
+                .map(
+                  (p) => Card(
+                    color: Colors.red.shade50,
+                    child: ListTile(
+                      leading: const Icon(Icons.warning, color: Colors.red),
+                      title: Text('${p['name']} (${p['product_code']})'),
+                      subtitle: Text(
+                        'Qty: ${p['current_qty']} (Target: ${p['reorder_level']})',
+                      ),
+                      trailing: Text(p['sku']),
+                    ),
+                  ),
+                ),
           ],
           if (overstocks.isNotEmpty) ...[
             const SizedBox(height: 24),
-            const Text('Overstock Alerts', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.orange)),
-            const SizedBox(height: 8),
-            ...overstocks.take(5).map((p) => Card(
-              color: Colors.orange.shade50,
-              child: ListTile(
-                leading: const Icon(Icons.inventory_2, color: Colors.orange),
-                title: Text('${p['name']} (${p['product_code']})'),
-                subtitle: Text('Qty: ${p['current_qty']} (Limit: ${p['overstock_level']})'),
-                trailing: Text(p['sku']),
+            const Text(
+              'Overstock Alerts',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange,
               ),
-            )),
+            ),
+            const SizedBox(height: 8),
+            ...overstocks
+                .take(5)
+                .map(
+                  (p) => Card(
+                    color: Colors.orange.shade50,
+                    child: ListTile(
+                      leading: const Icon(
+                        Icons.inventory_2,
+                        color: Colors.orange,
+                      ),
+                      title: Text('${p['name']} (${p['product_code']})'),
+                      subtitle: Text(
+                        'Qty: ${p['current_qty']} (Limit: ${p['overstock_level']})',
+                      ),
+                      trailing: Text(p['sku']),
+                    ),
+                  ),
+                ),
           ],
         ],
       ),

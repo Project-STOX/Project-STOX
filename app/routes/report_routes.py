@@ -42,7 +42,7 @@ def create_audit_log(
 
 @router.get("/historical-sales", response_model=list[HistoricalSaleRead])
 def list_historical_sales(
-    limit: int = Query(default=500, ge=1, le=2000),
+    limit: int = Query(default=500, ge=1, le=1000000),
     start_date: date | None = Query(default=None),
     end_date: date | None = Query(default=None),
     product_id: int | None = Query(default=None, ge=1),

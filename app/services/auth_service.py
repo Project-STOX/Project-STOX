@@ -16,6 +16,7 @@ from app.models.role_permission import RolePermission
 from app.models.user import User
 from app.schemas.auth import LoginRequest, TokenPairResponse
 from app.schemas.user import UserRead
+from app.services.audit_service import AuditService
 
 settings = get_settings()
 
@@ -73,6 +74,13 @@ class AuthService:
 
         # The current schema has no trusted OTP seed/challenge store; issue backend tokens directly.
         token_pair = AuthService._issue_token_pair(db, user)
+        AuditService.write_log(
+            db,
+            user_id=user.id,
+            action="Login",
+            entity_type="sessions",
+            entity_id=user.id,
+        )
         return token_pair.model_dump()
 
     @staticmethod
@@ -199,7 +207,15 @@ class AuthService:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid 2FA code")
 
         _LOGIN_CHALLENGES.pop(login_challenge, None)
-        return AuthService._issue_token_pair(db, user)
+        token_pair = AuthService._issue_token_pair(db, user)
+        AuditService.write_log(
+            db,
+            user_id=user.id,
+            action="Login (2FA)",
+            entity_type="sessions",
+            entity_id=user.id,
+        )
+        return token_pair
 
     @staticmethod
     def refresh_tokens(db: Session, raw_refresh_token: str) -> TokenPairResponse:
@@ -225,6 +241,13 @@ class AuthService:
             # Delete all sessions for this specific user (Global Logout)
             db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete(synchronize_session=False)
             db.commit()
+            AuditService.write_log(
+                db,
+                user_id=user_id,
+                action="Logout",
+                entity_type="sessions",
+                entity_id=user_id,
+            )
 
     @staticmethod
     def _decode_refresh_token_or_401(raw_refresh_token: str) -> dict:
@@ -275,11 +298,27 @@ class AuthService:
             )
         user.password_hash = hash_password(new_password)
         db.commit()
+        AuditService.write_log(
+            db,
+            user_id=user.id,
+            action="Changed Password",
+            entity_type="users",
+            entity_id=user.id,
+        )
 
     @staticmethod
     def delete_account(db: Session, *, user: User, two_factor_code: str | None = None) -> None:
-        db.query(RefreshToken).filter(RefreshToken.user_id == user.id).delete(synchronize_session=False)
-        db.query(AuditLog).filter(AuditLog.user_id == user.id).update(
+        user_id = user.id
+        # Log before deletion to avoid foreign key issues
+        AuditService.write_log(
+            db,
+            user_id=user_id,
+            action="Deleted Account",
+            entity_type="users",
+            entity_id=user_id,
+        )
+        db.query(RefreshToken).filter(RefreshToken.user_id == user_id).delete(synchronize_session=False)
+        db.query(AuditLog).filter(AuditLog.user_id == user_id).update(
             {"user_id": None}, synchronize_session=False
         )
         db.delete(user)

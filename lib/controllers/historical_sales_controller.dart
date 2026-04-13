@@ -51,10 +51,11 @@ class HistoricalSalesController {
     DateTime? endDate,
     String? productQuery,
     String? supplierQuery,
+    int limit = 1000,
   }) async {
     try {
       return _reportsApi.getHistoricalSales(
-        limit: 1000,
+        limit: limit,
         startDate: startDate,
         endDate: endDate,
         productQuery: productQuery,

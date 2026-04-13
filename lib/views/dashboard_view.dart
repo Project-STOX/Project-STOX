@@ -208,14 +208,7 @@ class _DashboardViewState extends State<DashboardView> {
                   );
                 },
               ),
-            ListTile(
-              leading: const Icon(Icons.inventory_2),
-              title: const Text('View Products'),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/products');
-              },
-            ),
+
             if (_canManageUsers)
               ListTile(
                 leading: const Icon(Icons.people),

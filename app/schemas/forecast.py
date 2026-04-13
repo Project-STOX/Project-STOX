@@ -13,6 +13,7 @@ class ForecastResultItem(BaseModel):
     method: str
     window_days: int
     predicted_qty: Decimal
+    reorder_suggestion: int | None = None
 
 
 class ForecastGenerateResponse(BaseModel):

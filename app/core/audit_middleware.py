@@ -22,7 +22,7 @@ class AuditMiddleware(BaseHTTPMiddleware):
             return response
         # Use rstrip to ignore trailing slashes in path checks.
         path = request.url.path.rstrip("/")
-        if path.endswith("/auth/login") or path.endswith("/auth/verify-2fa"):
+        if "/auth/" in path:
             return response
 
         user_id = self._extract_user_id(request)

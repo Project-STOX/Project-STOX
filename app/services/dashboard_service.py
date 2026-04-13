@@ -95,7 +95,12 @@ class DashboardService:
         most_important = get_product_importance(asc_order=False)
         least_important = get_product_importance(asc_order=True)
 
-        base_date = datetime.now(UTC).date()
+        max_date_stmt = select(func.max(HistoricalSale.sale_date))
+        if filters:
+            max_date_stmt = max_date_stmt.join(Product, HistoricalSale.product_id == Product.id).where(*filters)
+        max_sale_date = db.scalar(max_date_stmt)
+        
+        base_date = max_sale_date if max_sale_date else datetime.now(UTC).date()
         lookback_days = 120
         history_start = base_date - timedelta(days=lookback_days - 1)
 
@@ -297,7 +302,10 @@ class DashboardService:
 
         # ── Generate cumulative future forecast series (running total) ────────
         # Each point represents "cumulative demand sold by this day" projected from today
-        base_date = datetime.now(UTC).date()
+        if history_rows:
+            base_date = history_rows[-1].sale_date
+        else:
+            base_date = datetime.now(UTC).date()
         future_forecasts = []
         cumulative_ma = 0.0
         cumulative_es = 0.0
