@@ -100,7 +100,11 @@ class _DashboardContentState extends State<DashboardContent> {
           debugPrint('Forecast generation warning: $e');
         }
       }
-      await Future.wait([_loadSummary(), _loadAlerts()]);
+      await Future.wait([
+        _loadSummary(),
+        _loadAlerts(),
+        if (widget.canViewForecasts) _loadProducts(),
+      ]);
       if (_selectedProduct != null) {
         await _fetchForecast();
       }
@@ -123,41 +127,59 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Future<void> _loadSummary() async {
+    setState(() {
+      _isLoadingSummary = true;
+      _summaryError = '';
+    });
     try {
       final summary = await _dashboardController.getSummary();
-      setState(() {
-        _summaryData = summary;
-        _isLoadingSummary = false;
-      });
+      if (mounted) {
+        setState(() {
+          _summaryData = summary;
+          _isLoadingSummary = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _summaryError = e.toString();
-        _isLoadingSummary = false;
-      });
+      if (mounted) {
+        setState(() {
+          _summaryError = e.toString();
+          _isLoadingSummary = false;
+        });
+      }
     }
   }
 
   Future<void> _loadAlerts() async {
+    setState(() {
+      _isLoadingAlerts = true;
+      _alertsError = '';
+    });
     try {
       final alerts = await _dashboardController.getAlerts();
-      setState(() {
-        _alertsData = alerts;
-        _isLoadingAlerts = false;
-      });
+      if (mounted) {
+        setState(() {
+          _alertsData = alerts;
+          _isLoadingAlerts = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _alertsError = e.toString();
-        _isLoadingAlerts = false;
-      });
+      if (mounted) {
+        setState(() {
+          _alertsError = e.toString();
+          _isLoadingAlerts = false;
+        });
+      }
     }
   }
 
   Future<void> _loadProducts() async {
     try {
       final products = await _productController.fetchProducts();
-      setState(() {
-        _products = products;
-      });
+      if (mounted) {
+        setState(() {
+          _products = products;
+        });
+      }
     } catch (e) {
       debugPrint('Failed to fetch products for search bar: $e');
     }
@@ -175,16 +197,20 @@ class _DashboardContentState extends State<DashboardContent> {
         productId,
         _selectedWindow,
       );
-      setState(() {
-        _forecastData = forecast;
-        _isLoadingForecast = false;
-      });
-      _computeEoq(); // Auto-refresh EOQ with new forecast data
+      if (mounted) {
+        setState(() {
+          _forecastData = forecast;
+          _isLoadingForecast = false;
+        });
+        _computeEoq(); // Auto-refresh EOQ with new forecast data
+      }
     } catch (e) {
-      setState(() {
-        _forecastError = e.toString();
-        _isLoadingForecast = false;
-      });
+      if (mounted) {
+        setState(() {
+          _forecastError = e.toString();
+          _isLoadingForecast = false;
+        });
+      }
     }
   }
 
@@ -268,10 +294,12 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildTopSummary() {
-    if (_isLoadingSummary)
+    if (_isLoadingSummary) {
       return const Center(child: CircularProgressIndicator());
-    if (_summaryError.isNotEmpty)
+    }
+    if (_summaryError.isNotEmpty) {
       return Center(child: Text('Error: $_summaryError'));
+    }
     if (_summaryData == null) return const SizedBox.shrink();
 
     return Padding(
@@ -574,8 +602,9 @@ class _DashboardContentState extends State<DashboardContent> {
                                       '';
                                 }
                               }
-                              if (dateStr.isEmpty)
+                              if (dateStr.isEmpty) {
                                 return const SizedBox.shrink();
+                              }
                               final date = DateTime.tryParse(dateStr);
                               if (date == null) return const SizedBox.shrink();
                               return Padding(
@@ -1459,10 +1488,12 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   Widget _buildAlertsSection() {
-    if (_isLoadingAlerts)
+    if (_isLoadingAlerts) {
       return const Center(child: CircularProgressIndicator());
-    if (_alertsError.isNotEmpty)
+    }
+    if (_alertsError.isNotEmpty) {
       return Center(child: Text('Error loading alerts: $_alertsError'));
+    }
     if (_alertsData == null) return const SizedBox.shrink();
 
     final stockouts = _alertsData!['stockout_risks'] as List<dynamic>? ?? [];

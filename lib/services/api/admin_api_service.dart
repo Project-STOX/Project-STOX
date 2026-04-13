@@ -6,7 +6,7 @@ import 'api_config.dart';
 
 class AdminApiService {
   AdminApiService({ApiClient? apiClient})
-      : _api = apiClient ?? ApiClient(baseUrl: ApiConfig.baseUrl);
+    : _api = apiClient ?? ApiClient(baseUrl: ApiConfig.baseUrl);
 
   final ApiClient _api;
 
@@ -64,11 +64,11 @@ class AdminApiService {
     bool? tfaActive,
   }) async {
     final payload = <String, dynamic>{
-      if (username != null) 'username': username,
-      if (email != null) 'email': email,
-      if (roleId != null) 'role_id': roleId,
-      if (isActive != null) 'is_active': isActive,
-      if (tfaActive != null) 'tfa_active': tfaActive,
+      'username': ?username,
+      'email': ?email,
+      'role_id': ?roleId,
+      'is_active': ?isActive,
+      'tfa_active': ?tfaActive,
     };
     final data = await _api.put(
       '/admin/users/$userId',
