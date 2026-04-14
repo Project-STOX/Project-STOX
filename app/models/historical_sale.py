@@ -17,4 +17,4 @@ class HistoricalSale(Base):
     quantity_sold: Mapped[int] = mapped_column(Integer, nullable=False)
     revenue: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
 
-    product: Mapped["Product"] = relationship("Product")
+    product: Mapped["Product"] = relationship("Product", back_populates="historical_sales")

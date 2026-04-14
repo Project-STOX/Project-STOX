@@ -11,6 +11,8 @@ class Product {
   final int reorderPoint;
   final String? serialNo;
   final String statusFlag;
+  final double holdingCost;
+  final double orderingCost;
 
   Product({
     required this.productId,
@@ -25,6 +27,8 @@ class Product {
     required this.reorderPoint,
     this.serialNo,
     required this.statusFlag,
+    required this.holdingCost,
+    required this.orderingCost,
   });
 
   factory Product.fromJson(Map<String, dynamic> json) {
@@ -86,6 +90,8 @@ class Product {
       reorderPoint: intValue(json['reorder_point'] ?? json['reorder_level']) ?? 0,
       serialNo: json['serial_no']?.toString(),
       statusFlag: statusValue,
+      holdingCost: double.tryParse((json['holding_cost'] ?? 0).toString()) ?? 0.0,
+      orderingCost: double.tryParse((json['ordering_cost'] ?? 0).toString()) ?? 0.0,
     );
   }
 }

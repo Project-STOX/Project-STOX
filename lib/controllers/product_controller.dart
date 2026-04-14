@@ -58,6 +58,8 @@ class ProductController {
         'safety_stock': _toInt(product['overstock_level']),
         'serial_no': product['serial_no'],
         'lead_time_days': _toInt(product['lead_time_days']),
+        'holding_cost': double.tryParse((product['holding_cost'] ?? 0).toString()) ?? 0.0,
+        'ordering_cost': double.tryParse((product['ordering_cost'] ?? 0).toString()) ?? 0.0,
         'status_flag': _displayStatus(product['status_flag']?.toString()),
         'supplier': supplier == null
             ? {'supplier_id': supplierId, 'supplier_name': 'Unknown'}
@@ -83,6 +85,9 @@ class ProductController {
           : product.safetyStock,
       'unit_cost': product.unitCost,
       'serial_no': product.serialNo != null ? int.tryParse(product.serialNo!) : null,
+      'holding_cost': product.holdingCost,
+      'ordering_cost': product.orderingCost,
+      'lead_time_days': product.leadTimeDays,
     });
   }
 
@@ -103,6 +108,9 @@ class ProductController {
           : product.safetyStock,
       'unit_cost': product.unitCost,
       'serial_no': product.serialNo != null ? int.tryParse(product.serialNo!) : null,
+      'holding_cost': product.holdingCost,
+      'ordering_cost': product.orderingCost,
+      'lead_time_days': product.leadTimeDays,
     });
   }
 

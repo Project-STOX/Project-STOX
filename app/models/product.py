@@ -1,8 +1,15 @@
 from decimal import Decimal
 from sqlalchemy import Enum, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import TYPE_CHECKING
 from app.models.base import Base
 
+if TYPE_CHECKING:
+    from app.models.reorder_parameter import ReorderParameter
+    from app.models.supplier import Supplier
+    from app.models.stock_receipt import StockReceipt
+    from app.models.demand_forecast import DemandForecast
+    from app.models.historical_sale import HistoricalSale
 
 class Product(Base):
     __tablename__ = "product"
@@ -21,15 +28,19 @@ class Product(Base):
         index=True
     )
     serial_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    holding_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+    ordering_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
 
     supplier: Mapped["Supplier"] = relationship("Supplier", back_populates="products")
     stock_receipts: Mapped["list[StockReceipt]"] = relationship("StockReceipt", back_populates="product")
-    reorder_params: Mapped["ReorderParameter | None"] = relationship("ReorderParameter", back_populates="product", uselist=False)
+    reorder_params: Mapped["ReorderParameter | None"] = relationship("ReorderParameter", back_populates="product", uselist=False, cascade="all, delete-orphan")
+    forecasts: Mapped["list[DemandForecast]"] = relationship("DemandForecast", back_populates="product", cascade="all, delete-orphan")
+    historical_sales: Mapped["list[HistoricalSale]"] = relationship("HistoricalSale", back_populates="product", cascade="all, delete-orphan")
 
     @property
     def overstock_level(self) -> int:
-        return self.reorder_level
+        return self.reorder_params.safety_stock if self.reorder_params else self.reorder_level
 
     @property
-    def lead_time_days(self) -> int:
-        return self.reorder_params.lead_time_days if self.reorder_params else 0
+    def lead_time_days(self) -> int | None:
+        return self.reorder_params.lead_time_days if self.reorder_params else None

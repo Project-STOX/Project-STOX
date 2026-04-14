@@ -451,9 +451,12 @@ class _ImportDataViewState extends State<ImportDataView> {
         'name': productData['product_name'],
         'supplier_id': productData['supplier_id'],
         'current_qty': productData['current_qty'] ?? 0,
-        'reorder_level': productData['reorder_point'] ?? 0,
-        'overstock_level': productData['reorder_point'] ?? 0,
+        'reorder_level': productData['reorder_level'] ?? 0,
+        'overstock_level': productData['overstock_level'] ?? productData['reorder_level'] ?? 0,
         'unit_cost': productData['unit_cost'] ?? 0,
+        'serial_no': productData['serial_no'],
+        'holding_cost': productData['holding_cost'] ?? 0,
+        'ordering_cost': productData['ordering_cost'] ?? 0,
       });
     }
 
@@ -468,10 +471,13 @@ class _ImportDataViewState extends State<ImportDataView> {
   Future<void> _importSuppliers(List<String> headers, List<List<dynamic>> rows) async {
     for (final row in rows) {
       final supplierData = _mapRowToSupplier(headers, row);
+      final contactInfo = supplierData['contact_info']?.toString();
       await _inventoryApi.createSupplier({
         'name': supplierData['supplier_name'],
-        'email': supplierData['contact_info'] != null && supplierData['contact_info'].toString().contains('@') ? supplierData['contact_info'] : null,
-        'phone': supplierData['contact_info'] != null && !supplierData['contact_info'].toString().contains('@') ? supplierData['contact_info'] : null,
+        'email': contactInfo != null && contactInfo.contains('@') ? contactInfo : null,
+        'phone': contactInfo != null && !contactInfo.contains('@') ? contactInfo : null,
+        'address': supplierData['address'],
+        'lead_time_days': supplierData['lead_time_days'],
         'is_active': true,
       });
     }
@@ -547,41 +553,60 @@ class _ImportDataViewState extends State<ImportDataView> {
     );
   }
 
-  // Helper methods to map CSV rows to database objects
   Map<String, dynamic> _mapRowToProduct(List<String> headers, List<dynamic> row) {
     final Map<String, dynamic> data = {};
     for (int i = 0; i < headers.length && i < row.length; i++) {
-      final header = headers[i].toLowerCase().replaceAll(' ', '_');
-      final value = row[i];
+      final header = headers[i].toLowerCase().trim().replaceAll(' ', '_');
+      final rawValue = row[i];
+      if (rawValue == null) continue;
+      final value = rawValue.toString().trim();
+      if (value.isEmpty || value.toLowerCase() == 'null') continue;
 
       switch (header) {
         case 'product_code':
-          data['product_code'] = value.toString();
+        case 'code':
+          data['product_code'] = value;
           break;
         case 'supplier_id':
-          data['supplier_id'] = int.tryParse(value.toString()) ?? 0;
+          data['supplier_id'] = _toInt(value);
           break;
         case 'product_name':
-          data['product_name'] = value.toString();
+        case 'name':
+          data['product_name'] = value;
           break;
         case 'sku':
-          data['sku'] = value.toString();
+          data['sku'] = value;
           break;
         case 'unit_cost':
-          data['unit_cost'] = double.tryParse(value.toString()) ?? 0.0;
+        case 'cost':
+          data['unit_cost'] = double.tryParse(value) ?? 0.0;
           break;
         case 'current_qty':
-          data['current_qty'] = int.tryParse(value.toString()) ?? 0;
+        case 'quantity':
+        case 'qty':
+          data['current_qty'] = _toInt(value);
           break;
+        case 'reorder_level':
         case 'reorder_point':
-          data['reorder_point'] = int.tryParse(value.toString()) ?? 0;
+          data['reorder_level'] = _toInt(value);
           break;
-        case 'serial_no':
+        case 'overstock_level':
+        case 'safety_stock':
+          data['overstock_level'] = _toInt(value);
+          break;
         case 'serial_number':
-          data['serial_no'] = value.toString().isEmpty ? null : value.toString();
+        case 'serial_no':
+        case 'sn':
+          data['serial_no'] = _toInt(value);
+          break;
+        case 'holding_cost':
+          data['holding_cost'] = double.tryParse(value) ?? 0.0;
+          break;
+        case 'ordering_cost':
+          data['ordering_cost'] = double.tryParse(value) ?? 0.0;
           break;
         case 'status_flag':
-          data['status_flag'] = value.toString().isEmpty ? 'In Stock' : value.toString();
+          data['status_flag'] = value;
           break;
       }
     }
@@ -591,22 +616,31 @@ class _ImportDataViewState extends State<ImportDataView> {
   Map<String, dynamic> _mapRowToSupplier(List<String> headers, List<dynamic> row) {
     final Map<String, dynamic> data = {};
     for (int i = 0; i < headers.length && i < row.length; i++) {
-      final header = headers[i].toLowerCase().replaceAll(' ', '_');
-      final value = row[i];
+      final header = headers[i].toLowerCase().trim().replaceAll(' ', '_');
+      final rawValue = row[i];
+      if (rawValue == null) continue;
+      final value = rawValue.toString().trim();
+      if (value.isEmpty || value.toLowerCase() == 'null') continue;
 
       switch (header) {
+        case 'supplier_id':
+          // Ignore — auto-assigned by the database
+          break;
         case 'supplier_name':
-          data['supplier_name'] = value.toString();
+        case 'name':
+        case 'supplier':
+          data['supplier_name'] = value;
           break;
         case 'contact_info':
-          data['contact_info'] = value.toString().isEmpty ? null : value.toString();
+          data['contact_info'] = value;
           break;
         case 'leadtime_days':
         case 'lead_time_days':
-          data['lead_time_days'] = int.tryParse(value.toString());
+        case 'lead_time':
+          data['lead_time_days'] = _toInt(value);
           break;
         case 'address':
-          data['address'] = value.toString().isEmpty ? null : value.toString();
+          data['address'] = value;
           break;
       }
     }
@@ -686,8 +720,11 @@ class _ImportDataViewState extends State<ImportDataView> {
   }
 
   int _toInt(dynamic value) {
+    if (value == null) return 0;
     if (value is num) return value.toInt();
-    return int.tryParse(value?.toString() ?? '') ?? 0;
+    final str = value.toString().trim();
+    if (str.isEmpty) return 0;
+    return double.tryParse(str)?.toInt() ?? 0;
   }
 
   Future<Set<String>> _fetchKnownProductCodes() async {

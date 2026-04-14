@@ -7,7 +7,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../controllers/historical_sales_controller.dart';
 import '../models/historical_sale.dart';
@@ -59,9 +58,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   double _eoqZoom = 1.0;
   double _forecastZoom = 1.0;
 
-  static const String _orderingCostPrefKey = 'product_detail_ordering_cost';
-  static const String _holdingCostPrefKey = 'product_detail_holding_cost';
-
   final List<String> statusOptions = [
     'Low Stock',
     'In Stock',
@@ -79,9 +75,15 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
       productCodeController = TextEditingController(text: product.productCode);
       skuController = TextEditingController(text: product.sku);
       costController = TextEditingController(text: product.unitCost.toString());
-      orderingCostController = TextEditingController(text: '50');
+      orderingCostController = TextEditingController(
+        text: product.orderingCost > 0
+            ? product.orderingCost.toStringAsFixed(2)
+            : '50',
+      );
       holdingCostController = TextEditingController(
-        text: (product.unitCost * 0.25).toStringAsFixed(2),
+        text: product.holdingCost > 0
+            ? product.holdingCost.toStringAsFixed(2)
+            : (product.unitCost * 0.25).toStringAsFixed(2),
       );
       qtyController = TextEditingController(
         text: product.currentQty.toString(),
@@ -120,8 +122,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
           ? widget.suppliers.first.supplierId
           : 0;
     }
-
-    _loadPersistedCostAssumptions();
   }
 
   @override
@@ -173,54 +173,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   String _formatRsCompact(num value) {
     return 'Rs. ${NumberFormat.compact().format(value)}';
-  }
-
-  Future<void> _loadPersistedCostAssumptions() async {
-    if (kIsWeb) {
-      return;
-    }
-
-    setState(() {
-      _loadingPreferences = true;
-    });
-
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      if (!mounted) return;
-
-      final savedOrderingCost = prefs.getDouble(_orderingCostPrefKey);
-      final savedHoldingCost = prefs.getDouble(_holdingCostPrefKey);
-
-      if (savedOrderingCost != null) {
-        orderingCostController.text = savedOrderingCost.toStringAsFixed(2);
-      }
-
-      if (savedHoldingCost != null) {
-        holdingCostController.text = savedHoldingCost.toStringAsFixed(2);
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loadingPreferences = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _persistCostAssumptions() async {
-    if (kIsWeb) {
-      return;
-    }
-
-    final orderingCost = _parseDouble(orderingCostController.text);
-    final holdingCost = _parseDouble(
-      holdingCostController.text,
-      defaultValue: _unitCost * 0.25,
-    );
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setDouble(_orderingCostPrefKey, orderingCost);
-    await prefs.setDouble(_holdingCostPrefKey, holdingCost);
   }
 
   Future<void> _loadHistory() async {
@@ -804,7 +756,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   Future<void> _save() async {
     try {
-      await _persistCostAssumptions();
       final leadTimeDays = _leadTimeDays;
       final safetyStock = _safetyStock;
       final reorderPoint = (_dailyDemand * leadTimeDays + safetyStock).ceil();
@@ -821,6 +772,14 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
         reorderPoint: reorderPoint,
         serialNo: serialController.text.isEmpty ? null : serialController.text,
         statusFlag: status,
+        holdingCost: _parseDouble(
+          holdingCostController.text,
+          defaultValue: _unitCost * 0.25,
+        ),
+        orderingCost: _parseDouble(
+          orderingCostController.text,
+          defaultValue: 50.0,
+        ),
       );
 
       await widget.onSave(updated);
@@ -897,7 +856,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               keyboardType: TextInputType.number,
               onChanged: (_) {
                 setState(() {});
-                unawaited(_persistCostAssumptions());
               },
             ),
             TextField(
@@ -909,7 +867,6 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
               keyboardType: TextInputType.number,
               onChanged: (_) {
                 setState(() {});
-                unawaited(_persistCostAssumptions());
               },
             ),
             TextField(

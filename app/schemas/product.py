@@ -14,6 +14,8 @@ class ProductBase(BaseModel):
     unit_cost: Decimal = Field(default=Decimal("0.00"), ge=0)
     serial_no: int | None = Field(default=None)
     lead_time_days: int | None = Field(default=None, ge=0)
+    holding_cost: Decimal = Field(default=Decimal("0.00"), ge=0)
+    ordering_cost: Decimal = Field(default=Decimal("0.00"), ge=0)
 
 
 class ProductCreate(ProductBase):
@@ -31,10 +33,12 @@ class ProductUpdate(BaseModel):
     unit_cost: Decimal | None = Field(default=None, ge=0)
     serial_no: int | None = Field(default=None)
     lead_time_days: int | None = Field(default=None, ge=0)
+    holding_cost: Decimal | None = Field(default=None, ge=0)
+    ordering_cost: Decimal | None = Field(default=None, ge=0)
 
 
 class ProductRead(ProductBase):
     id: int
     status_flag: str
-    lead_time_days: int
+    lead_time_days: int | None
     model_config = ConfigDict(from_attributes=True)

@@ -18,4 +18,4 @@ class DemandForecast(Base):
     reorder_suggestion: Mapped[int | None] = mapped_column(Integer, nullable=True)
     generated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    product: Mapped["Product"] = relationship("Product")
+    product: Mapped["Product"] = relationship("Product", back_populates="forecasts")

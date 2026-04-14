@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -72,15 +73,15 @@ def generate_2fa(payload: dict, db: Session = Depends(get_db)):
     user_id = payload.get("user_id")
     email = payload.get("email")
     if not user_id and not email:
-        from fastapi import HTTPException
         raise HTTPException(status_code=400, detail="user_id or email is required")
+
     
     if email and not user_id:
-        from app.models.user import User
         user = db.scalar(select(User).where(User.email == email.strip().lower()))
+
         if not user:
-             from fastapi import HTTPException
              raise HTTPException(status_code=404, detail="User not found")
+
         user_id = user.id
 
     return AuthService.generate_2fa_challenge(db, user_id)

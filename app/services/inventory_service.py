@@ -3,6 +3,7 @@ import io
 from decimal import Decimal, InvalidOperation
 
 from fastapi import HTTPException, status
+
 from sqlalchemy import Select, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -10,6 +11,8 @@ from app.core.security.input_sanitizer import sanitize_text
 from app.models.product import Product
 from app.models.stock_receipt import StockReceipt
 from app.models.reorder_parameter import ReorderParameter
+import math
+from app.models.historical_sale import HistoricalSale
 from app.models.supplier import Supplier
 from app.schemas.imports import CsvImportResult, CsvRejectedRow
 from app.schemas.product import ProductCreate, ProductUpdate
@@ -38,6 +41,37 @@ def sanitize_csv_cell(value: str) -> str:
         sanitized = sanitized[1:].strip()
     return sanitized
 
+def _calculate_eoq(db: Session, product_id: int, ordering_cost: Decimal, holding_cost: Decimal) -> Decimal | None:
+    if ordering_cost <= 0 or holding_cost <= 0:
+        return None
+        
+    from sqlalchemy import func
+    stmt = select(
+        func.sum(HistoricalSale.quantity_sold),
+        func.min(HistoricalSale.sale_date),
+        func.max(HistoricalSale.sale_date)
+    ).where(HistoricalSale.product_id == product_id)
+    
+    result = db.execute(stmt).first()
+    if not result or not result[0] or not result[1] or not result[2]:
+        return None
+        
+    total_qty = result[0]
+    min_date = result[1]
+    max_date = result[2]
+    
+    days_span = (max_date - min_date).days + 1
+    if days_span <= 0:
+        days_span = 1
+        
+    daily_demand = float(total_qty) / days_span
+    annual_demand = daily_demand * 365
+    
+    if annual_demand <= 0:
+        return None
+        
+    eoq = math.sqrt((2 * annual_demand * float(ordering_cost)) / float(holding_cost))
+    return Decimal(str(round(eoq, 2)))
 
 class SupplierService:
     @staticmethod
@@ -162,6 +196,7 @@ class ProductService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="SKU must be unique")
         status_flag = _product_status(payload.current_qty, payload.reorder_level)
         data = payload.model_dump()
+        safety_stock_val = payload.overstock_level
         data.pop("overstock_level", None)
         lead_time = data.pop("lead_time_days", None)
         data["sku"] = sanitize_text(data["sku"], max_length=50)
@@ -170,15 +205,14 @@ class ProductService:
         db.add(product)
         db.flush() # Get product.id
         
-        # Create ReorderParameter if lead_time provided
-        if lead_time is not None:
-            param = ReorderParameter(
-                product_id=product.id,
-                configured_by=actor_id,
-                lead_time_days=lead_time,
-                safety_stock=payload.reorder_level # Default safety stock to reorder level?
-            )
-            db.add(param)
+        param = ReorderParameter(
+            product_id=product.id,
+            configured_by=actor_id,
+            lead_time_days=lead_time,
+            safety_stock=safety_stock_val,
+            eoq=_calculate_eoq(db, product.id, product.ordering_cost, product.holding_cost)
+        )
+        db.add(param)
             
         db.commit()
         db.refresh(product)
@@ -187,7 +221,7 @@ class ProductService:
     @staticmethod
     def update_product(db: Session, product: Product, payload: ProductUpdate, actor_id: int) -> Product:
         updates = payload.model_dump(exclude_none=True)
-        updates.pop("overstock_level", None)
+        safety_stock_val = updates.pop("overstock_level", None)
         lead_time = updates.pop("lead_time_days", None)
         
         if "supplier_id" in updates:
@@ -208,18 +242,22 @@ class ProductService:
             
         product.status_flag = _product_status(product.current_qty, product.reorder_level)
         
-        if lead_time is not None:
-            if product.reorder_params:
+        if product.reorder_params:
+            if lead_time is not None:
                 product.reorder_params.lead_time_days = lead_time
-                product.reorder_params.configured_by = actor_id
-            else:
-                param = ReorderParameter(
-                    product_id=product.id,
-                    configured_by=actor_id,
-                    lead_time_days=lead_time,
-                    safety_stock=product.reorder_level
-                )
-                db.add(param)
+            if safety_stock_val is not None:
+                product.reorder_params.safety_stock = safety_stock_val
+            product.reorder_params.configured_by = actor_id
+            product.reorder_params.eoq = _calculate_eoq(db, product.id, product.ordering_cost, product.holding_cost)
+        else:
+            param = ReorderParameter(
+                product_id=product.id,
+                configured_by=actor_id,
+                lead_time_days=lead_time,
+                safety_stock=safety_stock_val if safety_stock_val is not None else product.reorder_level,
+                eoq=_calculate_eoq(db, product.id, product.ordering_cost, product.holding_cost)
+            )
+            db.add(param)
                 
         db.commit()
         db.refresh(product)
@@ -233,6 +271,14 @@ class ProductService:
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Cannot delete product with stock receipts",
             )
+            
+        has_sales = db.scalar(select(HistoricalSale.id).where(HistoricalSale.product_id == product.id).limit(1))
+        if has_sales:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete product with historical sales records",
+            )
+            
         db.delete(product)
         db.commit()
 
@@ -382,13 +428,9 @@ class CsvImportService:
     REQUIRED_PRODUCT_HEADERS = {
         "product_code",
         "sku",
-        "name",
+        "product_name",
         "supplier_id",
-        "current_qty",
-        "reorder_level",
-        "overstock_level",
         "unit_cost",
-        "serial_no",
     }
 
     REQUIRED_RECEIPT_HEADERS = {
@@ -400,7 +442,7 @@ class CsvImportService:
     @staticmethod
     def _parse_positive_int(raw: str, field: str) -> int:
         try:
-            value = int(raw)
+            value = int(float(raw))
         except (TypeError, ValueError) as exc:
             raise ValueError(f"{field} must be an integer") from exc
         if value < 0:
@@ -455,32 +497,44 @@ class CsvImportService:
 
                 product_code = sanitize_csv_cell(str(normalized_row.get("product_code", "")))
                 sku = sanitize_csv_cell(str(normalized_row.get("sku", "")))
-                name = sanitize_csv_cell(str(normalized_row.get("name", "")))
+                name = sanitize_csv_cell(str(normalized_row.get("product_name", normalized_row.get("name", ""))))
                 if not product_code:
                     raise ValueError("product_code is required")
                 if not sku:
                     raise ValueError("sku is required")
                 if not name:
-                    raise ValueError("name is required")
+                    raise ValueError("product_name is required")
 
                 supplier_id = CsvImportService._parse_positive_int(
                     str(normalized_row.get("supplier_id", "")),
                     "supplier_id",
                 )
-                current_qty = CsvImportService._parse_positive_int(
-                    str(normalized_row.get("current_qty", "")),
-                    "current_qty",
-                )
-                reorder_level = CsvImportService._parse_positive_int(
-                    str(normalized_row.get("reorder_level", "")),
-                    "reorder_level",
-                )
-                overstock_level = CsvImportService._parse_positive_int(
-                    str(normalized_row.get("overstock_level", "")),
-                    "overstock_level",
-                )
+                
+                current_qty_raw = str(normalized_row.get("current_qty", "")).strip()
+                current_qty = CsvImportService._parse_positive_int(current_qty_raw, "current_qty") if current_qty_raw else 0
+                
+                reorder_level_raw = str(normalized_row.get("reorder_level", "")).strip()
+                reorder_level = CsvImportService._parse_positive_int(reorder_level_raw, "reorder_level") if reorder_level_raw else 10
+                
+                overstock_level_raw = str(normalized_row.get("overstock_level", "")).strip()
+                overstock_level = CsvImportService._parse_positive_int(overstock_level_raw, "overstock_level") if overstock_level_raw else 500
+
                 unit_cost = CsvImportService._parse_decimal(str(normalized_row.get("unit_cost", "")), "unit_cost")
-                serial_no = CsvImportService._parse_optional_int(str(normalized_row.get("serial_no", "")), "serial_no")
+                
+                holding_cost_raw = str(normalized_row.get("holding_cost", "")).strip()
+                holding_cost = CsvImportService._parse_decimal(holding_cost_raw, "holding_cost") if holding_cost_raw else Decimal("0.00")
+                
+                ordering_cost_raw = str(normalized_row.get("ordering_cost", "")).strip()
+                ordering_cost = CsvImportService._parse_decimal(ordering_cost_raw, "ordering_cost") if ordering_cost_raw else Decimal("0.00")
+
+                # Robust search for serial number in case of extra spaces
+                serial_no_raw = ""
+                for k, v in normalized_row.items():
+                    if "serial" in k or k == "sn":
+                        serial_no_raw = str(v)
+                        break
+                        
+                serial_no = CsvImportService._parse_optional_int(serial_no_raw, "serial_no")
 
                 if overstock_level < reorder_level:
                     raise ValueError("overstock_level must be greater than or equal to reorder_level")
@@ -497,6 +551,8 @@ class CsvImportService:
                     overstock_level=overstock_level,
                     unit_cost=unit_cost,
                     serial_no=serial_no,
+                    holding_cost=holding_cost,
+                    ordering_cost=ordering_cost,
                 )
                 ProductService.create_product(db, payload, actor_id=actor_id)
                 inserted_rows += 1
@@ -564,12 +620,6 @@ class CsvImportService:
                 
                 reference_no = sanitize_csv_cell(str(normalized_row.get("remarks", "") or normalized_row.get("reference_no", "")))
                 received_at_raw = normalized_row.get("receipt_date") or normalized_row.get("received_at")
-                received_at = None
-                if received_at_raw:
-                    try:
-                        received_at = datetime.fromisoformat(str(received_at_raw))
-                    except ValueError:
-                        pass # Fallback to default in StockReceiptService
 
                 payload = StockReceiptCreate(
                     product_id=product.id,
@@ -577,9 +627,10 @@ class CsvImportService:
                     quantity=quantity,
                     quantity_damaged=quantity_damaged,
                     reference_no=reference_no or None,
-                    received_at=received_at, # This might need careful schema alignment if it expects datetime
+                    received_at=received_at_raw, 
                     unit_cost=Decimal("0.00"), # Default for import
                 )
+
                 StockReceiptService.create_receipt(db, payload, recorded_by=actor_id)
                 inserted_rows += 1
             except HTTPException as exc:
