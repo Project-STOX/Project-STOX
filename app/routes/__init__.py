@@ -8,6 +8,7 @@ from app.routes.notification_routes import router as notification_router
 from app.routes.item_routes import router as item_router
 from app.routes.protected_routes import router as protected_router
 from app.routes.backup_routes import router as backup_router
+from app.routes.export_routes import router as export_router
 
 __all__ = [
     "item_router",
@@ -20,4 +21,5 @@ __all__ = [
     "forecast_router",
     "dashboard_router",
     "backup_router",
+    "export_router",
 ]

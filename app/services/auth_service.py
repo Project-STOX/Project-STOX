@@ -307,6 +307,12 @@ class AuthService:
         )
 
     @staticmethod
+    def check_user_password(user: User, password: str) -> bool:
+        """Utility for verifying password before high security actions without altering session."""
+        from app.core.security.password import verify_password
+        return verify_password(password, user.password_hash)
+
+    @staticmethod
     def delete_account(db: Session, *, user: User, two_factor_code: str | None = None) -> None:
         user_id = user.id
         # Log before deletion to avoid foreign key issues

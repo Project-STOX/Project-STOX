@@ -1,4 +1,5 @@
 from app.models.audit_log import AuditLog
+from app.models.backup_schedule import BackupSchedule
 from app.models.base import Base
 from app.models.demand_forecast import DemandForecast
 from app.models.historical_sale import HistoricalSale
@@ -30,4 +31,5 @@ __all__ = [
     "Product",
     "StockReceipt",
     "ReorderParameter",
+    "BackupSchedule",
 ]

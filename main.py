@@ -23,6 +23,7 @@ from app.routes import (
     report_router,
     item_router,
     protected_router,
+    export_router,
 )
 
 settings = get_settings()
@@ -70,6 +71,7 @@ app.include_router(report_router, prefix=settings.api_prefix)
 app.include_router(forecast_router, prefix=settings.api_prefix)
 app.include_router(dashboard_router, prefix=settings.api_prefix)
 app.include_router(backup_router, prefix=settings.api_prefix)
+app.include_router(export_router, prefix=settings.api_prefix)
 
 
 @app.on_event("startup")
@@ -84,3 +86,4 @@ def on_startup() -> None:
             "Database startup check failed; continuing without eager DB validation: %s",
             exc,
         )
+

@@ -1,0 +1,705 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
+
+import '../models/user.dart';
+import '../services/api/export_api_service.dart';
+import '../utils/backup_downloader.dart';
+
+// ─────────────────────────────────────────────────────────────────────────────
+// New Backup Tab — SME Owner only
+// ─────────────────────────────────────────────────────────────────────────────
+class NewBackupTab extends StatefulWidget {
+  final UserModel user;
+  const NewBackupTab({super.key, required this.user});
+
+  @override
+  State<NewBackupTab> createState() => _NewBackupTabState();
+}
+
+class _NewBackupTabState extends State<NewBackupTab> {
+  final ExportApiService _service = ExportApiService();
+  final _uuid = const Uuid();
+
+  // Categories
+  List<ExportCategory> _categories = [];
+  final Set<String> _selected = {};
+  bool _loadingCategories = true;
+
+  // Manual backup state
+  bool _isRunning = false;
+  double _progress = 0;
+  String _statusMessage = '';
+  bool _done = false;
+  bool _error = false;
+  Timer? _progressTimer;
+
+  // Schedules
+  List<BackupScheduleModel> _schedules = [];
+  bool _loadingSchedules = true;
+
+  static const int maxSchedules = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+    _loadSchedules();
+  }
+
+  @override
+  void dispose() {
+    _progressTimer?.cancel();
+    super.dispose();
+  }
+
+  // ─── Loaders ─────────────────────────────────────────────────────────────
+
+  Future<void> _loadCategories() async {
+    try {
+      final cats = await _service.getCategories();
+      if (mounted) {
+        setState(() {
+          _categories = cats;
+          _selected.addAll(cats.map((c) => c.key));
+          _loadingCategories = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _loadingCategories = false);
+        _showError('Could not load categories: ${e.toString().replaceFirst('Exception: ', '')}');
+      }
+    }
+  }
+
+  Future<void> _loadSchedules() async {
+    try {
+      final schedules = await ScheduleStorage.load();
+      if (mounted) setState(() { _schedules = schedules; _loadingSchedules = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loadingSchedules = false);
+    }
+  }
+
+  void _showError(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: Theme.of(context).colorScheme.error,
+      content: Text(msg),
+    ));
+  }
+
+  // ─── Manual Backup ───────────────────────────────────────────────────────
+
+  Future<void> _runBackup({List<String>? categoryOverride, bool silent = false}) async {
+    final cats = categoryOverride ?? _selected.toList();
+    if (cats.isEmpty) return;
+
+    if (!silent) {
+      setState(() {
+        _isRunning = true;
+        _progress = 0;
+        _statusMessage = 'Preparing backup…';
+        _done = false;
+        _error = false;
+      });
+    }
+
+    // Animate progress bar while HTTP call happens
+    _progressTimer?.cancel();
+    if (!silent) {
+      _progressTimer = Timer.periodic(const Duration(milliseconds: 80), (t) {
+        if (!mounted) { t.cancel(); return; }
+        setState(() {
+          if (_progress < 0.85) _progress += 0.012;
+        });
+      });
+    }
+
+    try {
+      if (!silent) setState(() => _statusMessage = 'Fetching data from server…');
+      final bytes = await _service.runBackup(cats);
+
+      _progressTimer?.cancel();
+      if (!silent) {
+        setState(() {
+          _progress = 0.92;
+          _statusMessage = 'Saving ZIP file…';
+        });
+      }
+
+      final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+      final filename = 'stox_backup_$timestamp.zip';
+      await downloadZip(bytes, filename);
+
+      if (!silent) {
+        setState(() {
+          _progress = 1.0;
+          _isRunning = false;
+          _done = true;
+          _statusMessage = kIsWeb
+              ? 'Backup downloaded to your browser Downloads folder.'
+              : 'Saved to Downloads/STOX Backups/';
+        });
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green.shade700,
+            duration: const Duration(seconds: 5),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    kIsWeb
+                        ? '✅ $filename downloaded successfully.'
+                        : '✅ Saved to Downloads/STOX Backups/',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      _progressTimer?.cancel();
+      if (!silent) {
+        setState(() {
+          _isRunning = false;
+          _error = true;
+          _progress = 0;
+          _statusMessage = e.toString().replaceFirst('Exception: ', '');
+        });
+      } else {
+        // Background schedule — show snackbar
+        if (mounted) _showError('Scheduled backup failed: ${e.toString().replaceFirst('Exception: ', '')}');
+      }
+    }
+  }
+
+  // ─── Schedule Dialog ─────────────────────────────────────────────────────
+
+  Future<void> _showAddScheduleDialog() async {
+    if (_schedules.length >= maxSchedules) {
+      _showError('Maximum of 10 schedules reached. Delete one to add another.');
+      return;
+    }
+    await showDialog(
+      context: context,
+      builder: (ctx) => _AddScheduleDialog(
+        categories: _categories,
+        onSave: (label, cats, freq, time, dow, dom, mon) async {
+          try {
+            final s = BackupScheduleModel(
+              id: _uuid.v4(),
+              label: label,
+              categories: cats,
+              frequency: freq,
+              scheduledTime: time,
+              dayOfWeek: dow,
+              dayOfMonth: dom,
+              month: mon,
+            );
+            await ScheduleStorage.add(s);
+            if (mounted) {
+              setState(() => _schedules.add(s));
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  behavior: SnackBarBehavior.floating,
+                  content: Text('Schedule created successfully.'),
+                ),
+              );
+            }
+          } catch (e) {
+            if (mounted) {
+              _showError(e.toString().replaceFirst('Exception: ', ''));
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  Future<void> _deleteSchedule(BackupScheduleModel schedule) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Schedule'),
+        content: Text('Delete "${schedule.label}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await ScheduleStorage.remove(schedule.id);
+      if (mounted) setState(() => _schedules.removeWhere((s) => s.id == schedule.id));
+    }
+  }
+
+  // ─── Build ────────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          // ── Header Info ─────────────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: colorScheme.primaryContainer),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.info_outline_rounded, color: colorScheme.primary),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Backup your data as CSV files (Excel-compatible) bundled in a ZIP. '
+                    'On web, the ZIP downloads to your browser Downloads folder. '
+                    'On Windows/Desktop, it saves to Downloads/STOX Backups/.',
+                    style: TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 28),
+
+          // ── Manual Backup ────────────────────────────────────────────────
+          _SectionHeader(title: 'Manual Backup', icon: Icons.download_rounded),
+          const SizedBox(height: 12),
+
+          _Card(
+            children: [
+              // Category checklist header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    const Text('Select data to include:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Spacer(),
+                    TextButton(
+                      onPressed: () => setState(() => _selected.addAll(_categories.map((c) => c.key))),
+                      child: const Text('All'),
+                    ),
+                    TextButton(
+                      onPressed: () => setState(() => _selected.clear()),
+                      child: const Text('None'),
+                    ),
+                  ],
+                ),
+              ),
+              if (_loadingCategories)
+                const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
+              else if (_categories.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(
+                    'Could not load categories. Make sure the backend is running.',
+                    style: TextStyle(color: colorScheme.error),
+                  ),
+                )
+              else
+                ..._categories.map((cat) => CheckboxListTile(
+                  dense: true,
+                  value: _selected.contains(cat.key),
+                  onChanged: (v) => setState(() {
+                    if (v == true) { _selected.add(cat.key); } else { _selected.remove(cat.key); }
+                  }),
+                  title: Text(cat.label, style: const TextStyle(fontSize: 14)),
+                  subtitle: Text(cat.description, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                  secondary: _categoryIcon(cat.key, colorScheme),
+                  controlAffinity: ListTileControlAffinity.trailing,
+                )),
+
+              const Divider(indent: 16, endIndent: 16),
+
+              // Progress
+              if (_isRunning || _done || _error)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(4),
+                        child: LinearProgressIndicator(
+                          value: _progress,
+                          minHeight: 8,
+                          backgroundColor: colorScheme.surfaceContainerHighest,
+                          valueColor: AlwaysStoppedAnimation(
+                            _error ? colorScheme.error :
+                            _done ? Colors.green : colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _statusMessage,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: _error ? colorScheme.error : _done ? Colors.green : colorScheme.onSurface,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+              // Run button
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _isRunning || _selected.isEmpty ? null : _runBackup,
+                    icon: _isRunning
+                        ? const SizedBox(
+                            width: 18, height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Icon(Icons.download_rounded),
+                    label: Text(
+                      _isRunning
+                          ? 'Backing up…'
+                          : _selected.isEmpty
+                              ? 'Select at least one category'
+                              : 'Run Backup Now  (${_selected.length} selected)',
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 28),
+
+          // ── Scheduled Backups ────────────────────────────────────────────
+          _SectionHeader(title: 'Automated Schedules', icon: Icons.schedule_rounded),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 12),
+            child: Text(
+              'Scheduled backups fire automatically while the app is open. Max $maxSchedules schedules.',
+              style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.6)),
+            ),
+          ),
+
+          _Card(
+            children: [
+              ListTile(
+                leading: Icon(Icons.add_alarm_rounded, color: colorScheme.primary),
+                title: const Text('Add Automated Schedule'),
+                subtitle: Text('${_schedules.length}/$maxSchedules schedules active'),
+                trailing: FilledButton.tonalIcon(
+                  onPressed: _schedules.length >= maxSchedules ? null : _showAddScheduleDialog,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('New'),
+                ),
+              ),
+              if (_loadingSchedules)
+                const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
+              else if (_schedules.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, 20),
+                  child: Text('No schedules configured yet.', style: TextStyle(color: Colors.grey)),
+                )
+              else ...[
+                const Divider(indent: 16, endIndent: 16),
+                ..._schedules.map((s) => _ScheduleTile(
+                  schedule: s,
+                  onDelete: () => _deleteSchedule(s),
+                )),
+              ],
+            ],
+          ),
+
+          const SizedBox(height: 40),
+        ],
+      ),
+    );
+  }
+
+  Widget _categoryIcon(String key, ColorScheme cs) {
+    final icon = switch (key) {
+      'users' => Icons.people_rounded,
+      'roles_permissions' => Icons.admin_panel_settings_rounded,
+      'products' => Icons.inventory_2_rounded,
+      'suppliers' => Icons.business_rounded,
+      'stock_receipts' => Icons.receipt_long_rounded,
+      'historical_sales' => Icons.bar_chart_rounded,
+      'demand_forecasts' => Icons.trending_up_rounded,
+      'audit_log' => Icons.manage_history_rounded,
+      'notifications' => Icons.notifications_rounded,
+      _ => Icons.folder_rounded,
+    };
+    return Icon(icon, size: 20, color: cs.secondary);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Schedule tile
+// ─────────────────────────────────────────────────────────────────────────────
+class _ScheduleTile extends StatelessWidget {
+  final BackupScheduleModel schedule;
+  final VoidCallback onDelete;
+  const _ScheduleTile({required this.schedule, required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListTile(
+      dense: true,
+      leading: Icon(Icons.event_repeat_rounded, size: 20, color: colorScheme.primary),
+      title: Text(schedule.label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(schedule.summary, style: const TextStyle(fontSize: 12)),
+          Text(
+            schedule.categories.join(', '),
+            style: TextStyle(fontSize: 11, color: colorScheme.onSurface.withValues(alpha: 0.5)),
+            overflow: TextOverflow.ellipsis,
+          ),
+        ],
+      ),
+      trailing: IconButton(
+        icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 20),
+        tooltip: 'Delete schedule',
+        onPressed: onDelete,
+      ),
+      isThreeLine: true,
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Add Schedule Dialog
+// ─────────────────────────────────────────────────────────────────────────────
+typedef _OnSave = void Function(
+  String label,
+  List<String> categories,
+  String frequency,
+  String scheduledTime,
+  int? dayOfWeek,
+  int? dayOfMonth,
+  int? month,
+);
+
+class _AddScheduleDialog extends StatefulWidget {
+  final List<ExportCategory> categories;
+  final _OnSave onSave;
+  const _AddScheduleDialog({required this.categories, required this.onSave});
+
+  @override
+  State<_AddScheduleDialog> createState() => _AddScheduleDialogState();
+}
+
+class _AddScheduleDialogState extends State<_AddScheduleDialog> {
+  final _labelCtrl = TextEditingController();
+  String _frequency = 'daily';
+  TimeOfDay _time = const TimeOfDay(hour: 2, minute: 0);
+  int _dayOfWeek = 0;
+  int _dayOfMonth = 1;
+  int _month = 1;
+  late Set<String> _selectedCats;
+
+  static const _weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  static const _months = ['January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'];
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCats = Set.from(widget.categories.map((c) => c.key));
+    _labelCtrl.text = 'Daily Backup';
+  }
+
+  @override
+  void dispose() {
+    _labelCtrl.dispose();
+    super.dispose();
+  }
+
+  void _updateLabel() {
+    _labelCtrl.text = '${_frequency[0].toUpperCase()}${_frequency.substring(1)} Backup';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('New Backup Schedule'),
+      scrollable: true,
+      content: SizedBox(
+        width: 420,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _labelCtrl,
+              decoration: const InputDecoration(labelText: 'Schedule Name', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 16),
+
+            // Frequency
+            DropdownButtonFormField<String>(
+              value: _frequency,
+              decoration: const InputDecoration(labelText: 'Frequency', border: OutlineInputBorder()),
+              items: ['daily', 'weekly', 'monthly', 'yearly']
+                  .map((f) => DropdownMenuItem(value: f, child: Text(f[0].toUpperCase() + f.substring(1))))
+                  .toList(),
+              onChanged: (v) => setState(() { _frequency = v!; _updateLabel(); }),
+            ),
+            const SizedBox(height: 12),
+
+            // Time
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Time', style: TextStyle(fontSize: 14)),
+              subtitle: Text(_time.format(context), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              trailing: const Icon(Icons.access_time_rounded),
+              onTap: () async {
+                final p = await showTimePicker(context: context, initialTime: _time);
+                if (p != null) setState(() => _time = p);
+              },
+            ),
+
+            if (_frequency == 'weekly') ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                value: _dayOfWeek,
+                decoration: const InputDecoration(labelText: 'Day of Week', border: OutlineInputBorder()),
+                items: List.generate(7, (i) => DropdownMenuItem(value: i, child: Text(_weekdays[i]))),
+                onChanged: (v) => setState(() => _dayOfWeek = v!),
+              ),
+            ],
+
+            if (_frequency == 'monthly' || _frequency == 'yearly') ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                value: _dayOfMonth,
+                decoration: const InputDecoration(labelText: 'Day of Month', border: OutlineInputBorder()),
+                items: List.generate(28, (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}'))),
+                onChanged: (v) => setState(() => _dayOfMonth = v!),
+              ),
+            ],
+
+            if (_frequency == 'yearly') ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<int>(
+                value: _month,
+                decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder()),
+                items: List.generate(12, (i) => DropdownMenuItem(value: i + 1, child: Text(_months[i]))),
+                onChanged: (v) => setState(() => _month = v!),
+              ),
+            ],
+
+            const SizedBox(height: 16),
+            const Text('Data to include:', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            ...widget.categories.map((cat) => CheckboxListTile(
+              dense: true,
+              value: _selectedCats.contains(cat.key),
+              onChanged: (v) => setState(() {
+                if (v == true) { _selectedCats.add(cat.key); } else { _selectedCats.remove(cat.key); }
+              }),
+              title: Text(cat.label, style: const TextStyle(fontSize: 13)),
+              controlAffinity: ListTileControlAffinity.leading,
+            )),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: _selectedCats.isEmpty ? null : () {
+            final timeStr =
+                '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
+            widget.onSave(
+              _labelCtrl.text.trim().isEmpty ? 'Backup' : _labelCtrl.text.trim(),
+              _selectedCats.toList(),
+              _frequency,
+              timeStr,
+              _frequency == 'weekly' ? _dayOfWeek : null,
+              (_frequency == 'monthly' || _frequency == 'yearly') ? _dayOfMonth : null,
+              _frequency == 'yearly' ? _month : null,
+            );
+            Navigator.pop(context);
+          },
+          child: const Text('Save Schedule'),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared widgets
+// ─────────────────────────────────────────────────────────────────────────────
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  const _SectionHeader({required this.title, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(left: 4, bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
+          const SizedBox(width: 8),
+          Text(
+            title.toUpperCase(),
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: Theme.of(context).colorScheme.primary,
+              letterSpacing: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Card extends StatelessWidget {
+  final List<Widget> children;
+  const _Card({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
+      ),
+      child: Column(children: children),
+    );
+  }
+}

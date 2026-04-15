@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../controllers/auth_controller.dart';
 import '../models/user.dart';
@@ -15,6 +17,8 @@ import 'import_data_view.dart';
 import 'audit_log_view.dart';
 import 'dashboard_content.dart';
 import 'settings_view.dart';
+import '../services/api/export_api_service.dart';
+import '../utils/backup_downloader.dart';
 
 class DashboardView extends StatefulWidget {
   final UserModel user;
@@ -49,12 +53,90 @@ class _DashboardViewState extends State<DashboardView> {
   bool _canSetupBackup = false;
   bool _isSidebarLoading = true;
 
+  // ── Scheduled Backup Timer (SME Owner only) ────────────────────────────
+  Timer? _scheduleTimer;
+  final ExportApiService _exportService = ExportApiService();
+
   @override
   void initState() {
     super.initState();
     _currentUser = widget.user;
     authController.cacheUser(_currentUser);
     _loadSidebarState();
+    // Start the schedule checker only for SME Owner (role_id == 1)
+    if (_currentUser.roleId == 1) {
+      _startScheduleTimer();
+    }
+  }
+
+  void _startScheduleTimer() {
+    // Fire every 30 s — ensures we always catch the target minute regardless
+    // of when the app launched (a 60 s interval could miss a 1-minute window).
+    _scheduleTimer = Timer.periodic(const Duration(seconds: 30), (_) {
+      _checkAndRunSchedules();
+    });
+    // Also check immediately after a short warm-up delay
+    Future.delayed(const Duration(seconds: 3), _checkAndRunSchedules);
+  }
+
+  Future<void> _checkAndRunSchedules() async {
+    if (!mounted) return;
+    final schedules = await ScheduleStorage.load();
+    for (final schedule in schedules) {
+      if (schedule.isDue()) {
+        // Mark as run immediately to prevent double-firing
+        await ScheduleStorage.markRun(schedule.id);
+        _runScheduledBackup(schedule);
+      }
+    }
+  }
+
+  Future<void> _runScheduledBackup(BackupScheduleModel schedule) async {
+    try {
+      final bytes = await _exportService.runBackup(schedule.categories);
+      final timestamp = DateTime.now();
+      final filename =
+          'stox_scheduled_backup_${timestamp.year}${timestamp.month.toString().padLeft(2, '0')}${timestamp.day.toString().padLeft(2, '0')}_${timestamp.hour.toString().padLeft(2, '0')}${timestamp.minute.toString().padLeft(2, '0')}.zip';
+      await downloadZip(bytes, filename);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Colors.green.shade700,
+            duration: const Duration(seconds: 6),
+            content: Row(
+              children: [
+                const Icon(Icons.schedule_rounded, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '✅ Scheduled backup "${schedule.label}" completed and saved.',
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+            content: Text(
+              '⚠️ Scheduled backup "${schedule.label}" failed: ${e.toString().replaceFirst('Exception: ', '')}',
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _scheduleTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadSidebarState() async {
