@@ -25,3 +25,8 @@ This project provides an automated, offline backup solution for a Supabase datab
 - **Logs**: Open `full_backup/backup_history.log` or `ind_backup/backup_history.log` to see a text history of all backups.
 - **Live Feed**: Run `docker-compose logs -f` in your terminal to see the system working in real-time.
 - **Files**: Your backup `.sql` files will appear automatically in the `full_backup/` and `ind_backup/` folders.
+
+- ## Limitations and future roadmap
+- **Compression**: Implement a properly compressed file backup instead of .sql
+- **NO 3-2-1**: Implement automatic redundent backup of 3 copies, 2 different media, 1 offsite after the initial backup_database succeeds
+- **NO Incident Detection capabilities**: Implement an Incident Detection system and rules to notice in case of pg_dump failiure. 
