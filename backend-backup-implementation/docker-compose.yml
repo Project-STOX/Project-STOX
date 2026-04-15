@@ -1,0 +1,50 @@
+services:
+  # The Local Database Mirror
+  local_db:
+    image: postgres:15-alpine
+    container_name: local_postgres_mirror
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD} # Defined in your .env file
+    volumes:
+      - ./postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv6.conf.default.disable_ipv6=1
+
+  # High-Frequency Emergency DR Backup (3-day retention)
+  backup_worker:
+    build: .
+    container_name: supabase_backup_agent
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - LOCAL_DB_URL=postgresql://postgres:${LOCAL_DB_PASSWORD}@local_db:5432/postgres
+      - BACKUP_DIR=/backups
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./full_backup:/backups # Saves to a folder named 'full_backup' next to this file
+    depends_on:
+      - local_db
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv6.conf.default.disable_ipv6=1
+
+  # Long-Term SME Audit Backup (7-year retention)
+  sme_backup_worker:
+    build: .
+    command: ["python", "ind_backup.py"]
+    container_name: sme_backup_agent
+    environment:
+      - SUPABASE_URL=${SUPABASE_URL}
+      - LOCAL_DB_URL=postgresql://postgres:${LOCAL_DB_PASSWORD}@local_db:5432/postgres
+      - BACKUP_DIR=/ind_backups
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - ./ind_backup:/ind_backups # Saves to a folder named 'ind_backup' next to this file
+    depends_on:
+      - local_db
+    sysctls:
+      - net.ipv6.conf.all.disable_ipv6=1
+      - net.ipv6.conf.default.disable_ipv6=1
