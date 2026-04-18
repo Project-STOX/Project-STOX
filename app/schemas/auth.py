@@ -17,6 +17,9 @@ class Verify2FARequest(BaseModel):
     login_challenge: str
     code: str = Field(min_length=1, max_length=10)
 
+class Generate2FARequest(BaseModel):
+    user_id: int | None = None
+    email: str | None = Field(None, max_length=255)
 
 class RefreshRequest(BaseModel):
     refresh_token: str

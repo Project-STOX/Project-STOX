@@ -114,7 +114,7 @@ class AuthApiService {
       body: {
         'current_password': currentPassword,
         'new_password': newPassword,
-        'two_factor_code': ?twoFactorCode,
+        'two_factor_code': twoFactorCode,
       },
       authorized: true,
     );

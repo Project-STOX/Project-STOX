@@ -46,6 +46,7 @@ class TOTPService:
             box_size=10,
             border=4,
         )
+        provisioning_uri = TOTPService.get_provisioning_uri(email, secret, app_name)
         qr.add_data(provisioning_uri)
         qr.make(fit=True)
 

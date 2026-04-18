@@ -29,20 +29,15 @@ class _TOTPSetupViewState extends State<TOTPSetupView> {
   void _initiateSetup() async {
     setState(() => isLoading = true);
     try {
-      final response = await AuthApiService().post(
-        '/auth/totp/setup',
-        authorized: true,
-      );
+      final response = await authController.setupTOTP();
 
-      if (response is Map<String, dynamic>) {
-        setState(() {
-          secret = response['secret'] as String?;
-          qrCodeBase64 = response['qr_code'] as String?;
-          backupCodes = List<String>.from(response['backup_codes'] as List? ?? []);
-          setupInitiated = true;
-          isLoading = false;
-        });
-      }
+      setState(() {
+        secret = response['secret'] as String?;
+        qrCodeBase64 = response['qr_code'] as String?;
+        backupCodes = List<String>.from(response['backup_codes'] as List? ?? []);
+        setupInitiated = true;
+        isLoading = false;
+      });
     } catch (e) {
       if (!mounted) return;
       setState(() => isLoading = false);
@@ -63,14 +58,13 @@ class _TOTPSetupViewState extends State<TOTPSetupView> {
 
     setState(() => isLoading = true);
     try {
-      await AuthApiService().post(
-        '/auth/totp/verify-setup',
-        body: {'totp_code': code},
-        authorized: true,
-      );
+      final updatedBackupCodes = await authController.verifyTOTPSetup(code);
 
       if (!mounted) return;
-      setState(() => isLoading = false);
+      setState(() {
+        backupCodes = updatedBackupCodes;
+        isLoading = false;
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("TOTP enabled successfully!")),
       );

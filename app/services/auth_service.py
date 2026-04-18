@@ -416,7 +416,7 @@ class AuthService:
 
         secret = TOTPService.generate_secret()
         backup_codes = TOTPService.generate_backup_codes()
-        qr_code = TOTPService.get_provisioning_uri(user.email, secret)
+        qr_code_image = TOTPService.generate_qr_code(user.email, secret)
 
         # Store the secret temporarily in a global cache (keyed by user_id)
         # In a distributed system, this would go into Redis.
@@ -436,7 +436,7 @@ class AuthService:
 
         return TOTPSetupResponse(
             secret=secret,
-            qr_code=qr_code,
+            qr_code=qr_code_image,
             backup_codes=backup_codes,
         )
 

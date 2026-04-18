@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import '../services/api/auth_api_service.dart';
+import 'dart:convert';
+import '../controllers/auth_controller.dart';
 
 class TOTPSetupDialog extends StatefulWidget {
   final dynamic user; // Using dynamic to avoid hard dependency in this snippet
@@ -12,7 +12,7 @@ class TOTPSetupDialog extends StatefulWidget {
 }
 
 class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
-  final AuthApiService _api = AuthApiService();
+  final AuthController _authController = AuthController();
   final TextEditingController _codeController = TextEditingController();
   
   bool _isLoading = true;
@@ -31,11 +31,11 @@ class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
 
   Future<void> _loadSetupData() async {
     try {
-      final data = await _api.setupTOTP();
+      final data = await _authController.setupTOTP();
       if (mounted) {
         setState(() {
           _secret = data['secret'];
-          _qrData = data['qr_code'];
+          _qrData = data['qr_code']; // This is now a Base64 string from backend
           _isLoading = false;
         });
       }
@@ -54,7 +54,7 @@ class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
 
     setState(() => _isVerifying = true);
     try {
-      final codes = await _api.verifyTOTPSetup(_codeController.text);
+      final codes = await _authController.verifyTOTPSetup(_codeController.text);
       
       if (mounted) {
         setState(() {
@@ -130,10 +130,10 @@ class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: QrImageView(
-                data: _qrData!,
-                version: QrVersions.auto,
-                size: 200.0,
+              child: Image.memory(
+                base64Decode(_qrData!.split(',').last),
+                width: 200,
+                height: 200,
               ),
             ),
           const SizedBox(height: 20),

@@ -16,6 +16,7 @@ from app.schemas.auth import (
     RefreshRequest,
     TokenPairResponse,
     Verify2FARequest,
+    Generate2FARequest,
     TOTPSetupResponse,
     TOTPVerifySetupRequest,
     TOTPVerifySetupResponse,
@@ -60,32 +61,22 @@ def has_permissions_batch(
 
 
 @router.post("/verify-2fa", response_model=TokenPairResponse)
-def verify_2fa(payload: dict, db: Session = Depends(get_db)) -> TokenPairResponse:
-    print(f"DEBUG: verify_2fa raw payload: {payload}")
-    # Still use the logic but extract from dict
-    login_challenge = payload.get("login_challenge")
-    code = payload.get("code")
-
-    if not login_challenge or not code:
-        raise HTTPException(status_code=422, detail="Missing login_challenge or code")
-
-    return AuthService.verify_2fa_and_issue_tokens(db, login_challenge, str(code))
+def verify_2fa(payload: Verify2FARequest, db: Session = Depends(get_db)) -> TokenPairResponse:
+    print(f"DEBUG: verify_2fa payload: {payload}")
+    return AuthService.verify_2fa_and_issue_tokens(db, payload.login_challenge, payload.code)
 
 
 @router.post("/generate-2fa")
-def generate_2fa(payload: dict, db: Session = Depends(get_db)):
-    user_id = payload.get("user_id")
-    email = payload.get("email")
+def generate_2fa(payload: Generate2FARequest, db: Session = Depends(get_db)):
+    user_id = payload.user_id
+    email = payload.email
     if not user_id and not email:
         raise HTTPException(status_code=400, detail="user_id or email is required")
 
-
     if email and not user_id:
         user = db.scalar(select(User).where(User.email == email.strip().lower()))
-
         if not user:
              raise HTTPException(status_code=404, detail="User not found")
-
         user_id = user.id
 
     return AuthService.generate_2fa_challenge(db, user_id)

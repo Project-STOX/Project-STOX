@@ -106,8 +106,8 @@ class AuthController {
     return await _authApiService.setupTOTP();
   }
 
-  Future<void> verifyTOTPSetup(String totpCode) async {
-    await _authApiService.verifyTOTPSetup(totpCode);
+  Future<List<String>> verifyTOTPSetup(String totpCode) async {
+    return await _authApiService.verifyTOTPSetup(totpCode);
   }
 
   Future<void> disableTOTP(String password) async {
