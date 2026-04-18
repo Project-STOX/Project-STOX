@@ -6,11 +6,13 @@ import '../services/api/api_config.dart';
 class SendFeedbackView extends StatefulWidget {
   final UserModel user;
   final bool isEmbedded;
+  final VoidCallback? onSuccess;
 
   const SendFeedbackView({
     super.key,
     required this.user,
     this.isEmbedded = false,
+    this.onSuccess,
   });
 
   @override
@@ -19,7 +21,9 @@ class SendFeedbackView extends StatefulWidget {
 
 class _SendFeedbackViewState extends State<SendFeedbackView> {
   final TextEditingController _messageController = TextEditingController();
-  final ApiClient _apiClient = ApiClient(baseUrl: ApiConfig.baseUrl);
+  
+  // Reactive getter ensures we always use latest local URL
+  ApiClient get _apiClient => ApiClient(baseUrl: ApiConfig.baseUrl);
   
   String _selectedCategory = 'Suggestion';
   bool _isSending = false;
@@ -60,7 +64,12 @@ class _SendFeedbackViewState extends State<SendFeedbackView> {
             backgroundColor: Colors.green,
           ),
         );
-        Navigator.pop(context);
+        
+        if (widget.onSuccess != null) {
+          widget.onSuccess!();
+        } else {
+          Navigator.pop(context);
+        }
       }
     } catch (e) {
       if (mounted) {

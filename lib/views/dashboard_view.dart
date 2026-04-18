@@ -464,7 +464,11 @@ class _DashboardViewState extends State<DashboardView> {
             },
           ));
         } else if (val == 'feedback') {
-          _navigateTo(SendFeedbackView(user: _currentUser, isEmbedded: true));
+          _navigateTo(SendFeedbackView(
+            user: _currentUser, 
+            isEmbedded: true,
+            onSuccess: _navigateBack,
+          ));
         } else if (val == 'logout') {
           _logout(context);
         }
@@ -599,15 +603,18 @@ class _DashboardViewState extends State<DashboardView> {
           ListTile(
             leading: const Icon(Icons.feedback_outlined),
             title: const Text('Send Feedback'),
-            onTap: () {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => SendFeedbackView(user: _currentUser),
-                ),
-              );
-            },
+                onTap: () {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SendFeedbackView(
+                        user: _currentUser,
+                        onSuccess: () => Navigator.pop(context),
+                      ),
+                    ),
+                  );
+                },
           ),
           ListTile(
             leading: const Icon(Icons.logout),
