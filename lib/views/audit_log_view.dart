@@ -7,8 +7,9 @@ import '../models/user.dart';
 
 class AuditLogView extends StatefulWidget {
   final UserModel user;
+  final bool isEmbedded;
 
-  const AuditLogView({super.key, required this.user});
+  const AuditLogView({super.key, required this.user, this.isEmbedded = false});
 
   @override
   State<AuditLogView> createState() => _AuditLogViewState();
@@ -193,16 +194,18 @@ class _AuditLogViewState extends State<AuditLogView> {
     final logs = _filteredLogs;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Audit Log'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _load,
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: const Text('Audit Log'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _load,
+                  tooltip: 'Refresh',
+                ),
+              ],
+            ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : !_hasPermission

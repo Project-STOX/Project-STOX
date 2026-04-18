@@ -6,8 +6,9 @@ import '../models/user.dart';
 
 class SendNotificationView extends StatefulWidget {
   final int senderId;
+  final bool isEmbedded;
 
-  const SendNotificationView({super.key, required this.senderId});
+  const SendNotificationView({super.key, required this.senderId, this.isEmbedded = false});
 
   @override
   State<SendNotificationView> createState() => _SendNotificationViewState();
@@ -125,7 +126,7 @@ class _SendNotificationViewState extends State<SendNotificationView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Send Message')),
+      appBar: widget.isEmbedded ? null : AppBar(title: const Text('Send Message')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(

@@ -7,10 +7,12 @@ import 'supplier_detail_page.dart';
 class ManageSuppliersView extends StatefulWidget {
   final int roleId;
   final int userId;
+  final bool isEmbedded;
   const ManageSuppliersView({
     super.key,
     required this.roleId,
     required this.userId,
+    this.isEmbedded = false,
   });
 
   @override
@@ -164,7 +166,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     return Scaffold(
-      appBar: AppBar(title: const Text("Manage Suppliers")),
+      appBar: widget.isEmbedded ? null : AppBar(title: const Text("Manage Suppliers")),
       floatingActionButton: FloatingActionButton(
         onPressed: _createSupplier,
         child: const Icon(Icons.add),

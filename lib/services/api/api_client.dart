@@ -45,7 +45,30 @@ class ApiClient {
       headers: await _headers(authorized: authorized),
       body: jsonEncode(body ?? {}),
     );
-    return _handleResponse(response, () => post(path, body: body, authorized: authorized), authorized: authorized);
+    return _handleResponse(
+      response,
+      () => post(path, body: body, authorized: authorized),
+      authorized: authorized,
+    );
+  }
+
+  /// New method to handle binary responses (like ZIP files) while keeping 401 refresh logic.
+  Future<dynamic> postBinary(
+    String path, {
+    Map<String, dynamic>? body,
+    bool authorized = false,
+  }) async {
+    final response = await _http.post(
+      _uri(path),
+      headers: await _headers(authorized: authorized),
+      body: jsonEncode(body ?? {}),
+    );
+    return _handleResponse(
+      response,
+      () => postBinary(path, body: body, authorized: authorized),
+      authorized: authorized,
+      isBinary: true,
+    );
   }
 
   Future<dynamic> put(
@@ -58,7 +81,28 @@ class ApiClient {
       headers: await _headers(authorized: authorized),
       body: jsonEncode(body ?? {}),
     );
-    return _handleResponse(response, () => put(path, body: body, authorized: authorized), authorized: authorized);
+    return _handleResponse(
+      response,
+      () => put(path, body: body, authorized: authorized),
+      authorized: authorized,
+    );
+  }
+
+  Future<dynamic> patch(
+    String path, {
+    Map<String, dynamic>? body,
+    bool authorized = false,
+  }) async {
+    final response = await _http.patch(
+      _uri(path),
+      headers: await _headers(authorized: authorized),
+      body: jsonEncode(body ?? {}),
+    );
+    return _handleResponse(
+      response,
+      () => patch(path, body: body, authorized: authorized),
+      authorized: authorized,
+    );
   }
 
   Future<dynamic> delete(
@@ -69,7 +113,11 @@ class ApiClient {
       _uri(path),
       headers: await _headers(authorized: authorized),
     );
-    return _handleResponse(response, () => delete(path, authorized: authorized), authorized: authorized);
+    return _handleResponse(
+      response,
+      () => delete(path, authorized: authorized),
+      authorized: authorized,
+    );
   }
 
   Future<dynamic> get(
@@ -81,7 +129,11 @@ class ApiClient {
       _uri(path, query),
       headers: await _headers(authorized: authorized),
     );
-    return _handleResponse(response, () => get(path, query: query, authorized: authorized), authorized: authorized);
+    return _handleResponse(
+      response,
+      () => get(path, query: query, authorized: authorized),
+      authorized: authorized,
+    );
   }
 
   bool _isRefreshing = false;
@@ -90,6 +142,7 @@ class ApiClient {
     http.Response response,
     Future<dynamic> Function() retry, {
     bool authorized = false,
+    bool isBinary = false,
   }) async {
     if (response.statusCode == 401 && authorized && !_isRefreshing) {
       _isRefreshing = true;
@@ -102,7 +155,7 @@ class ApiClient {
         _isRefreshing = false;
       }
     }
-    return _decode(response);
+    return _decode(response, isBinary: isBinary);
   }
 
   Future<bool> _refreshToken() async {
@@ -135,10 +188,15 @@ class ApiClient {
     return false;
   }
 
-  dynamic _decode(http.Response response) {
+  dynamic _decode(http.Response response, {bool isBinary = false}) {
     if (response.statusCode >= 200 && response.statusCode < 300) {
+      if (isBinary) return response.bodyBytes;
       if (response.body.isEmpty) return {};
-      return jsonDecode(response.body);
+      try {
+        return jsonDecode(response.body);
+      } catch (_) {
+        return response.body;
+      }
     }
     final message = response.body.isEmpty ? 'Request failed' : response.body;
     throw Exception('HTTP ${response.statusCode}: $message');

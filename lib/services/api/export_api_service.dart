@@ -1,9 +1,7 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
-
+import 'api_client.dart';
 import 'api_config.dart';
 import 'token_storage.dart';
 
@@ -36,6 +34,7 @@ class BackupScheduleModel {
     required this.categories,
     required this.frequency,
     required this.scheduledTime,
+    this.formats = const ['csv'],
     this.dayOfWeek,
     this.dayOfMonth,
     this.month,
@@ -44,11 +43,14 @@ class BackupScheduleModel {
 
   factory BackupScheduleModel.fromJson(Map<String, dynamic> json) =>
       BackupScheduleModel(
-        id: json['id'] as String,
+        id: json['id'], // Can be int from server or String from legacy local
         label: json['label'] as String,
         categories: List<String>.from(json['categories'] as List),
         frequency: json['frequency'] as String,
         scheduledTime: json['scheduled_time'] as String,
+        formats: json['formats'] != null
+            ? List<String>.from(json['formats'] as List)
+            : ['csv'],
         dayOfWeek: json['day_of_week'] as int?,
         dayOfMonth: json['day_of_month'] as int?,
         month: json['month'] as int?,
@@ -63,17 +65,19 @@ class BackupScheduleModel {
         'categories': categories,
         'frequency': frequency,
         'scheduled_time': scheduledTime,
+        'formats': formats,
         if (dayOfWeek != null) 'day_of_week': dayOfWeek,
         if (dayOfMonth != null) 'day_of_month': dayOfMonth,
         if (month != null) 'month': month,
         if (lastRunAt != null) 'last_run_at': lastRunAt!.toIso8601String(),
       };
 
-  final String id;
+  final dynamic id; // Use dynamic to handle migration or native DB ints
   final String label;
   final List<String> categories;
   final String frequency;
   final String scheduledTime;
+  final List<String> formats;
   final int? dayOfWeek;
   final int? dayOfMonth;
   final int? month;
@@ -86,23 +90,31 @@ class BackupScheduleModel {
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
     ];
+    String base = '';
     switch (frequency.toLowerCase()) {
       case 'daily':
-        return 'Every day at $scheduledTime';
+        base = 'Every day at $scheduledTime';
+        break;
       case 'weekly':
         final day = dayOfWeek != null ? days[dayOfWeek!] : '?';
-        return 'Every $day at $scheduledTime';
+        base = 'Every $day at $scheduledTime';
+        break;
       case 'monthly':
-        return 'Monthly on day ${dayOfMonth ?? '?'} at $scheduledTime';
+        base = 'Monthly on day ${dayOfMonth ?? '?'} at $scheduledTime';
+        break;
       case 'yearly':
         final m = month != null ? months[month! - 1] : '?';
-        return 'Yearly on ${dayOfMonth ?? '?'} $m at $scheduledTime';
+        base = 'Yearly on ${dayOfMonth ?? '?'} $m at $scheduledTime';
+        break;
       default:
-        return frequency;
+        base = frequency;
     }
+    final fmtStr = formats.map((f) => f.toUpperCase()).join('+');
+    return '$base ($fmtStr)';
   }
 
   /// Returns true if this schedule should fire right now.
+  /// Returns true if this schedule should fire right now or if a run was missed.
   bool isDue() {
     final now = DateTime.now();
     final parts = scheduledTime.split(':');
@@ -110,84 +122,51 @@ class BackupScheduleModel {
     final h = int.tryParse(parts[0]) ?? 0;
     final m = int.tryParse(parts[1]) ?? 0;
 
-    // Must match current hour:minute
-    if (now.hour != h || now.minute != m) return false;
-
-    // Must not have already run in the last 60 seconds (prevents double-fire)
-    if (lastRunAt != null) {
-      final elapsed = now.difference(lastRunAt!).inSeconds;
-      if (elapsed < 58) return false;
-    }
-
+    // Calculate the most recent valid occurrence of this schedule in the past.
+    DateTime lastExpected;
+    
     switch (frequency.toLowerCase()) {
       case 'daily':
-        return true;
+        lastExpected = DateTime(now.year, now.month, now.day, h, m);
+        if (lastExpected.isAfter(now)) {
+          lastExpected = lastExpected.subtract(const Duration(days: 1));
+        }
+        break;
       case 'weekly':
-        // now.weekday is 1=Mon…7=Sun; dayOfWeek is 0=Mon…6=Sun
-        return (now.weekday - 1) == (dayOfWeek ?? 0);
+        final targetDow = (dayOfWeek ?? 0) + 1; // 1=Mon...7=Sun
+        lastExpected = DateTime(now.year, now.month, now.day, h, m);
+        while (lastExpected.weekday != targetDow || lastExpected.isAfter(now)) {
+          lastExpected = lastExpected.subtract(const Duration(days: 1));
+        }
+        break;
       case 'monthly':
-        final lastDay = DateTime(now.year, now.month + 1, 0).day;
-        final target = (dayOfMonth ?? 1).clamp(1, lastDay);
-        return now.day == target;
+        final targetDom = (dayOfMonth ?? 1);
+        lastExpected = DateTime(now.year, now.month, targetDom, h, m);
+        if (lastExpected.isAfter(now)) {
+          lastExpected = DateTime(now.year, now.month - 1, targetDom, h, m);
+        }
+        break;
       case 'yearly':
-        final cMonth = month ?? 1;
-        final lastDay = DateTime(now.year, cMonth + 1, 0).day;
-        final target = (dayOfMonth ?? 1).clamp(1, lastDay);
-        return now.month == cMonth && now.day == target;
+        final targetM = (month ?? 1);
+        final targetD = (dayOfMonth ?? 1);
+        lastExpected = DateTime(now.year, targetM, targetD, h, m);
+        if (lastExpected.isAfter(now)) {
+          lastExpected = DateTime(now.year - 1, targetM, targetD, h, m);
+        }
+        break;
       default:
         return false;
     }
-  }
-}
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Schedule Local Storage (SharedPreferences)
-// ─────────────────────────────────────────────────────────────────────────────
+    // If we have never run it, or if our last run was BEFORE the most recent expectation,
+    // then we are due for a run (either a normal trigger or a catch-up).
+    if (lastRunAt == null) return true;
+    
+    // Safety: ignore if we already started running in the last 60 seconds (prevents double-fire)
+    final secondsSinceLastRun = now.difference(lastRunAt!).inSeconds;
+    if (secondsSinceLastRun < 60) return false;
 
-class ScheduleStorage {
-  static const _key = 'stox_backup_schedules';
-
-  static Future<List<BackupScheduleModel>> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_key);
-    if (raw == null || raw.isEmpty) return [];
-    try {
-      final list = jsonDecode(raw) as List<dynamic>;
-      return list
-          .map((e) => BackupScheduleModel.fromJson(e as Map<String, dynamic>))
-          .toList();
-    } catch (_) {
-      return [];
-    }
-  }
-
-  static Future<void> save(List<BackupScheduleModel> schedules) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(schedules.map((s) => s.toJson()).toList()));
-  }
-
-  static Future<BackupScheduleModel> add(BackupScheduleModel schedule) async {
-    final list = await load();
-    if (list.length >= 10) {
-      throw Exception('Maximum of 10 schedules reached. Delete one to add another.');
-    }
-    list.add(schedule);
-    await save(list);
-    return schedule;
-  }
-
-  static Future<void> remove(String id) async {
-    final list = await load();
-    list.removeWhere((s) => s.id == id);
-    await save(list);
-  }
-
-  static Future<void> markRun(String id) async {
-    final list = await load();
-    for (final s in list) {
-      if (s.id == id) s.lastRunAt = DateTime.now();
-    }
-    await save(list);
+    return lastRunAt!.isBefore(lastExpected);
   }
 }
 
@@ -196,58 +175,64 @@ class ScheduleStorage {
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ExportApiService {
-  ExportApiService({TokenStorage? tokenStorage})
-      : _tokenStorage = tokenStorage ?? TokenStorage();
+  ExportApiService({ApiClient? apiClient})
+      : _apiClient = apiClient ?? ApiClient(baseUrl: ApiConfig.baseUrl);
 
-  final TokenStorage _tokenStorage;
-  final String _base = ApiConfig.baseUrl;
-
-  Future<Map<String, String>> _authHeaders() async {
-    final token = await _tokenStorage.getAccessToken();
-    return {
-      'Content-Type': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
-  }
+  final ApiClient _apiClient;
 
   /// Fetch all available export categories from the backend.
   Future<List<ExportCategory>> getCategories() async {
-    final response = await http.get(
-      Uri.parse('$_base/export/categories'),
-      headers: await _authHeaders(),
+    final List<dynamic> raw = await _apiClient.get('/export/categories', authorized: true);
+    return raw.map((e) => ExportCategory.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// RESTful Schedule CRUD
+  
+  Future<List<BackupScheduleModel>> getSchedules() async {
+    final List<dynamic> raw = await _apiClient.get('/export/schedules', authorized: true);
+    return raw.map((e) => BackupScheduleModel.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  Future<void> addSchedule(BackupScheduleModel schedule) async {
+    await _apiClient.post(
+      '/export/schedules',
+      authorized: true,
+      body: {
+        'label': schedule.label,
+        'categories': schedule.categories,
+        'frequency': schedule.frequency,
+        'scheduled_time': schedule.scheduledTime,
+        'day_of_week': schedule.dayOfWeek,
+        'day_of_month': schedule.dayOfMonth,
+        'month': schedule.month,
+      },
     );
-    if (response.statusCode == 200) {
-      final List<dynamic> raw = jsonDecode(response.body) as List<dynamic>;
-      return raw
-          .map((e) => ExportCategory.fromJson(e as Map<String, dynamic>))
-          .toList();
-    }
-    throw Exception('Failed to load export categories: ${response.statusCode} — ${response.body}');
+  }
+
+  Future<void> removeSchedule(dynamic id) async {
+    await _apiClient.delete('/export/schedules/$id', authorized: true);
+  }
+
+  Future<void> markScheduleRun(dynamic id) async {
+    await _apiClient.patch('/export/schedules/$id/mark-run', authorized: true);
   }
 
   /// Run a manual or scheduled backup for the given categories.
   /// Returns raw ZIP bytes.
-  Future<Uint8List> runBackup(List<String> categories, {List<String> formats = const ['csv']}) async {
-    final headers = await _authHeaders();
-    final response = await http.post(
-      Uri.parse('$_base/export/run'),
-      headers: headers,
-      body: jsonEncode({
+  Future<Uint8List> runBackup(List<String> categories,
+      {List<String> formats = const ['csv']}) async {
+    final bytes = await _apiClient.postBinary(
+      '/export/run',
+      authorized: true,
+      body: {
         'categories': categories,
         'formats': formats,
-      }),
+      },
     );
-    if (response.statusCode == 200) {
-      return response.bodyBytes;
+    if (bytes is Uint8List) {
+      return bytes;
     }
-    // Try to parse an error message
-    String detail = 'Unknown error';
-    try {
-      detail = (jsonDecode(response.body)['detail'] as String?) ?? response.body;
-    } catch (_) {
-      detail = response.body;
-    }
-    throw Exception('Backup failed (${response.statusCode}): $detail');
+    throw Exception('Failed to receive binary data from server');
   }
 
   /// Exclusively trigger the End of Contract sequence.
@@ -257,27 +242,19 @@ class ExportApiService {
     required List<String> formats,
     String? feedback,
   }) async {
-    final headers = await _authHeaders();
-    final response = await http.post(
-      Uri.parse('$_base/export/end-of-contract'),
-      headers: headers,
-      body: jsonEncode({
+    final bytes = await _apiClient.postBinary(
+      '/export/end-of-contract',
+      authorized: true,
+      body: {
         'categories': categories,
         'password': password,
         'formats': formats,
         'feedback': feedback ?? '',
-      }),
+      },
     );
-    if (response.statusCode == 200) {
-      return response.bodyBytes;
+    if (bytes is Uint8List) {
+      return bytes;
     }
-    // Try to parse an error message
-    String detail = 'Unknown error';
-    try {
-      detail = (jsonDecode(response.body)['detail'] as String?) ?? response.body;
-    } catch (_) {
-      detail = response.body;
-    }
-    throw Exception(detail); // Just throw the API message logic for the wizard
+    throw Exception('Failed to receive binary data from server');
   }
 }

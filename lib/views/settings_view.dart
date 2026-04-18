@@ -8,6 +8,7 @@ import '../models/user.dart';
 import '../services/api/backup_api_service.dart';
 import 'new_backup_tab.dart';
 import 'end_of_contract_view.dart';
+import '../utils/theme_controller.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Top-level model for a settings destination (tab entry in the sidebar)
@@ -29,11 +30,13 @@ class _SettingsDestination {
 class SettingsView extends StatefulWidget {
   final UserModel user;
   final bool canManageBackup;
+  final bool isEmbedded;
 
   const SettingsView({
     super.key,
     required this.user,
     required this.canManageBackup,
+    this.isEmbedded = false,
   });
 
   @override
@@ -338,6 +341,43 @@ class _GeneralSettingsTab extends StatelessWidget {
                       ),
                     );
                   }).toList(),
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 28),
+
+          // ── Navigation Style ──────────────────────────────────────────────
+          _SectionHeader(title: 'Navigation Style', icon: Icons.explore_rounded),
+          const SizedBox(height: 12),
+          _SettingsCard(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.grid_view_rounded),
+                title: const Text('Layout Style'),
+                subtitle: Text(themeController.navigationMode.name.toUpperCase()),
+                trailing: SegmentedButton<AppNavigationMode>(
+                  segments: const [
+                    ButtonSegment(
+                      value: AppNavigationMode.sidebar,
+                      icon: Icon(Icons.menu_open_rounded),
+                      label: Text('Sidebar'),
+                    ),
+                    ButtonSegment(
+                      value: AppNavigationMode.header,
+                      icon: Icon(Icons.view_headline_rounded),
+                      label: Text('Header'),
+                    ),
+                  ],
+                  selected: {themeController.navigationMode},
+                  onSelectionChanged: (Set<AppNavigationMode> newSelection) {
+                    themeController.setNavigationMode(newSelection.first);
+                  },
+                  showSelectedIcon: false,
+                  style: const ButtonStyle(
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
               ),
             ],

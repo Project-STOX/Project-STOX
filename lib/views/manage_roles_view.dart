@@ -8,8 +8,9 @@ import '../controllers/notification_controller.dart';
 
 class ManageRolesView extends StatefulWidget {
   final UserModel user;
+  final bool isEmbedded;
 
-  const ManageRolesView({super.key, required this.user});
+  const ManageRolesView({super.key, required this.user, this.isEmbedded = false});
 
   @override
   _ManageRolesViewState createState() => _ManageRolesViewState();
@@ -217,7 +218,9 @@ class _ManageRolesViewState extends State<ManageRolesView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Manage Roles & Permissions')),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(title: const Text('Manage Roles & Permissions')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : Column(

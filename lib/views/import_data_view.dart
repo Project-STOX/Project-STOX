@@ -20,8 +20,9 @@ import '../services/api/reports_api_service.dart';
 
 class ImportDataView extends StatefulWidget {
   final UserModel user;
+  final bool isEmbedded;
 
-  const ImportDataView({super.key, required this.user});
+  const ImportDataView({super.key, required this.user, this.isEmbedded = false});
 
   @override
   State<ImportDataView> createState() => _ImportDataViewState();
@@ -785,28 +786,24 @@ class _ImportDataViewState extends State<ImportDataView> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+      return Scaffold(
+        appBar: widget.isEmbedded ? null : AppBar(title: const Text('Import CSV Data')),
+        body: const Center(child: CircularProgressIndicator()),
       );
     }
-
     if (!_hasAccess) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Import CSV Data')),
+        appBar: widget.isEmbedded ? null : AppBar(title: const Text('Access Denied')),
         body: const Center(
-          child: Padding(
-            padding: EdgeInsets.all(24.0),
-            child: Text(
-              'Access denied: you do not have permission to use CSV import.',
-              textAlign: TextAlign.center,
-            ),
+          child: Text(
+            'You do not have permission to access the CSV Import module.',
+            textAlign: TextAlign.center,
           ),
         ),
       );
     }
-
     return Scaffold(
-      appBar: AppBar(title: const Text('Import CSV Data')),
+      appBar: widget.isEmbedded ? null : AppBar(title: const Text('Import CSV Data')),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16.0),

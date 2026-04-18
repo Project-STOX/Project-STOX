@@ -10,8 +10,9 @@ import '../controllers/notification_controller.dart';
 
 class ManageUsersView extends StatefulWidget {
   final UserModel user;
+  final bool isEmbedded;
 
-  const ManageUsersView({super.key, required this.user});
+  const ManageUsersView({super.key, required this.user, this.isEmbedded = false});
 
   @override
   State<ManageUsersView> createState() => _ManageUsersViewState();
@@ -180,7 +181,9 @@ class _ManageUsersViewState extends State<ManageUsersView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
         title: const Text('Manage Users'),
         actions: [
           FutureBuilder<bool>(

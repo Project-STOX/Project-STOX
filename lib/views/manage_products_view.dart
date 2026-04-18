@@ -9,11 +9,13 @@ import 'product_detail_page.dart';
 class ManageProductsView extends StatefulWidget {
   final int roleId;
   final int userId;
+  final bool isEmbedded;
 
   const ManageProductsView({
     super.key,
     required this.roleId,
     required this.userId,
+    this.isEmbedded = false,
   });
 
   @override
@@ -175,7 +177,7 @@ class _ManageProductsViewState extends State<ManageProductsView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Manage Products")),
+      appBar: widget.isEmbedded ? null : AppBar(title: const Text("Manage Products")),
       floatingActionButton: FloatingActionButton(
         onPressed: _createProduct,
         child: const Icon(Icons.add),

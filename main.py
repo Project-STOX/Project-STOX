@@ -34,7 +34,7 @@ app = FastAPI(title=settings.app_name, version=settings.app_version, debug=setti
 app.add_middleware(AuditMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1)(:\d+)?$",
+    allow_origins=["*"],  # More permissive for testing/failover mode
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

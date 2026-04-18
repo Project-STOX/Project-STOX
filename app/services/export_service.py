@@ -10,7 +10,8 @@ from __future__ import annotations
 import csv
 import io
 import zipfile
-from datetime import datetime
+from datetime import datetime, date
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy.orm import Session
@@ -92,10 +93,12 @@ def _stream_to_zip_json(zf: zipfile.ZipFile, filename: str, rows_iter):
             # Start JSON array
             text_writer.write("[\\n  ")
             
-            # Datetime serializer helper
+            # Datetime & Decimal serializer helper
             def _json_serial(obj):
-                if isinstance(obj, datetime):
+                if isinstance(obj, (datetime, date)):
                     return obj.isoformat()
+                if isinstance(obj, Decimal):
+                    return float(obj)
                 raise TypeError(f"Type {type(obj)} not serializable")
 
             # Write first row
@@ -144,6 +147,11 @@ def _stream_to_zip_sql(zf: zipfile.ZipFile, filename: str, table_name: str, rows
                 vals_str = ", ".join([_format_val(row[c]) for c in columns])
                 text_writer.write(f"INSERT INTO {table_name} ({cols_str}) VALUES ({vals_str});\n")
             
+            # Add header comment
+            text_writer.write(f"-- STOX SQL Data Export: {table_name}\n")
+            text_writer.write(f"-- Generated: {datetime.now().isoformat()}\n")
+            text_writer.write("-- NOTE: This file contains INSERT statements only. It assumes the table structure already exists.\n\n")
+
             write_row(peek)
             for row in rows_iter:
                 write_row(row)
@@ -378,11 +386,14 @@ def _fetch_notifications(db: Session) -> list[dict[str, Any]]:
 # Main ZIP builder
 # ─────────────────────────────────────────────────────────────────────────────
 
-def build_export_zip(db: Session, categories: list[str], format_type: str = "csv") -> tuple[str, str]:
+def build_export_zip(db: Session, categories: list[str], formats: list[str] | None = None) -> tuple[str, str]:
     """
     Build a ZIP file containing one file per table for each
     selected category. Returns (zip_filepath, suggested_filename).
     """
+    if formats is None:
+        formats = ["csv"]
+
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     zip_filename = f"stox_backup_{timestamp}.zip"
 
@@ -390,21 +401,28 @@ def build_export_zip(db: Session, categories: list[str], format_type: str = "csv
     os.close(fd)
 
     def _stream(zf, base_name, data):
-        if format_type == "json":
-            _stream_to_zip_json(zf, f"{base_name}.json", data)
-        else:
-            _stream_to_zip(zf, f"{base_name}.csv", data)
+        # Convert to list so we can iterate multiple times if multiple formats are requested
+        data_list = list(data) if data else []
+        for fmt in formats:
+            if fmt == "json":
+                _stream_to_zip_json(zf, f"{base_name}.json", data_list)
+            elif fmt == "sql":
+                table_name = base_name.replace(" ", "_").lower()
+                _stream_to_zip_sql(zf, f"{base_name}.sql", table_name, data_list)
+            else:
+                _stream_to_zip(zf, f"{base_name}.csv", data_list)
 
     with zipfile.ZipFile(temp_path, mode="w", compression=zipfile.ZIP_DEFLATED) as zf:
         # README
+        formats_display = ", ".join(f.upper() for f in formats)
         readme = (
-            f"STOX Data Export\\n"
-            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\\n"
-            f"Categories: {', '.join(categories)}\\n"
-            f"Format: {format_type.upper()}\\n\\n"
+            f"STOX Data Export\n"
+            f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+            f"Categories: {', '.join(categories)}\n"
+            f"Formats: {formats_display}\n\n"
         )
-        if format_type == "csv":
-            readme += "All CSV files use UTF-8 encoding with BOM for direct Excel compatibility.\\n"
+        if "csv" in formats:
+            readme += "All CSV files use UTF-8 encoding with BOM for direct Excel compatibility.\n"
         zf.writestr("README.txt", readme)
 
         if CATEGORY_USERS in categories:

@@ -13,8 +13,9 @@ import '../models/user.dart';
 
 class StockReceiptView extends StatefulWidget {
   final UserModel user;
+  final bool isEmbedded;
 
-  const StockReceiptView({super.key, required this.user});
+  const StockReceiptView({super.key, required this.user, this.isEmbedded = false});
 
   @override
   State<StockReceiptView> createState() => _StockReceiptViewState();
@@ -927,24 +928,26 @@ class _StockReceiptViewState extends State<StockReceiptView> {
   Widget build(BuildContext context) {
     if (!_isAuthorized && !_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Stock Receipt')),
+        appBar: widget.isEmbedded ? null : AppBar(title: const Text('Access denied')),
         body: const Center(child: Text('Access denied')),
       );
     }
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Stock Receipt'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () async {
-              await _loadCatalog();
-              await _loadReceipts();
-            },
-          ),
-        ],
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: const Text('Stock Receipt'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () async {
+                    await _loadCatalog();
+                    await _loadReceipts();
+                  },
+                ),
+              ],
+            ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _openReceiptEditor(),
         child: const Icon(Icons.add),

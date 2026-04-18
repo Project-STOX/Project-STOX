@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 import traceback
+from datetime import datetime
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from fastapi.responses import FileResponse
 from starlette.background import BackgroundTask
@@ -21,9 +22,13 @@ from typing import Any
 from app.core.security.dependencies import get_current_user
 from app.db.database import get_db
 from app.models.user import User
+from app.models.backup_schedule import BackupSchedule
 from app.services.export_service import ALL_CATEGORIES, build_export_zip
 from app.services.auth_service import AuthService
 from app.services.audit_service import AuditService
+from app.services.feedback_service import FeedbackService
+from pydantic import BaseModel
+import json
 
 router = APIRouter(prefix="/export", tags=["export"])
 _log = logging.getLogger(__name__)
@@ -44,6 +49,10 @@ def _require_sme_owner(
     return current_user
 
 
+class FeedbackRequest(BaseModel):
+    category: str
+    message: str
+
 # ─────────────────────────────────────────────────────────────────────────────
 # Routes
 # ─────────────────────────────────────────────────────────────────────────────
@@ -62,6 +71,126 @@ def list_categories(_: User = Depends(_require_sme_owner)) -> list[dict[str, str
         {"key": "audit_log", "label": "Audit Log", "description": "Full system activity and change history"},
         {"key": "notifications", "label": "Notifications", "description": "All sent system and user notifications"},
     ]
+
+
+@router.post("/feedback")
+def submit_feedback(
+    payload: FeedbackRequest,
+    current_user: User = Depends(_require_sme_owner),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Submit user feedback."""
+    FeedbackService.save_feedback(
+        db,
+        user_id=current_user.id,
+        username=current_user.full_name,
+        email=current_user.email,
+        category=payload.category,
+        message=payload.message
+    )
+    return {"status": "success", "message": "Feedback received. Thank you!"}
+
+
+@router.get("/schedules")
+def list_schedules(
+    current_user: User = Depends(_require_sme_owner),
+    db: Session = Depends(get_db),
+) -> list[dict[str, Any]]:
+    """Return all backup schedules for the current SME owner."""
+    schedules = (
+        db.query(BackupSchedule)
+        .filter(BackupSchedule.user_id == current_user.id)
+        .order_by(BackupSchedule.id)
+        .all()
+    )
+    return [
+        {
+            "id": s.id,
+            "label": s.label,
+            "categories": s.categories,
+            "frequency": s.frequency,
+            "scheduled_time": s.scheduled_time,
+            "day_of_week": s.day_of_week,
+            "day_of_month": s.day_of_month,
+            "month": s.month,
+            "last_run_at": s.last_run_at.isoformat() if s.last_run_at else None,
+            "next_run_at": s.next_run_at.isoformat() if s.next_run_at else None,
+        }
+        for s in schedules
+    ]
+
+
+@router.post("/schedules")
+def create_schedule(
+    payload: dict[str, Any] = Body(...),
+    current_user: User = Depends(_require_sme_owner),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Create a new backup schedule."""
+    # Enforce limit of 10 schedules per user
+    count = db.query(BackupSchedule).filter(BackupSchedule.user_id == current_user.id).count()
+    if count >= 10:
+        raise HTTPException(status_code=400, detail="Maximum of 10 schedules allowed.")
+
+    try:
+        new_schedule = BackupSchedule(
+            user_id=current_user.id,
+            label=payload.get("label", "New Backup"),
+            frequency=payload.get("frequency", "daily"),
+            scheduled_time=payload.get("scheduled_time", "02:00"),
+            day_of_week=payload.get("day_of_week"),
+            day_of_month=payload.get("day_of_month"),
+            month=payload.get("month"),
+        )
+        new_schedule.categories = payload.get("categories", [])
+        
+        db.add(new_schedule)
+        db.commit()
+        db.refresh(new_schedule)
+        return {"id": new_schedule.id}
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@router.delete("/schedules/{schedule_id}")
+def delete_schedule(
+    schedule_id: int,
+    current_user: User = Depends(_require_sme_owner),
+    db: Session = Depends(get_db),
+) -> dict[str, str]:
+    """Delete a backup schedule."""
+    schedule = (
+        db.query(BackupSchedule)
+        .filter(BackupSchedule.id == schedule_id, BackupSchedule.user_id == current_user.id)
+        .first()
+    )
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found.")
+
+    db.delete(schedule)
+    db.commit()
+    return {"status": "deleted"}
+
+
+@router.patch("/schedules/{schedule_id}/mark-run")
+def mark_schedule_run(
+    schedule_id: int,
+    current_user: User = Depends(_require_sme_owner),
+    db: Session = Depends(get_db),
+) -> dict[str, Any]:
+    """Update the last_run_at timestamp for a schedule."""
+    schedule = (
+        db.query(BackupSchedule)
+        .filter(BackupSchedule.id == schedule_id, BackupSchedule.user_id == current_user.id)
+        .first()
+    )
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found.")
+
+    schedule.last_run_at = datetime.now()
+    db.commit()
+    return {"id": schedule.id, "last_run_at": schedule.last_run_at.isoformat()}
 
 
 @router.post("/run")

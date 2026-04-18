@@ -5,8 +5,15 @@ import '../models/user.dart';
 
 class AccountView extends StatefulWidget {
   final UserModel user;
+  final bool isEmbedded;
+  final void Function(UserModel)? onUserUpdated;
 
-  const AccountView({super.key, required this.user});
+  const AccountView({
+    super.key,
+    required this.user,
+    this.isEmbedded = false,
+    this.onUserUpdated,
+  });
 
   @override
   State<AccountView> createState() => _AccountViewState();
@@ -82,8 +89,13 @@ class _AccountViewState extends State<AccountView> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text(message)),
         );
-        // Return updated user to the dashboard
-        Navigator.of(context).pop(updatedUser);
+        // If embedded, notify parent instead of popping the entire dashboard
+        if (widget.isEmbedded) {
+          widget.onUserUpdated?.call(updatedUser);
+        } else {
+          // Return updated user to the dashboard (sidebar mode)
+          Navigator.of(context).pop(updatedUser);
+        }
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -162,9 +174,7 @@ class _AccountViewState extends State<AccountView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Account Settings'),
-      ),
+      appBar: widget.isEmbedded ? null : AppBar(title: const Text('Account Settings')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(

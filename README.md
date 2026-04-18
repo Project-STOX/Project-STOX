@@ -64,7 +64,7 @@ supabase link --project-ref odowtpnnkxgdbmtnqphr
 
 STOX includes automatic failover to a local PostgreSQL database if Supabase becomes unavailable. Your local database is **read-only** to prevent accidental data modifications during failover.
 
-### Quick Setup ⚡
+### Quick Setup
 
 1. **Check backup status:**
    ```powershell

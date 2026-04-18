@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+enum AppNavigationMode { sidebar, header }
+
 class ThemeController with ChangeNotifier {
   static const String _themeModeKey = 'theme_mode';
   static const String _primaryColorKey = 'primary_color';
+  static const String _navigationModeKey = 'app_navigation_mode';
 
   ThemeMode _themeMode = ThemeMode.light;
   Color _primaryColor = Colors.blue;
+  AppNavigationMode _navigationMode = AppNavigationMode.sidebar;
   bool _initialized = false;
 
   ThemeMode get themeMode => _themeMode;
   Color get primaryColor => _primaryColor;
+  AppNavigationMode get navigationMode => _navigationMode;
   bool get initialized => _initialized;
 
   ThemeController() {
@@ -32,6 +37,12 @@ class ThemeController with ChangeNotifier {
       _primaryColor = Color(colorValue);
     }
 
+    // Load Navigation Mode
+    final navIndex = prefs.getInt(_navigationModeKey);
+    if (navIndex != null) {
+      _navigationMode = AppNavigationMode.values[navIndex];
+    }
+
     _initialized = true;
     notifyListeners();
   }
@@ -48,6 +59,13 @@ class ThemeController with ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_primaryColorKey, color.value);
+  }
+
+  Future<void> setNavigationMode(AppNavigationMode mode) async {
+    _navigationMode = mode;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_navigationModeKey, mode.index);
   }
 
   ThemeData getLightTheme() {

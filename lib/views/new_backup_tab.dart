@@ -36,12 +36,18 @@ class _NewBackupTabState extends State<NewBackupTab> {
   bool _done = false;
   bool _error = false;
   Timer? _progressTimer;
+  final Set<String> _selectedFormats = {'csv'};
 
   // Schedules
   List<BackupScheduleModel> _schedules = [];
   bool _loadingSchedules = true;
 
   static const int maxSchedules = 10;
+  static const List<Map<String, String>> availableFormats = [
+    {'key': 'csv', 'label': 'CSV (Excel)'},
+    {'key': 'json', 'label': 'JSON (Web)'},
+    {'key': 'sql', 'label': 'SQL (Database)'},
+  ];
 
   @override
   void initState() {
@@ -78,10 +84,10 @@ class _NewBackupTabState extends State<NewBackupTab> {
 
   Future<void> _loadSchedules() async {
     try {
-      final schedules = await ScheduleStorage.load();
+      final schedules = await _service.getSchedules();
       if (mounted) setState(() { _schedules = schedules; _loadingSchedules = false; });
     } catch (_) {
-      if (mounted) setState(() => _loadingSchedules = false);
+      if (mounted) setState(() { _loadingSchedules = false; });
     }
   }
 
@@ -99,6 +105,12 @@ class _NewBackupTabState extends State<NewBackupTab> {
   Future<void> _runBackup({List<String>? categoryOverride, bool silent = false}) async {
     final cats = categoryOverride ?? _selected.toList();
     if (cats.isEmpty) return;
+
+    final fmts = _selectedFormats.toList();
+    if (fmts.isEmpty) {
+      _showError('Please select at least one format.');
+      return;
+    }
 
     if (!silent) {
       setState(() {
@@ -123,7 +135,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
 
     try {
       if (!silent) setState(() => _statusMessage = 'Fetching data from server…');
-      final bytes = await _service.runBackup(cats);
+      final bytes = await _service.runBackup(cats, formats: fmts);
 
       _progressTimer?.cancel();
       if (!silent) {
@@ -149,6 +161,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
       }
 
       if (mounted) {
+        final fmtLabel = fmts.map((f) => f.toUpperCase()).join(' + ');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             behavior: SnackBarBehavior.floating,
@@ -161,8 +174,8 @@ class _NewBackupTabState extends State<NewBackupTab> {
                 Expanded(
                   child: Text(
                     kIsWeb
-                        ? '✅ $filename downloaded successfully.'
-                        : '✅ Saved to Downloads/STOX Backups/',
+                        ? '$filename ($fmtLabel) downloaded successfully.'
+                        : 'Saved to Downloads/STOX Backups/ ($fmtLabel)',
                   ),
                 ),
               ],
@@ -197,21 +210,23 @@ class _NewBackupTabState extends State<NewBackupTab> {
       context: context,
       builder: (ctx) => _AddScheduleDialog(
         categories: _categories,
-        onSave: (label, cats, freq, time, dow, dom, mon) async {
+        onSave: (label, cats, freq, time, fmts, dow, dom, mon) async {
           try {
             final s = BackupScheduleModel(
-              id: _uuid.v4(),
+              id: 0, // Server will assign int ID
               label: label,
               categories: cats,
               frequency: freq,
               scheduledTime: time,
+              formats: fmts,
               dayOfWeek: dow,
               dayOfMonth: dom,
               month: mon,
             );
-            await ScheduleStorage.add(s);
+            await _service.addSchedule(s);
+            // Refresh list from server to get the new real ID
+            await _loadSchedules();
             if (mounted) {
-              setState(() => _schedules.add(s));
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   behavior: SnackBarBehavior.floating,
@@ -245,8 +260,12 @@ class _NewBackupTabState extends State<NewBackupTab> {
       ),
     );
     if (confirmed == true) {
-      await ScheduleStorage.remove(schedule.id);
-      if (mounted) setState(() => _schedules.removeWhere((s) => s.id == schedule.id));
+      try {
+        await _service.removeSchedule(schedule.id);
+        if (mounted) setState(() => _schedules.removeWhere((s) => s.id == schedule.id));
+      } catch (e) {
+        _showError('Failed to delete schedule: ${e.toString()}');
+      }
     }
   }
 
@@ -276,9 +295,35 @@ class _NewBackupTabState extends State<NewBackupTab> {
                 const SizedBox(width: 12),
                 const Expanded(
                   child: Text(
-                    'Backup your data as CSV files (Excel-compatible) bundled in a ZIP. '
+                    'Backup your data as CSV, JSON, or SQL files bundled in a ZIP archive. '
                     'On web, the ZIP downloads to your browser Downloads folder. '
                     'On Windows/Desktop, it saves to Downloads/STOX Backups/.',
+                    style: TextStyle(fontSize: 13, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 12),
+
+          // ── System Recovery Info ─────────────────────────────────────────
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.secondaryContainer.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: colorScheme.secondaryContainer),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.security_rounded, color: colorScheme.secondary),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'System-wide encrypted snapshots are performed every 4 hours to ensure recovery from infrastructure failure or security incidents. '
+                    'This is supplemented by individually isolated SME backups generated daily. '
+                    'While we recommend following standard operational procedures, your data remains fully protected and recoverable in the event of accidental loss.',
                     style: TextStyle(fontSize: 13, height: 1.4),
                   ),
                 ),
@@ -337,6 +382,36 @@ class _NewBackupTabState extends State<NewBackupTab> {
 
               const Divider(indent: 16, endIndent: 16),
 
+              // Format selection
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Preferred Formats:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 12,
+                      children: availableFormats.map((f) {
+                        final isSelected = _selectedFormats.contains(f['key']);
+                        return FilterChip(
+                          label: Text(f['label']!),
+                          selected: isSelected,
+                          onSelected: (v) {
+                            setState(() {
+                              if (v) { _selectedFormats.add(f['key']!); }
+                              else if (_selectedFormats.length > 1) { _selectedFormats.remove(f['key']!); }
+                            });
+                          },
+                        );
+                      }).toList(),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(indent: 16, endIndent: 16),
+
               // Progress
               if (_isRunning || _done || _error)
                 Padding(
@@ -347,7 +422,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
-                          value: _progress,
+                          value: _isRunning && _progress < 0.05 ? null : _progress,
                           minHeight: 8,
                           backgroundColor: colorScheme.surfaceContainerHighest,
                           valueColor: AlwaysStoppedAnimation(
@@ -503,6 +578,7 @@ typedef _OnSave = void Function(
   List<String> categories,
   String frequency,
   String scheduledTime,
+  List<String> formats,
   int? dayOfWeek,
   int? dayOfMonth,
   int? month,
@@ -525,6 +601,7 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
   int _dayOfMonth = 1;
   int _month = 1;
   late Set<String> _selectedCats;
+  final Set<String> _selectedFormats = {'csv'};
 
   static const _weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   static const _months = ['January', 'February', 'March', 'April', 'May', 'June',
@@ -618,7 +695,41 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
             ],
 
             const SizedBox(height: 16),
-            const Text('Data to include:', style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text('Formats to include:', style: TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                _FormatChoice(
+                  label: 'CSV',
+                  isSelected: _selectedFormats.contains('csv'),
+                  onToggle: (v) => setState(() {
+                    if (v) _selectedFormats.add('csv');
+                    else if (_selectedFormats.length > 1) _selectedFormats.remove('csv');
+                  }),
+                ),
+                const SizedBox(width: 8),
+                _FormatChoice(
+                  label: 'JSON',
+                  isSelected: _selectedFormats.contains('json'),
+                  onToggle: (v) => setState(() {
+                    if (v) _selectedFormats.add('json');
+                    else if (_selectedFormats.length > 1) _selectedFormats.remove('json');
+                  }),
+                ),
+                const SizedBox(width: 8),
+                _FormatChoice(
+                  label: 'SQL',
+                  isSelected: _selectedFormats.contains('sql'),
+                  onToggle: (v) => setState(() {
+                    if (v) _selectedFormats.add('sql');
+                    else if (_selectedFormats.length > 1) _selectedFormats.remove('sql');
+                  }),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+            const Text('Categories to include:', style: TextStyle(fontWeight: FontWeight.w600)),
             const SizedBox(height: 4),
             ...widget.categories.map((cat) => CheckboxListTile(
               dense: true,
@@ -635,7 +746,7 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         FilledButton(
-          onPressed: _selectedCats.isEmpty ? null : () {
+          onPressed: _selectedCats.isEmpty || _selectedFormats.isEmpty ? null : () {
             final timeStr =
                 '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
             widget.onSave(
@@ -643,6 +754,7 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
               _selectedCats.toList(),
               _frequency,
               timeStr,
+              _selectedFormats.toList(),
               _frequency == 'weekly' ? _dayOfWeek : null,
               (_frequency == 'monthly' || _frequency == 'yearly') ? _dayOfMonth : null,
               _frequency == 'yearly' ? _month : null,
@@ -652,6 +764,22 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
           child: const Text('Save Schedule'),
         ),
       ],
+    );
+  }
+}
+
+class _FormatChoice extends StatelessWidget {
+  final String label;
+  final bool isSelected;
+  final ValueChanged<bool> onToggle;
+  const _FormatChoice({required this.label, required this.isSelected, required this.onToggle});
+
+  @override
+  Widget build(BuildContext context) {
+    return ChoiceChip(
+      label: Text(label, style: const TextStyle(fontSize: 12)),
+      selected: isSelected,
+      onSelected: onToggle,
     );
   }
 }

@@ -4,8 +4,9 @@ import 'package:intl/intl.dart';
 
 class NotificationsListView extends StatefulWidget {
   final int userId;
+  final bool isEmbedded;
 
-  const NotificationsListView({super.key, required this.userId});
+  const NotificationsListView({super.key, required this.userId, this.isEmbedded = false});
 
   @override
   State<NotificationsListView> createState() => _NotificationsListViewState();
@@ -78,15 +79,17 @@ class _NotificationsListViewState extends State<NotificationsListView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchNotifications,
-          ),
-        ],
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: const Text('Notifications'),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _fetchNotifications,
+                ),
+              ],
+            ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _notifications.isEmpty

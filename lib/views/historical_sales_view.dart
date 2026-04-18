@@ -11,8 +11,9 @@ import '../utils/csv_export_stub.dart'
 
 class HistoricalSalesView extends StatefulWidget {
   final UserModel user;
+  final bool isEmbedded;
 
-  const HistoricalSalesView({super.key, required this.user});
+  const HistoricalSalesView({super.key, required this.user, this.isEmbedded = false});
 
   @override
   State<HistoricalSalesView> createState() => _HistoricalSalesViewState();
@@ -244,12 +245,15 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        appBar: widget.isEmbedded ? null : AppBar(title: const Text('Historical Sales')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
     }
 
     if (!_hasAccess) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Historical Sales Data')),
+        appBar: widget.isEmbedded ? null : AppBar(title: const Text('Access Denied')),
         body: const Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
