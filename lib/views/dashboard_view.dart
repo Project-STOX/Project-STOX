@@ -418,45 +418,6 @@ class _DashboardViewState extends State<DashboardView> {
             ));
           },
         ),
-        // Connectivity Status Indicator
-        ValueListenableBuilder<bool>(
-          valueListenable: ApiConfig.isUsingCloud,
-          builder: (context, isCloud, _) {
-            return ValueListenableBuilder<bool>(
-              valueListenable: ApiConfig.isConnecting,
-              builder: (context, isConnecting, _) {
-                return Tooltip(
-                  message: isConnecting 
-                    ? 'Checking connection...' 
-                    : (isCloud ? 'Connected to Cloud' : 'Local Failover Mode'),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Center(
-                      child: Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isConnecting 
-                            ? Colors.grey 
-                            : (isCloud ? Colors.green : Colors.amber),
-                          boxShadow: [
-                            if (!isConnecting)
-                              BoxShadow(
-                                color: (isCloud ? Colors.green : Colors.amber).withOpacity(0.4),
-                                blurRadius: 4,
-                                spreadRadius: 1,
-                              )
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              },
-            );
-          },
-        ),
         if (showHeader) ...[
           const VerticalDivider(width: 20, indent: 12, endIndent: 12),
           _buildAccountMenu(context),

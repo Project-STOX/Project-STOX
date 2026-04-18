@@ -23,19 +23,6 @@ void main() async {
   // 1. Initialize DB
   await SupabaseService.initializeIfConfigured();
 
-  // 2. Resilient Networking: Ping Cloud URL with a tight timeout
-  // If it's sleeping, Render starts waking up, but we fail-over to local instantly.
-  await ApiConfig.checkHealth(timeout: const Duration(milliseconds: 1500));
-
-  // 3. If we failed over to local, set a 2-minute timer to switch back to cloud
-  // once it has finished waking up.
-  if (!ApiConfig.isUsingCloud.value) {
-    Timer(const Duration(minutes: 2), () async {
-      debugPrint('STOX: 2-minute mark reached. Attempting cloud wake-up switch...');
-      await ApiConfig.trySwitchToCloud();
-    });
-  }
-
   runApp(const MyApp());
 }
 

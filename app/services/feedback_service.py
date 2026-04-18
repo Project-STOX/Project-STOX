@@ -20,8 +20,13 @@ class FeedbackService:
         log_entry = f"[{timestamp}] User: {username} ({email}) | Category: {category} | Message: {message}\n"
         
         # 1. Save to local log file
-        log_path = "feedback.log"
+        log_dir = "logs"
+        log_path = os.path.join(log_dir, "feedback.log")
+        
         try:
+            if not os.path.exists(log_dir):
+                os.makedirs(log_dir)
+                
             with open(log_path, "a", encoding="utf-8") as f:
                 f.write(log_entry)
         except Exception as e:

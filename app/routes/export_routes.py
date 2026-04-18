@@ -76,7 +76,7 @@ def list_categories(_: User = Depends(_require_sme_owner)) -> list[dict[str, str
 @router.post("/feedback")
 def submit_feedback(
     payload: FeedbackRequest,
-    current_user: User = Depends(_require_sme_owner),
+    current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
     """Submit user feedback."""
