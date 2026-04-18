@@ -37,22 +37,38 @@ def get_db() -> Generator[Session, None, None]:
     """
     Dependency to get a database session.
     Automatically falls back to local PostgreSQL in READ-ONLY mode if primary is down.
+    Supports LOCAL_ONLY_MODE to skip primary check entirely.
     """
     db: Session | None = None
     is_fallback = False
 
     try:
+        # 0. Check for Local Only Mode
+        if settings.local_only_mode:
+            print("🏠 DEBUG: LOCAL_ONLY_MODE is ON. Bypassing Supabase.")
+            db = LocalSession()
+            db.execute(txt("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"))
+            is_fallback = True
+            yield db
+            return
+
         # 1. Try Primary (Supabase)
         try:
+            print("🚀 DEBUG: Attempting to connect to Primary DB (Supabase)...")
             db = SessionLocal()
+            # Reduce timeout for the check itself
             db.execute(txt("SELECT 1"))
-        except Exception:
+            print("✅ DEBUG: Connected to Supabase successfully.")
+        except Exception as e:
+            print(f"⚠️ DEBUG: Supabase connection failed: {e}")
+            print("🔄 DEBUG: Switching to Local Failover Database...")
             # 2. Try Fallback (Local)
             if db:
                 db.close()
             db = LocalSession()
             db.execute(txt("SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY"))
             is_fallback = True
+            print("🏠 DEBUG: Local Fallback Active (Read-Only Mode).")
         
         # 3. Yield the established session
         yield db

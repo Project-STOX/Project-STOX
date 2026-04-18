@@ -15,6 +15,7 @@ class UserRead(BaseModel):
     username: str
     is_active: bool
     tfa_active: bool
+    totp_enabled: bool
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -29,4 +30,5 @@ class UserRead(BaseModel):
             username=user.full_name,
             is_active=user.is_active,
             tfa_active=user.tfa_active,
+            totp_enabled=user.totp_enabled,
         )

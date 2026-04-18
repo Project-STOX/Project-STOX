@@ -6,6 +6,7 @@ class UserModel {
   final int roleIdValue;
   final bool isActive;
   final bool tfaActiveValue;
+  final bool totpEnabledValue;
 
   UserModel({
     required this.id,
@@ -15,12 +16,14 @@ class UserModel {
     required this.roleIdValue,
     required this.isActive,
     required this.tfaActiveValue,
+    required this.totpEnabledValue,
   });
 
   int get userId => id;
   String get username => fullName.isNotEmpty ? fullName : email;
   int get roleId => roleIdValue;
   bool get tfaActive => tfaActiveValue;
+  bool get totpEnabled => totpEnabledValue;
 
   static int _roleIdFromRoleName(String roleName) {
     final normalized = roleName.trim().toLowerCase();
@@ -72,6 +75,7 @@ class UserModel {
       roleIdValue: parsedRoleId,
       isActive: _asBool(json['is_active'], fallback: true),
       tfaActiveValue: _asBool(json['tfa_active'], fallback: false),
+      totpEnabledValue: _asBool(json['totp_enabled'], fallback: false),
     );
   }
 }

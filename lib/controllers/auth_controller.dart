@@ -102,6 +102,18 @@ class AuthController {
     await _authApiService.generate2fa(userId: userId);
   }
 
+  Future<Map<String, dynamic>> setupTOTP() async {
+    return await _authApiService.setupTOTP();
+  }
+
+  Future<void> verifyTOTPSetup(String totpCode) async {
+    await _authApiService.verifyTOTPSetup(totpCode);
+  }
+
+  Future<void> disableTOTP(String password) async {
+    await _authApiService.disableTOTP(password);
+  }
+
   Future<bool> isAccountDeactivated(String identifier, String password) async =>
       false;
 }

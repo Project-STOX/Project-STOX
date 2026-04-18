@@ -19,6 +19,7 @@ class _LoginViewState extends State<LoginView> {
   bool _obscurePassword = true;
   bool _rememberMe = true;
   bool _isAutoLoggingIn = true;
+  bool _isLoggingIn = false;
 
   @override
   void initState() {
@@ -27,14 +28,29 @@ class _LoginViewState extends State<LoginView> {
   }
 
   Future<void> _checkAutoLogin() async {
-    final user = await authController.tryAutoLogin();
-    if (user != null && mounted) {
-      Navigator.pushReplacementNamed(
-        context,
-        '/dashboard',
-        arguments: user,
+    try {
+      // Add a 5-second timeout to prevent hangups if the backend is slow/unreachable
+      final user = await authController.tryAutoLogin().timeout(
+        const Duration(seconds: 5),
+        onTimeout: () {
+          debugPrint("Auto-login timed out.");
+          return null;
+        },
       );
-    } else {
+      
+      if (user != null && mounted) {
+        Navigator.pushReplacementNamed(
+          context,
+          '/dashboard',
+          arguments: user,
+        );
+      } else {
+        if (mounted) {
+          setState(() => _isAutoLoggingIn = false);
+        }
+      }
+    } catch (e) {
+      debugPrint("Auto-login error: $e");
       if (mounted) {
         setState(() => _isAutoLoggingIn = false);
       }
@@ -42,6 +58,8 @@ class _LoginViewState extends State<LoginView> {
   }
 
   void login() async {
+    if (_isLoggingIn) return;
+    setState(() => _isLoggingIn = true);
     try {
       final loginResponse = await authController.signIn(
         emailController.text.trim(),
@@ -71,6 +89,8 @@ class _LoginViewState extends State<LoginView> {
         throw Exception('Invalid login response');
       }
 
+      final isTotp = loginResponse['is_totp'] as bool? ?? false;
+
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -78,12 +98,13 @@ class _LoginViewState extends State<LoginView> {
             loginChallenge: loginChallenge,
             email: emailController.text.trim(),
             rememberMe: _rememberMe,
+            isTotp: isTotp,
           ),
         ),
       );
     } catch (e) {
       if (!mounted) return;
-
+      setState(() => _isLoggingIn = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Login error: $e")),
       );
@@ -179,8 +200,14 @@ class _LoginViewState extends State<LoginView> {
               ),
               const SizedBox(height: 20),
               ElevatedButton(
-                onPressed: login,
-                child: const Text("Login"),
+                onPressed: _isLoggingIn ? null : login,
+                child: _isLoggingIn
+                    ? const SizedBox(
+                        height: 20,
+                        width: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text("Login"),
               ),
             ],
           ),

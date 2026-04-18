@@ -8,6 +8,9 @@ import '../models/user.dart';
 import '../services/api/backup_api_service.dart';
 import 'new_backup_tab.dart';
 import 'end_of_contract_view.dart';
+import 'totp_setup_dialog.dart';
+import '../controllers/auth_controller.dart';
+import '../controllers/user_controller.dart';
 import '../utils/theme_controller.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -61,6 +64,11 @@ class _SettingsViewState extends State<SettingsView> {
         icon: Icons.settings_outlined,
         selectedIcon: Icons.settings_rounded,
       ),
+      const _SettingsDestination(
+        title: 'Security',
+        icon: Icons.security_outlined,
+        selectedIcon: Icons.security_rounded,
+      ),
     ];
     if (widget.canManageBackup) {
       list.add(const _SettingsDestination(
@@ -91,6 +99,8 @@ class _SettingsViewState extends State<SettingsView> {
     switch (title) {
       case 'General':
         return _GeneralSettingsTab(user: widget.user);
+      case 'Security':
+        return _SecuritySettingsTab(user: widget.user);
       case 'Database Backup':
         return _BackupSettingsTab();
       case 'New Backup':
@@ -108,9 +118,11 @@ class _SettingsViewState extends State<SettingsView> {
       listenable: themeController,
       builder: (context, _) {
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('Settings'),
-          ),
+          appBar: widget.isEmbedded 
+            ? null 
+            : AppBar(
+                title: const Text('Settings'),
+              ),
           body: Row(
             children: [
               // ── Left Sidebar ──────────────────────────────────────────────
@@ -964,6 +976,446 @@ class _AdvancedSettingsTab extends StatelessWidget {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Tab - Security Settings (2FA / TOTP)
+// ─────────────────────────────────────────────────────────────────────────────
+class _SecuritySettingsTab extends StatefulWidget {
+  final UserModel user;
+  const _SecuritySettingsTab({required this.user});
+
+  @override
+  State<_SecuritySettingsTab> createState() => _SecuritySettingsTabState();
+}
+
+class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
+  final AuthController _authController = AuthController();
+  final UserController _userController = UserController();
+  
+  bool _isLoading = true;
+  late UserModel _user;
+  late bool _email2faEnabled;
+  late bool _totpEnabled;
+
+  // Change Password state
+  final _passwordFormKey = GlobalKey<FormState>();
+  final _oldPasswordController = TextEditingController();
+  final _newPasswordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _tfaCodeController = TextEditingController();
+  
+  bool _isOldPasswordVisible = false;
+  bool _isNewPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
+  bool _useTfaForPasswordChange = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _user = widget.user;
+    _email2faEnabled = _user.tfaActive;
+    _totpEnabled = _user.totpEnabled;
+    _refreshUser();
+  }
+
+  Future<void> _refreshUser() async {
+    try {
+      final user = await _authController.getCurrentUser();
+      if (mounted) {
+        setState(() {
+          _user = user;
+          _email2faEnabled = user.tfaActive;
+          _totpEnabled = user.totpEnabled;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _oldPasswordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
+    _tfaCodeController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _changePassword() async {
+    if (!(_passwordFormKey.currentState?.validate() ?? false)) return;
+
+    setState(() => _isLoading = true);
+    try {
+      await _userController.updatePassword(
+        _user.userId,
+        _oldPasswordController.text,
+        _newPasswordController.text,
+        tfaCode: _useTfaForPasswordChange ? _tfaCodeController.text : null,
+        actorUserId: _user.userId,
+      );
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _oldPasswordController.clear();
+          _newPasswordController.clear();
+          _confirmPasswordController.clear();
+          _tfaCodeController.clear();
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('Password changed successfully'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+            content: Text('Error: $e'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _sendTfaCode() async {
+    setState(() => _isLoading = true);
+    try {
+      await _authController.generate2FA(_user.userId);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            behavior: SnackBarBehavior.floating,
+            content: Text('2FA code sent to your email'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            behavior: SnackBarBehavior.floating,
+            backgroundColor: Theme.of(context).colorScheme.error,
+            content: Text('Error: $e'),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _toggleEmail2fa(bool enabled) async {
+    setState(() => _isLoading = true);
+    try {
+      final updatedUser = await _userController.updateUser(
+        _user.userId,
+        tfaActive: enabled,
+        actorUserId: _user.userId,
+      );
+      if (mounted) {
+        setState(() {
+          _user = updatedUser;
+          _email2faEnabled = updatedUser.tfaActive;
+          _isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Email 2FA ${enabled ? 'enabled' : 'disabled'}')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _startTotpSetup() async {
+    final success = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => TOTPSetupDialog(user: _user),
+    );
+
+    if (success == true && mounted) {
+      await _refreshUser();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Authenticator App enabled successfully!')),
+      );
+    }
+  }
+
+  Future<void> _disableTotp() async {
+    final passwordController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disable Authenticator App'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Enter your password to disable 2FA via Authenticator App.'),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              decoration: const InputDecoration(
+                labelText: 'Password',
+                border: OutlineInputBorder(),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Disable'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      setState(() => _isLoading = true);
+      try {
+        await _authController.disableTOTP(passwordController.text);
+        await _refreshUser();
+        if (mounted) {
+           ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Authenticator App disabled.')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error disabling TOTP: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) return const Center(child: CircularProgressIndicator());
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(title: 'Two-Factor Authentication', icon: Icons.shield_rounded),
+          const SizedBox(height: 12),
+          const Text(
+            'Add an extra layer of security to your account by requiring a second verification step during login.',
+            style: TextStyle(fontSize: 14, color: Colors.grey),
+          ),
+          const SizedBox(height: 24),
+
+          // ── Email 2FA ──────────────────────────────────────────────────
+          _SettingsCard(
+            children: [
+              SwitchListTile(
+                secondary: const Icon(Icons.email_outlined),
+                title: const Text('Email Verification'),
+                subtitle: const Text('Receive a 6-digit code via email during login.'),
+                value: _email2faEnabled,
+                onChanged: _toggleEmail2fa,
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 20),
+
+          // ── TOTP (Authenticator App) ───────────────────────────────────
+          _SettingsCard(
+            children: [
+              ListTile(
+                leading: const Icon(Icons.phonelink_lock_rounded),
+                title: const Text('Authenticator App'),
+                subtitle: const Text('Use an app like Google Authenticator, Authy, or Ente.'),
+                trailing: _totpEnabled
+                    ? const Icon(Icons.check_circle, color: Colors.green)
+                    : null,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: _totpEnabled
+                    ? SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: _disableTotp,
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                          ),
+                          icon: const Icon(Icons.delete_outline),
+                          label: const Text('Disable Authenticator App'),
+                        ),
+                      )
+                    : SizedBox(
+                        width: double.infinity,
+                        child: FilledButton.icon(
+                          onPressed: _startTotpSetup,
+                          icon: const Icon(Icons.add_moderator),
+                          label: const Text('Setup Authenticator App'),
+                        ),
+                      ),
+              ),
+              if (_totpEnabled)
+                const Padding(
+                  padding: EdgeInsets.only(left: 16, right: 16, bottom: 16),
+                  child: Text(
+                    'Verification is active. Ensure you have your backup codes saved.',
+                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.green),
+                  ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 28),
+          _SectionHeader(title: 'Change Password', icon: Icons.password_rounded),
+          const SizedBox(height: 12),
+          _SettingsCard(
+            children: [
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Form(
+                  key: _passwordFormKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (!_useTfaForPasswordChange || !_user.tfaActive)
+                        TextFormField(
+                          controller: _oldPasswordController,
+                          decoration: InputDecoration(
+                            labelText: 'Current Password',
+                            border: const OutlineInputBorder(),
+                            suffixIcon: IconButton(
+                              icon: Icon(
+                                _isOldPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                              ),
+                              onPressed: () {
+                                setState(() {
+                                  _isOldPasswordVisible = !_isOldPasswordVisible;
+                                });
+                              },
+                            ),
+                          ),
+                          obscureText: !_isOldPasswordVisible,
+                          validator: (value) {
+                            if (!_useTfaForPasswordChange && (value?.isEmpty ?? true)) {
+                              return 'Current password is required';
+                            }
+                            return null;
+                          },
+                        ),
+                      if (_useTfaForPasswordChange && _user.tfaActive) ...[
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextFormField(
+                                controller: _tfaCodeController,
+                                decoration: const InputDecoration(
+                                  labelText: '2FA Code',
+                                  border: OutlineInputBorder(),
+                                ),
+                                validator: (value) {
+                                  if (_useTfaForPasswordChange && (value?.isEmpty ?? true)) {
+                                    return '2FA code is required';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            ElevatedButton(
+                              onPressed: _sendTfaCode,
+                              child: const Text('Send Code'),
+                            ),
+                          ],
+                        ),
+                      ],
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _newPasswordController,
+                        decoration: InputDecoration(
+                          labelText: 'New Password',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isNewPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isNewPasswordVisible = !_isNewPasswordVisible;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: !_isNewPasswordVisible,
+                        validator: (value) {
+                          if (value?.isEmpty ?? true) return 'New password is required';
+                          if (value!.length < 6) return 'Password must be at least 6 characters';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _confirmPasswordController,
+                        decoration: InputDecoration(
+                          labelText: 'Confirm New Password',
+                          border: const OutlineInputBorder(),
+                          suffixIcon: IconButton(
+                            icon: Icon(
+                              _isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                            ),
+                            onPressed: () {
+                              setState(() {
+                                _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                              });
+                            },
+                          ),
+                        ),
+                        obscureText: !_isConfirmPasswordVisible,
+                        validator: (value) {
+                          if (value?.isEmpty ?? true) return 'Please confirm new password';
+                          if (value != _newPasswordController.text) return 'Passwords do not match';
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        onPressed: _isLoading ? null : _changePassword,
+                        child: const Text('Change Password'),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 48),
         ],
       ),
     );

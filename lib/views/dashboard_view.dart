@@ -60,7 +60,9 @@ class _DashboardViewState extends State<DashboardView> {
   bool _canSetupBackup = false;
   bool _isSidebarLoading = true;
   Widget? _shelledContent;
+  String? _shelledTitle;
   final List<Widget> _navigationStack = [];
+  final List<String> _titleStack = [];
 
   // ── Scheduled Backup Timer (SME Owner only) ────────────────────────────
   Timer? _scheduleTimer;
@@ -75,6 +77,19 @@ class _DashboardViewState extends State<DashboardView> {
     // Start the schedule checker only for SME Owner (role_id == 1)
     if (_currentUser.roleId == 1) {
       _startScheduleTimer();
+    }
+    themeController.addListener(_onThemeChanged);
+  }
+
+  void _onThemeChanged() {
+    // If navigation mode changes, clear internal shelled state to avoid UI ghosting
+    if (mounted) {
+      setState(() {
+        _shelledContent = null;
+        _shelledTitle = null;
+        _navigationStack.clear();
+        _titleStack.clear();
+      });
     }
   }
 
@@ -169,6 +184,7 @@ class _DashboardViewState extends State<DashboardView> {
 
   @override
   void dispose() {
+    themeController.removeListener(_onThemeChanged);
     _scheduleTimer?.cancel();
     super.dispose();
   }
@@ -242,13 +258,22 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   // ── Shelled Navigation Logic ──────────────────────────────────────────────
-  void _navigateTo(Widget view) {
-    if (themeController.navigationMode == AppNavigationMode.header) {
+  void _navigateTo(_NavItem item) {
+    // Current mode determines if we shell/embed or push/standalone
+    final bool isHeaderMode = themeController.navigationMode == AppNavigationMode.header;
+    final bool showHeader = isHeaderMode && MediaQuery.of(context).size.width >= 800;
+
+    // isEmbedded = true only if we are in Header mode (using Dashboard's AppBar)
+    final view = item.builder!(showHeader);
+
+    if (showHeader) {
       setState(() {
         if (_shelledContent != null) {
           _navigationStack.add(_shelledContent!);
+          _titleStack.add(_shelledTitle ?? 'Page');
         }
         _shelledContent = view;
+        _shelledTitle = item.label;
       });
     } else {
       Navigator.push(context, MaterialPageRoute(builder: (context) => view));
@@ -259,10 +284,12 @@ class _DashboardViewState extends State<DashboardView> {
     if (_navigationStack.isNotEmpty) {
       setState(() {
         _shelledContent = _navigationStack.removeLast();
+        _shelledTitle = _titleStack.isNotEmpty ? _titleStack.removeLast() : null;
       });
     } else {
       setState(() {
         _shelledContent = null; // Return to DashboardContent
+        _shelledTitle = null;
       });
     }
   }
@@ -273,72 +300,79 @@ class _DashboardViewState extends State<DashboardView> {
     if (_canManageRoles) {
       list.add(_NavItem(
         icon: Icons.admin_panel_settings,
-        label: 'Roles & Perms',
-        onTap: () => _navigateTo(ManageRolesView(user: _currentUser, isEmbedded: true)),
+        label: 'Manage Roles & Permissions',
+        builder: (emb) => ManageRolesView(user: _currentUser, isEmbedded: emb),
       ));
     }
     if (_canManageStock) {
       list.add(_NavItem(
         icon: Icons.inventory,
-        label: 'Stock Receipt',
-        onTap: () => _navigateTo(StockReceiptView(user: _currentUser, isEmbedded: true)),
+        label: 'Record Stock Receipt',
+        builder: (emb) => StockReceiptView(user: _currentUser, isEmbedded: emb),
       ));
     }
     if (_canManageUsers) {
       list.add(_NavItem(
         icon: Icons.people,
-        label: 'Users',
-        onTap: () => _navigateTo(ManageUsersView(user: _currentUser, isEmbedded: true)),
+        label: 'Manage Users',
+        builder: (emb) => ManageUsersView(user: _currentUser, isEmbedded: emb),
       ));
     }
     if (_canManageProducts) {
       list.add(_NavItem(
         icon: Icons.production_quantity_limits,
-        label: 'Products',
-        onTap: () => _navigateTo(ManageProductsView(
+        label: 'Manage Products',
+        builder: (emb) => ManageProductsView(
           roleId: _currentUser.roleId,
           userId: _currentUser.userId,
-          isEmbedded: true,
-        )),
+          isEmbedded: emb,
+        ),
       ));
     }
     if (_canManageSuppliers) {
       list.add(_NavItem(
         icon: Icons.business,
-        label: 'Suppliers',
-        onTap: () => _navigateTo(ManageSuppliersView(
+        label: 'Manage Suppliers',
+        builder: (emb) => ManageSuppliersView(
           roleId: _currentUser.roleId,
           userId: _currentUser.userId,
-          isEmbedded: true,
-        )),
+          isEmbedded: emb,
+        ),
       ));
     }
     if (_canSendMessage) {
       list.add(_NavItem(
         icon: Icons.message,
         label: 'Send Message',
-        onTap: () => _navigateTo(SendNotificationView(senderId: _currentUser.userId, isEmbedded: true)),
+        builder: (emb) => SendNotificationView(senderId: _currentUser.userId, isEmbedded: emb),
       ));
     }
     if (_canViewHistoricalData) {
       list.add(_NavItem(
         icon: Icons.history,
-        label: 'History',
-        onTap: () => _navigateTo(HistoricalSalesView(user: _currentUser, isEmbedded: true)),
+        label: 'Historical Sales Data',
+        builder: (emb) => HistoricalSalesView(user: _currentUser, isEmbedded: emb),
       ));
     }
     if (_canViewAuditLog) {
       list.add(_NavItem(
         icon: Icons.manage_history,
         label: 'Audit Log',
-        onTap: () => _navigateTo(AuditLogView(user: _currentUser, isEmbedded: true)),
+        builder: (emb) => AuditLogView(user: _currentUser, isEmbedded: emb),
       ));
     }
+     if (_canViewForecasts) {
+        list.add(_NavItem(
+         icon: Icons.auto_graph_rounded,
+         label: 'Sales Forecast',
+         builder: (emb) => HistoricalSalesView(user: _currentUser, isEmbedded: emb),
+       ));
+     }
     if (_canImportData) {
       list.add(_NavItem(
         icon: Icons.file_upload,
-        label: 'Import',
-        onTap: () => _navigateTo(ImportDataView(user: _currentUser, isEmbedded: true)),
+        label: 'Import Data',
+        builder: (emb) => ImportDataView(user: _currentUser, isEmbedded: emb),
       ));
     }
     return list;
@@ -386,35 +420,47 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context, bool showHeader) {
+    // Determine if we should show a back button or a hamburger
+    final bool isShelled = _shelledContent != null;
+
     return AppBar(
-      title: showHeader
-          ? Image.asset(
-              'assets/images/stox_logo.png',
-              height: 32,
-              filterQuality: FilterQuality.high,
-              errorBuilder: (c, e, s) => const Icon(Icons.inventory_2_rounded),
-            )
-          : const Text("Dashboard"),
-      centerTitle: showHeader ? false : null,
-      leading: showHeader
-          ? (_shelledContent != null
-              ? IconButton(
-                  icon: const Icon(Icons.arrow_back),
-                  onPressed: _navigateBack,
-                  tooltip: 'Back to Dashboard',
+      title: isShelled
+          ? Text(_shelledTitle ?? "Content")
+          : (showHeader
+              ? Image.asset(
+                  'assets/images/stox_logo.png',
+                  height: 32,
+                  filterQuality: FilterQuality.high,
+                  errorBuilder: (c, e, s) => const Icon(Icons.inventory_2_rounded),
                 )
-              : null)
-          : IconButton(
-              icon: const Icon(Icons.menu),
-              onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-            ),
+              : const Text("Dashboard")),
+      centerTitle: (showHeader && !isShelled) ? false : null,
+      leading: isShelled
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: _navigateBack,
+              tooltip: 'Back to Dashboard',
+            )
+          : (showHeader
+              ? null
+              : IconButton(
+                  icon: const Icon(Icons.menu),
+                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                )),
       actions: [
         IconButton(
           icon: const Icon(Icons.notifications_none_rounded),
           onPressed: () {
-            _navigateTo(NotificationsListView(
-              userId: _currentUser.userId,
-              isEmbedded: true,
+            final isHeaderMode = themeController.navigationMode == AppNavigationMode.header;
+            final bool showHeader = isHeaderMode && MediaQuery.of(context).size.width >= 800;
+
+            _navigateTo(_NavItem(
+              icon: Icons.notifications,
+              label: 'Notifications',
+              builder: (emb) => NotificationsListView(
+                userId: _currentUser.userId,
+                isEmbedded: emb,
+              ),
             ));
           },
         ),
@@ -449,25 +495,40 @@ class _DashboardViewState extends State<DashboardView> {
         ),
       ),
       onSelected: (val) {
+        final isHeaderMode = themeController.navigationMode == AppNavigationMode.header;
+        final bool showHeader = isHeaderMode && MediaQuery.of(context).size.width >= 800;
+
         if (val == 'settings') {
-          _navigateTo(SettingsView(
-            user: _currentUser,
-            canManageBackup: _canSetupBackup,
-            isEmbedded: true,
+          _navigateTo(_NavItem(
+            icon: Icons.settings,
+            label: 'Settings',
+            builder: (emb) => SettingsView(
+              user: _currentUser,
+              canManageBackup: _canSetupBackup,
+              isEmbedded: emb,
+            ),
           ));
         } else if (val == 'account') {
-          _navigateTo(AccountView(
-            user: _currentUser,
-            isEmbedded: true,
-            onUserUpdated: (updatedUser) {
-              setState(() => _currentUser = updatedUser);
-            },
+          _navigateTo(_NavItem(
+            icon: Icons.account_circle,
+            label: 'Account',
+            builder: (emb) => AccountView(
+              user: _currentUser,
+              isEmbedded: emb,
+              onUserUpdated: (updatedUser) {
+                setState(() => _currentUser = updatedUser);
+              },
+            ),
           ));
         } else if (val == 'feedback') {
-          _navigateTo(SendFeedbackView(
-            user: _currentUser, 
-            isEmbedded: true,
-            onSuccess: _navigateBack,
+          _navigateTo(_NavItem(
+            icon: Icons.feedback,
+            label: 'Feedback',
+            builder: (emb) => SendFeedbackView(
+              user: _currentUser, 
+              isEmbedded: emb,
+              onSuccess: _navigateBack,
+            ),
           ));
         } else if (val == 'logout') {
           _logout(context);
@@ -502,13 +563,14 @@ class _DashboardViewState extends State<DashboardView> {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
             child: TextButton.icon(
-              onPressed: () async {
-                if (item.onTap != null) {
-                  item.onTap!();
-                }
-              },
+              onPressed: () => _navigateTo(item),
               icon: Icon(item.icon, size: 18),
-              label: Text(item.label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              label: Text(
+                item.label, 
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+              ),
               style: TextButton.styleFrom(
                 foregroundColor: colorScheme.onSurface,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -535,16 +597,20 @@ class _DashboardViewState extends State<DashboardView> {
               children: [
                 Text(
                   _currentUser.username,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                const SizedBox(height: 8),
+                const SizedBox(height: 4),
                 Text(
                   _resolvedRole,
-                  style: const TextStyle(color: Colors.white70, fontSize: 16),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: Colors.white70, fontSize: 14),
                 ),
               ],
             ),
@@ -557,11 +623,9 @@ class _DashboardViewState extends State<DashboardView> {
           ...navItems.map((item) => ListTile(
                 leading: Icon(item.icon),
                 title: Text(item.label),
-                onTap: () async {
+                onTap: () {
                   Navigator.pop(context);
-                  if (item.onTap != null) {
-                    item.onTap!();
-                  }
+                  _navigateTo(item);
                 },
               )),
           const Divider(),
@@ -633,11 +697,11 @@ class _DashboardViewState extends State<DashboardView> {
 class _NavItem {
   final IconData icon;
   final String label;
-  final VoidCallback? onTap;
+  final Widget Function(bool isEmbedded)? builder;
 
   _NavItem({
     required this.icon,
     required this.label,
-    this.onTap,
+    this.builder,
   });
 }

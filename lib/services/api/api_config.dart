@@ -8,7 +8,14 @@ class ApiConfig {
     const fromEnv = String.fromEnvironment('API_BASE_URL');
     if (fromEnv.isNotEmpty) return fromEnv;
 
-    if (kIsWeb) return 'http://localhost:8000/api/v1';
+    if (kIsWeb) {
+      // Use the same host as the page (allows LAN testing with friend's PC)
+      final host = Uri.base.host;
+      if (host.isNotEmpty) {
+        return 'http://$host:8000/api/v1';
+      }
+      return 'http://localhost:8000/api/v1';
+    }
 
     try {
       if (Platform.isAndroid) return 'http://10.0.2.2:8000/api/v1';

@@ -123,7 +123,38 @@ class AuthApiService {
   Future<void> generate2fa({int? userId, String? email}) async {
     await _api.post(
       '/auth/generate-2fa',
-      body: {'user_id': ?userId, 'email': ?email},
+      body: {'user_id': userId, 'email': email},
+    );
+  }
+
+  Future<Map<String, dynamic>> setupTOTP() async {
+    final data = await _api.post(
+      '/auth/totp/setup',
+      authorized: true,
+    );
+    if (data is Map<String, dynamic>) {
+      return data;
+    }
+    throw Exception('Invalid TOTP setup response');
+  }
+
+  Future<List<String>> verifyTOTPSetup(String totpCode) async {
+    final data = await _api.post(
+      '/auth/totp/verify-setup',
+      body: {'totp_code': totpCode},
+      authorized: true,
+    );
+    if (data is Map<String, dynamic> && data['backup_codes'] is List) {
+      return List<String>.from(data['backup_codes']);
+    }
+    return [];
+  }
+
+  Future<void> disableTOTP(String password) async {
+    await _api.post(
+      '/auth/totp/disable',
+      body: {'password': password},
+      authorized: true,
     );
   }
 

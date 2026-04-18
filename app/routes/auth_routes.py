@@ -16,6 +16,10 @@ from app.schemas.auth import (
     RefreshRequest,
     TokenPairResponse,
     Verify2FARequest,
+    TOTPSetupResponse,
+    TOTPVerifySetupRequest,
+    TOTPVerifySetupResponse,
+    TOTPDisableRequest,
 )
 from app.services.auth_service import AuthService
 from app.schemas.user import UserRead
@@ -61,10 +65,10 @@ def verify_2fa(payload: dict, db: Session = Depends(get_db)) -> TokenPairRespons
     # Still use the logic but extract from dict
     login_challenge = payload.get("login_challenge")
     code = payload.get("code")
-    
+
     if not login_challenge or not code:
         raise HTTPException(status_code=422, detail="Missing login_challenge or code")
-        
+
     return AuthService.verify_2fa_and_issue_tokens(db, login_challenge, str(code))
 
 
@@ -75,7 +79,7 @@ def generate_2fa(payload: dict, db: Session = Depends(get_db)):
     if not user_id and not email:
         raise HTTPException(status_code=400, detail="user_id or email is required")
 
-    
+
     if email and not user_id:
         user = db.scalar(select(User).where(User.email == email.strip().lower()))
 
@@ -85,6 +89,35 @@ def generate_2fa(payload: dict, db: Session = Depends(get_db)):
         user_id = user.id
 
     return AuthService.generate_2fa_challenge(db, user_id)
+
+
+@router.post("/totp/setup", response_model=TOTPSetupResponse)
+def setup_totp(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TOTPSetupResponse:
+    """Initiate TOTP setup for the current user."""
+    return AuthService.setup_totp(db, current_user)
+
+
+@router.post("/totp/verify-setup", response_model=TOTPVerifySetupResponse)
+def verify_totp_setup(
+    payload: TOTPVerifySetupRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> TOTPVerifySetupResponse:
+    """Verify TOTP setup with a 6-digit code."""
+    return AuthService.verify_totp_setup(db, current_user, payload.totp_code)
+
+
+@router.post("/totp/disable", status_code=status.HTTP_204_NO_CONTENT)
+def disable_totp(
+    payload: TOTPDisableRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Disable TOTP for the current user."""
+    AuthService.disable_totp(db, current_user, payload.password)
 
 
 @router.post("/refresh", response_model=TokenPairResponse)
@@ -119,3 +152,4 @@ def delete_account(
     current_user: User = Depends(get_current_user),
 ) -> None:
     AuthService.delete_account(db, user=current_user, two_factor_code=payload.two_factor_code)
+

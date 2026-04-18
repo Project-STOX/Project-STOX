@@ -15,6 +15,7 @@ class ApiClient {
   final String baseUrl;
   final TokenStorage _tokenStorage;
   final http.Client _http;
+  final Duration _timeout = const Duration(seconds: 25);
 
   Uri _uri(String path, [Map<String, dynamic>? query]) {
     final normalizedBase = baseUrl.endsWith('/')
@@ -44,7 +45,7 @@ class ApiClient {
       _uri(path),
       headers: await _headers(authorized: authorized),
       body: jsonEncode(body ?? {}),
-    );
+    ).timeout(_timeout);
     return _handleResponse(
       response,
       () => post(path, body: body, authorized: authorized),
@@ -62,7 +63,7 @@ class ApiClient {
       _uri(path),
       headers: await _headers(authorized: authorized),
       body: jsonEncode(body ?? {}),
-    );
+    ).timeout(_timeout);
     return _handleResponse(
       response,
       () => postBinary(path, body: body, authorized: authorized),
@@ -80,7 +81,7 @@ class ApiClient {
       _uri(path),
       headers: await _headers(authorized: authorized),
       body: jsonEncode(body ?? {}),
-    );
+    ).timeout(_timeout);
     return _handleResponse(
       response,
       () => put(path, body: body, authorized: authorized),
@@ -97,7 +98,7 @@ class ApiClient {
       _uri(path),
       headers: await _headers(authorized: authorized),
       body: jsonEncode(body ?? {}),
-    );
+    ).timeout(_timeout);
     return _handleResponse(
       response,
       () => patch(path, body: body, authorized: authorized),
@@ -112,7 +113,7 @@ class ApiClient {
     final response = await _http.delete(
       _uri(path),
       headers: await _headers(authorized: authorized),
-    );
+    ).timeout(_timeout);
     return _handleResponse(
       response,
       () => delete(path, authorized: authorized),
@@ -128,7 +129,7 @@ class ApiClient {
     final response = await _http.get(
       _uri(path, query),
       headers: await _headers(authorized: authorized),
-    );
+    ).timeout(_timeout);
     return _handleResponse(
       response,
       () => get(path, query: query, authorized: authorized),
@@ -167,7 +168,7 @@ class ApiClient {
         _uri('/auth/refresh'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'refresh_token': refreshToken}),
-      );
+      ).timeout(_timeout);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);

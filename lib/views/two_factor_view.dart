@@ -6,12 +6,14 @@ class TwoFactorView extends StatefulWidget {
   final String loginChallenge;
   final String email;
   final bool rememberMe;
+  final bool isTotp;
 
   const TwoFactorView({
     super.key,
     required this.loginChallenge,
     required this.email,
     this.rememberMe = true,
+    this.isTotp = false,
   });
 
   @override
@@ -68,7 +70,7 @@ class _TwoFactorViewState extends State<TwoFactorView> {
       if (!mounted) return;
       setState(() => isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Invalid 2FA code")),
+        const SnackBar(content: Text("Invalid code")),
       );
     }
   }
@@ -85,12 +87,12 @@ class _TwoFactorViewState extends State<TwoFactorView> {
       _timer.cancel();
       _startCountdown();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("A new 2FA code has been sent.")),
+        const SnackBar(content: Text("A new code has been sent.")),
       );
     } catch (e) {
       if (!mounted) return;
       setState(() => isLoading = false);
-      
+
       String displayMessage = "Error resending code: $e";
       if (e.toString().contains("429") || e.toString().contains("limit exceeded")) {
         displayMessage = "Supabase free limit exceeded. Please wait an hour or contact support.";
@@ -114,8 +116,12 @@ class _TwoFactorViewState extends State<TwoFactorView> {
 
   @override
   Widget build(BuildContext context) {
+    final isTotpMode = widget.isTotp;
+
     return Scaffold(
-      appBar: AppBar(title: const Text("Two-Factor Authentication")),
+      appBar: AppBar(
+        title: Text(isTotpMode ? "Enter Authentication Code" : "Two-Factor Authentication"),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -123,25 +129,31 @@ class _TwoFactorViewState extends State<TwoFactorView> {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-              "Enter the 6-digit code for ${widget.email}",
+              isTotpMode
+                  ? "Enter the 6-digit code from your authenticator app"
+                  : "Enter the 6-digit code for ${widget.email}",
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),
             const SizedBox(height: 20),
             TextField(
               controller: codeController,
-              decoration: const InputDecoration(
-                labelText: "Authentication Code",
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: isTotpMode ? "Authenticator Code" : "Authentication Code",
+                border: const OutlineInputBorder(),
+                hintText: "000000",
               ),
               keyboardType: TextInputType.number,
               textAlign: TextAlign.center,
+              maxLength: 6,
             ),
             const SizedBox(height: 10),
             Text(
               _remainingSeconds > 0
-                  ? "Code expires in ${_formatTime(_remainingSeconds)}"
-                  : "Code has expired. Please request a new one.",
+                  ? (isTotpMode
+                      ? "Code refreshes every 30 seconds"
+                      : "Code expires in ${_formatTime(_remainingSeconds)}")
+                  : "Code has expired. Please try again.",
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 14,
@@ -159,10 +171,23 @@ class _TwoFactorViewState extends State<TwoFactorView> {
                         child: const Text("Verify"),
                       ),
                       const SizedBox(height: 10),
-                      OutlinedButton(
-                        onPressed: resendCode,
-                        child: const Text("Resend Code"),
-                      ),
+                      if (!isTotpMode)
+                        OutlinedButton(
+                          onPressed: resendCode,
+                          child: const Text("Resend Code"),
+                        ),
+                      if (isTotpMode)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 16),
+                          child: Text(
+                            "Don't have your phone? Use a backup code instead",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
           ],

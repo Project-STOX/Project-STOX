@@ -9,6 +9,7 @@ class Settings(BaseSettings):
     app_version: str = "1.0.0"
     api_prefix: str = "/api/v1"
     debug: bool = True
+    local_only_mode: bool = Field(default=False, alias="LOCAL_ONLY_MODE")
 
     database_url: str = Field(
         default="postgresql+psycopg://postgres:postgres@localhost:5432/stox_db",

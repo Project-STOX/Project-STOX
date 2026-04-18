@@ -41,3 +41,29 @@ class ChangePasswordRequest(BaseModel):
 
 class DeleteAccountRequest(BaseModel):
     two_factor_code: str | None = None
+
+
+# TOTP Schemas
+class TOTPSetupResponse(BaseModel):
+    """Response for TOTP setup initiation."""
+    secret: str
+    qr_code: str
+    backup_codes: list[str]
+    message: str = "Scan the QR code with your authenticator app. Save the backup codes in a safe place."
+
+
+class TOTPVerifySetupRequest(BaseModel):
+    """Request to verify TOTP setup by providing a code."""
+    totp_code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
+
+
+class TOTPVerifySetupResponse(BaseModel):
+    """Response after successful TOTP setup verification."""
+    message: str = "TOTP has been enabled successfully"
+    backup_codes: list[str]
+
+
+class TOTPDisableRequest(BaseModel):
+    """Request to disable TOTP."""
+    password: str = Field(min_length=8, max_length=128)
+

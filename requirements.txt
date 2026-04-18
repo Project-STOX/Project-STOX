@@ -7,5 +7,6 @@ pydantic-settings
 PyJWT
 passlib[bcrypt]
 pyotp
+qrcode[pil]
 email-validator
 python-multipart
