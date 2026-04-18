@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import '../controllers/auth_controller.dart';
-import '../services/api/auth_api_service.dart';
 
 class TOTPSetupView extends StatefulWidget {
   const TOTPSetupView({super.key});
@@ -34,7 +33,9 @@ class _TOTPSetupViewState extends State<TOTPSetupView> {
       setState(() {
         secret = response['secret'] as String?;
         qrCodeBase64 = response['qr_code'] as String?;
-        backupCodes = List<String>.from(response['backup_codes'] as List? ?? []);
+        backupCodes = List<String>.from(
+          response['backup_codes'] as List? ?? [],
+        );
         setupInitiated = true;
         isLoading = false;
       });
@@ -72,9 +73,9 @@ class _TOTPSetupViewState extends State<TOTPSetupView> {
     } catch (e) {
       if (!mounted) return;
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Verification failed: $e")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text("Verification failed: $e")));
     }
   }
 
@@ -91,8 +92,8 @@ class _TOTPSetupViewState extends State<TOTPSetupView> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : setupInitiated
-              ? _buildSetupContent()
-              : const Center(child: CircularProgressIndicator()),
+          ? _buildSetupContent()
+          : const Center(child: CircularProgressIndicator()),
     );
   }
 

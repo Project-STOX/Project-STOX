@@ -12,14 +12,11 @@ import 'views/audit_log_view.dart';
 import 'models/user.dart';
 import 'utils/theme_controller.dart';
 
-import 'dart:async';
-import 'services/api/api_config.dart';
-
 final themeController = ThemeController();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // 1. Initialize DB
   await SupabaseService.initializeIfConfigured();
 

@@ -1,9 +1,7 @@
-import 'dart:convert';
 import 'dart:typed_data';
 
 import 'api_client.dart';
 import 'api_config.dart';
-import 'token_storage.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Models
@@ -17,10 +15,10 @@ class ExportCategory {
   });
 
   factory ExportCategory.fromJson(Map<String, dynamic> json) => ExportCategory(
-        key: json['key'] as String,
-        label: json['label'] as String,
-        description: json['description'] as String,
-      );
+    key: json['key'] as String,
+    label: json['label'] as String,
+    description: json['description'] as String,
+  );
 
   final String key;
   final String label;
@@ -60,17 +58,17 @@ class BackupScheduleModel {
       );
 
   Map<String, dynamic> toJson() => {
-        'id': id,
-        'label': label,
-        'categories': categories,
-        'frequency': frequency,
-        'scheduled_time': scheduledTime,
-        'formats': formats,
-        if (dayOfWeek != null) 'day_of_week': dayOfWeek,
-        if (dayOfMonth != null) 'day_of_month': dayOfMonth,
-        if (month != null) 'month': month,
-        if (lastRunAt != null) 'last_run_at': lastRunAt!.toIso8601String(),
-      };
+    'id': id,
+    'label': label,
+    'categories': categories,
+    'frequency': frequency,
+    'scheduled_time': scheduledTime,
+    'formats': formats,
+    if (dayOfWeek != null) 'day_of_week': dayOfWeek,
+    if (dayOfMonth != null) 'day_of_month': dayOfMonth,
+    if (month != null) 'month': month,
+    if (lastRunAt != null) 'last_run_at': lastRunAt!.toIso8601String(),
+  };
 
   final dynamic id; // Use dynamic to handle migration or native DB ints
   final String label;
@@ -87,8 +85,18 @@ class BackupScheduleModel {
   String get summary {
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const months = [
-      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
     ];
     String base = '';
     switch (frequency.toLowerCase()) {
@@ -124,7 +132,7 @@ class BackupScheduleModel {
 
     // Calculate the most recent valid occurrence of this schedule in the past.
     DateTime lastExpected;
-    
+
     switch (frequency.toLowerCase()) {
       case 'daily':
         lastExpected = DateTime(now.year, now.month, now.day, h, m);
@@ -161,7 +169,7 @@ class BackupScheduleModel {
     // If we have never run it, or if our last run was BEFORE the most recent expectation,
     // then we are due for a run (either a normal trigger or a catch-up).
     if (lastRunAt == null) return true;
-    
+
     // Safety: ignore if we already started running in the last 60 seconds (prevents double-fire)
     final secondsSinceLastRun = now.difference(lastRunAt!).inSeconds;
     if (secondsSinceLastRun < 60) return false;
@@ -176,21 +184,31 @@ class BackupScheduleModel {
 
 class ExportApiService {
   ExportApiService({ApiClient? apiClient})
-      : _apiClient = apiClient ?? ApiClient(baseUrl: ApiConfig.baseUrl);
+    : _apiClient = apiClient ?? ApiClient(baseUrl: ApiConfig.baseUrl);
 
   final ApiClient _apiClient;
 
   /// Fetch all available export categories from the backend.
   Future<List<ExportCategory>> getCategories() async {
-    final List<dynamic> raw = await _apiClient.get('/export/categories', authorized: true);
-    return raw.map((e) => ExportCategory.fromJson(e as Map<String, dynamic>)).toList();
+    final List<dynamic> raw = await _apiClient.get(
+      '/export/categories',
+      authorized: true,
+    );
+    return raw
+        .map((e) => ExportCategory.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   /// RESTful Schedule CRUD
-  
+
   Future<List<BackupScheduleModel>> getSchedules() async {
-    final List<dynamic> raw = await _apiClient.get('/export/schedules', authorized: true);
-    return raw.map((e) => BackupScheduleModel.fromJson(e as Map<String, dynamic>)).toList();
+    final List<dynamic> raw = await _apiClient.get(
+      '/export/schedules',
+      authorized: true,
+    );
+    return raw
+        .map((e) => BackupScheduleModel.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   Future<void> addSchedule(BackupScheduleModel schedule) async {
@@ -219,15 +237,14 @@ class ExportApiService {
 
   /// Run a manual or scheduled backup for the given categories.
   /// Returns raw ZIP bytes.
-  Future<Uint8List> runBackup(List<String> categories,
-      {List<String> formats = const ['csv']}) async {
+  Future<Uint8List> runBackup(
+    List<String> categories, {
+    List<String> formats = const ['csv'],
+  }) async {
     final bytes = await _apiClient.postBinary(
       '/export/run',
       authorized: true,
-      body: {
-        'categories': categories,
-        'formats': formats,
-      },
+      body: {'categories': categories, 'formats': formats},
     );
     if (bytes is Uint8List) {
       return bytes;

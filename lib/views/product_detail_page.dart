@@ -53,7 +53,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   late int selectedSupplierId;
 
   bool _loadingHistory = false;
-  bool _loadingPreferences = false;
+  final bool _loadingPreferences = false;
   List<HistoricalSale> _historicalSales = [];
   double _eoqZoom = 1.0;
   double _forecastZoom = 1.0;

@@ -23,7 +23,6 @@ import 'settings_view.dart';
 import '../services/api/export_api_service.dart';
 import '../utils/backup_downloader.dart';
 import '../utils/theme_controller.dart';
-import '../services/api/api_config.dart';
 import 'send_feedback_view.dart';
 import '../main.dart'; // To access global themeController
 
@@ -126,7 +125,10 @@ class _DashboardViewState extends State<DashboardView> {
     }
   }
 
-  Future<void> _runScheduledBackup(BackupScheduleModel schedule, {bool isCatchUp = false}) async {
+  Future<void> _runScheduledBackup(
+    BackupScheduleModel schedule, {
+    bool isCatchUp = false,
+  }) async {
     try {
       if (mounted && isCatchUp) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -134,18 +136,25 @@ class _DashboardViewState extends State<DashboardView> {
             behavior: SnackBarBehavior.floating,
             backgroundColor: Theme.of(context).colorScheme.secondary,
             duration: const Duration(seconds: 4),
-            content: Text('Catching up on missed backup: "${schedule.label}"...'),
+            content: Text(
+              'Catching up on missed backup: "${schedule.label}"...',
+            ),
           ),
         );
       }
 
-      final bytes = await _exportService.runBackup(schedule.categories, formats: schedule.formats);
+      final bytes = await _exportService.runBackup(
+        schedule.categories,
+        formats: schedule.formats,
+      );
       final timestamp = DateTime.now();
       final filename =
           'stox_scheduled_backup_${timestamp.year}${timestamp.month.toString().padLeft(2, '0')}${timestamp.day.toString().padLeft(2, '0')}_${timestamp.hour.toString().padLeft(2, '0')}${timestamp.minute.toString().padLeft(2, '0')}.zip';
       await downloadZip(bytes, filename);
       if (mounted) {
-        final fmtLabel = schedule.formats.map((f) => f.toUpperCase()).join(' + ');
+        final fmtLabel = schedule.formats
+            .map((f) => f.toUpperCase())
+            .join(' + ');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             behavior: SnackBarBehavior.floating,
@@ -157,9 +166,9 @@ class _DashboardViewState extends State<DashboardView> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    isCatchUp 
-                      ? 'Missed backup "${schedule.label}" completed. ($fmtLabel)'
-                      : 'Scheduled backup "${schedule.label}" completed. ($fmtLabel)',
+                    isCatchUp
+                        ? 'Missed backup "${schedule.label}" completed. ($fmtLabel)'
+                        : 'Scheduled backup "${schedule.label}" completed. ($fmtLabel)',
                   ),
                 ),
               ],
@@ -260,8 +269,10 @@ class _DashboardViewState extends State<DashboardView> {
   // ── Shelled Navigation Logic ──────────────────────────────────────────────
   void _navigateTo(_NavItem item) {
     // Current mode determines if we shell/embed or push/standalone
-    final bool isHeaderMode = themeController.navigationMode == AppNavigationMode.header;
-    final bool showHeader = isHeaderMode && MediaQuery.of(context).size.width >= 800;
+    final bool isHeaderMode =
+        themeController.navigationMode == AppNavigationMode.header;
+    final bool showHeader =
+        isHeaderMode && MediaQuery.of(context).size.width >= 800;
 
     // isEmbedded = true only if we are in Header mode (using Dashboard's AppBar)
     final view = item.builder!(showHeader);
@@ -284,7 +295,9 @@ class _DashboardViewState extends State<DashboardView> {
     if (_navigationStack.isNotEmpty) {
       setState(() {
         _shelledContent = _navigationStack.removeLast();
-        _shelledTitle = _titleStack.isNotEmpty ? _titleStack.removeLast() : null;
+        _shelledTitle = _titleStack.isNotEmpty
+            ? _titleStack.removeLast()
+            : null;
       });
     } else {
       setState(() {
@@ -298,82 +311,100 @@ class _DashboardViewState extends State<DashboardView> {
   List<_NavItem> _getNavItems() {
     final list = <_NavItem>[];
     if (_canManageRoles) {
-      list.add(_NavItem(
-        icon: Icons.admin_panel_settings,
-        label: 'Manage Roles & Permissions',
-        builder: (emb) => ManageRolesView(user: _currentUser, isEmbedded: emb),
-      ));
+      list.add(
+        _NavItem(
+          icon: Icons.admin_panel_settings,
+          label: 'Manage Roles & Permissions',
+          builder: (emb) =>
+              ManageRolesView(user: _currentUser, isEmbedded: emb),
+        ),
+      );
     }
     if (_canManageStock) {
-      list.add(_NavItem(
-        icon: Icons.inventory,
-        label: 'Record Stock Receipt',
-        builder: (emb) => StockReceiptView(user: _currentUser, isEmbedded: emb),
-      ));
+      list.add(
+        _NavItem(
+          icon: Icons.inventory,
+          label: 'Record Stock Receipt',
+          builder: (emb) =>
+              StockReceiptView(user: _currentUser, isEmbedded: emb),
+        ),
+      );
     }
     if (_canManageUsers) {
-      list.add(_NavItem(
-        icon: Icons.people,
-        label: 'Manage Users',
-        builder: (emb) => ManageUsersView(user: _currentUser, isEmbedded: emb),
-      ));
+      list.add(
+        _NavItem(
+          icon: Icons.people,
+          label: 'Manage Users',
+          builder: (emb) =>
+              ManageUsersView(user: _currentUser, isEmbedded: emb),
+        ),
+      );
     }
     if (_canManageProducts) {
-      list.add(_NavItem(
-        icon: Icons.production_quantity_limits,
-        label: 'Manage Products',
-        builder: (emb) => ManageProductsView(
-          roleId: _currentUser.roleId,
-          userId: _currentUser.userId,
-          isEmbedded: emb,
+      list.add(
+        _NavItem(
+          icon: Icons.production_quantity_limits,
+          label: 'Manage Products',
+          builder: (emb) => ManageProductsView(
+            roleId: _currentUser.roleId,
+            userId: _currentUser.userId,
+            isEmbedded: emb,
+          ),
         ),
-      ));
+      );
     }
     if (_canManageSuppliers) {
-      list.add(_NavItem(
-        icon: Icons.business,
-        label: 'Manage Suppliers',
-        builder: (emb) => ManageSuppliersView(
-          roleId: _currentUser.roleId,
-          userId: _currentUser.userId,
-          isEmbedded: emb,
+      list.add(
+        _NavItem(
+          icon: Icons.business,
+          label: 'Manage Suppliers',
+          builder: (emb) => ManageSuppliersView(
+            roleId: _currentUser.roleId,
+            userId: _currentUser.userId,
+            isEmbedded: emb,
+          ),
         ),
-      ));
+      );
     }
     if (_canSendMessage) {
-      list.add(_NavItem(
-        icon: Icons.message,
-        label: 'Send Message',
-        builder: (emb) => SendNotificationView(senderId: _currentUser.userId, isEmbedded: emb),
-      ));
+      list.add(
+        _NavItem(
+          icon: Icons.message,
+          label: 'Send Message',
+          builder: (emb) => SendNotificationView(
+            senderId: _currentUser.userId,
+            isEmbedded: emb,
+          ),
+        ),
+      );
     }
-    if (_canViewHistoricalData) {
-      list.add(_NavItem(
-        icon: Icons.history,
-        label: 'Historical Sales Data',
-        builder: (emb) => HistoricalSalesView(user: _currentUser, isEmbedded: emb),
-      ));
+    if (_canViewHistoricalData || _canViewForecasts) {
+      list.add(
+        _NavItem(
+          icon: Icons.history,
+          label: 'Historical Sales Data',
+          builder: (emb) =>
+              HistoricalSalesView(user: _currentUser, isEmbedded: emb),
+        ),
+      );
     }
     if (_canViewAuditLog) {
-      list.add(_NavItem(
-        icon: Icons.manage_history,
-        label: 'Audit Log',
-        builder: (emb) => AuditLogView(user: _currentUser, isEmbedded: emb),
-      ));
+      list.add(
+        _NavItem(
+          icon: Icons.manage_history,
+          label: 'Audit Log',
+          builder: (emb) => AuditLogView(user: _currentUser, isEmbedded: emb),
+        ),
+      );
     }
-     if (_canViewForecasts) {
-        list.add(_NavItem(
-         icon: Icons.auto_graph_rounded,
-         label: 'Sales Forecast',
-         builder: (emb) => HistoricalSalesView(user: _currentUser, isEmbedded: emb),
-       ));
-     }
     if (_canImportData) {
-      list.add(_NavItem(
-        icon: Icons.file_upload,
-        label: 'Import Data',
-        builder: (emb) => ImportDataView(user: _currentUser, isEmbedded: emb),
-      ));
+      list.add(
+        _NavItem(
+          icon: Icons.file_upload,
+          label: 'Import Data',
+          builder: (emb) => ImportDataView(user: _currentUser, isEmbedded: emb),
+        ),
+      );
     }
     return list;
   }
@@ -401,7 +432,8 @@ class _DashboardViewState extends State<DashboardView> {
                   canPop: false,
                   onPopInvokedWithResult: (didPop, result) {
                     if (didPop) return;
-                    if (_navigationStack.isNotEmpty || _shelledContent != null) {
+                    if (_navigationStack.isNotEmpty ||
+                        _shelledContent != null) {
                       _navigateBack();
                     } else {
                       // Allow system to handle back if we're at home
@@ -409,7 +441,10 @@ class _DashboardViewState extends State<DashboardView> {
                   },
                   child: _isSidebarLoading
                       ? const Center(child: CircularProgressIndicator())
-                      : (_shelledContent ?? DashboardContent(canViewForecasts: _canViewForecasts)),
+                      : (_shelledContent ??
+                            DashboardContent(
+                              canViewForecasts: _canViewForecasts,
+                            )),
                 ),
               ),
             ],
@@ -427,13 +462,14 @@ class _DashboardViewState extends State<DashboardView> {
       title: isShelled
           ? Text(_shelledTitle ?? "Content")
           : (showHeader
-              ? Image.asset(
-                  'assets/images/stox_logo.png',
-                  height: 32,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (c, e, s) => const Icon(Icons.inventory_2_rounded),
-                )
-              : const Text("Dashboard")),
+                ? Image.asset(
+                    'assets/images/stox_logo.png',
+                    height: 32,
+                    filterQuality: FilterQuality.high,
+                    errorBuilder: (c, e, s) =>
+                        const Icon(Icons.inventory_2_rounded),
+                  )
+                : const Text("Dashboard")),
       centerTitle: (showHeader && !isShelled) ? false : null,
       leading: isShelled
           ? IconButton(
@@ -442,26 +478,30 @@ class _DashboardViewState extends State<DashboardView> {
               tooltip: 'Back to Dashboard',
             )
           : (showHeader
-              ? null
-              : IconButton(
-                  icon: const Icon(Icons.menu),
-                  onPressed: () => _scaffoldKey.currentState?.openDrawer(),
-                )),
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.menu),
+                    onPressed: () => _scaffoldKey.currentState?.openDrawer(),
+                  )),
       actions: [
         IconButton(
           icon: const Icon(Icons.notifications_none_rounded),
           onPressed: () {
-            final isHeaderMode = themeController.navigationMode == AppNavigationMode.header;
-            final bool showHeader = isHeaderMode && MediaQuery.of(context).size.width >= 800;
+            final isHeaderMode =
+                themeController.navigationMode == AppNavigationMode.header;
+            final bool showHeader =
+                isHeaderMode && MediaQuery.of(context).size.width >= 800;
 
-            _navigateTo(_NavItem(
-              icon: Icons.notifications,
-              label: 'Notifications',
-              builder: (emb) => NotificationsListView(
-                userId: _currentUser.userId,
-                isEmbedded: emb,
+            _navigateTo(
+              _NavItem(
+                icon: Icons.notifications,
+                label: 'Notifications',
+                builder: (emb) => NotificationsListView(
+                  userId: _currentUser.userId,
+                  isEmbedded: emb,
+                ),
               ),
-            ));
+            );
           },
         ),
         if (showHeader) ...[
@@ -483,10 +523,13 @@ class _DashboardViewState extends State<DashboardView> {
             CircleAvatar(
               radius: 14,
               backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-              child: Text(_currentUser.username[0].toUpperCase(),
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.onPrimaryContainer)),
+              child: Text(
+                _currentUser.username[0].toUpperCase(),
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                ),
+              ),
             ),
             const SizedBox(width: 8),
             Text(_currentUser.username, style: const TextStyle(fontSize: 14)),
@@ -495,41 +538,50 @@ class _DashboardViewState extends State<DashboardView> {
         ),
       ),
       onSelected: (val) {
-        final isHeaderMode = themeController.navigationMode == AppNavigationMode.header;
-        final bool showHeader = isHeaderMode && MediaQuery.of(context).size.width >= 800;
+        final isHeaderMode =
+            themeController.navigationMode == AppNavigationMode.header;
+        final bool showHeader =
+            isHeaderMode && MediaQuery.of(context).size.width >= 800;
 
         if (val == 'settings') {
-          _navigateTo(_NavItem(
-            icon: Icons.settings,
-            label: 'Settings',
-            builder: (emb) => SettingsView(
-              user: _currentUser,
-              canManageBackup: _canSetupBackup,
-              isEmbedded: emb,
+          _navigateTo(
+            _NavItem(
+              icon: Icons.settings,
+              label: 'Settings',
+              builder: (emb) => SettingsView(
+                user: _currentUser,
+                canManageBackup: _canSetupBackup,
+                isEmbedded: emb,
+                onBack: _navigateBack,
+              ),
             ),
-          ));
+          );
         } else if (val == 'account') {
-          _navigateTo(_NavItem(
-            icon: Icons.account_circle,
-            label: 'Account',
-            builder: (emb) => AccountView(
-              user: _currentUser,
-              isEmbedded: emb,
-              onUserUpdated: (updatedUser) {
-                setState(() => _currentUser = updatedUser);
-              },
+          _navigateTo(
+            _NavItem(
+              icon: Icons.account_circle,
+              label: 'Account',
+              builder: (emb) => AccountView(
+                user: _currentUser,
+                isEmbedded: emb,
+                onUserUpdated: (updatedUser) {
+                  setState(() => _currentUser = updatedUser);
+                },
+              ),
             ),
-          ));
+          );
         } else if (val == 'feedback') {
-          _navigateTo(_NavItem(
-            icon: Icons.feedback,
-            label: 'Feedback',
-            builder: (emb) => SendFeedbackView(
-              user: _currentUser, 
-              isEmbedded: emb,
-              onSuccess: _navigateBack,
+          _navigateTo(
+            _NavItem(
+              icon: Icons.feedback,
+              label: 'Feedback',
+              builder: (emb) => SendFeedbackView(
+                user: _currentUser,
+                isEmbedded: emb,
+                onSuccess: _navigateBack,
+              ),
             ),
-          ));
+          );
         } else if (val == 'logout') {
           _logout(context);
         }
@@ -552,7 +604,9 @@ class _DashboardViewState extends State<DashboardView> {
       height: 52,
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        border: Border(bottom: BorderSide(color: colorScheme.outlineVariant, width: 0.5)),
+        border: Border(
+          bottom: BorderSide(color: colorScheme.outlineVariant, width: 0.5),
+        ),
       ),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
@@ -566,15 +620,20 @@ class _DashboardViewState extends State<DashboardView> {
               onPressed: () => _navigateTo(item),
               icon: Icon(item.icon, size: 18),
               label: Text(
-                item.label, 
+                item.label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
               ),
               style: TextButton.styleFrom(
                 foregroundColor: colorScheme.onSurface,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
             ),
           );
@@ -590,7 +649,9 @@ class _DashboardViewState extends State<DashboardView> {
         padding: EdgeInsets.zero,
         children: [
           DrawerHeader(
-            decoration: BoxDecoration(color: Theme.of(context).colorScheme.primary),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primary,
+            ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
@@ -620,14 +681,16 @@ class _DashboardViewState extends State<DashboardView> {
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(child: CircularProgressIndicator()),
             ),
-          ...navItems.map((item) => ListTile(
-                leading: Icon(item.icon),
-                title: Text(item.label),
-                onTap: () {
-                  Navigator.pop(context);
-                  _navigateTo(item);
-                },
-              )),
+          ...navItems.map(
+            (item) => ListTile(
+              leading: Icon(item.icon),
+              title: Text(item.label),
+              onTap: () {
+                Navigator.pop(context);
+                _navigateTo(item);
+              },
+            ),
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.settings_rounded),
@@ -667,18 +730,18 @@ class _DashboardViewState extends State<DashboardView> {
           ListTile(
             leading: const Icon(Icons.feedback_outlined),
             title: const Text('Send Feedback'),
-                onTap: () {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SendFeedbackView(
-                        user: _currentUser,
-                        onSuccess: () => Navigator.pop(context),
-                      ),
-                    ),
-                  );
-                },
+            onTap: () {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SendFeedbackView(
+                    user: _currentUser,
+                    onSuccess: () => Navigator.pop(context),
+                  ),
+                ),
+              );
+            },
           ),
           ListTile(
             leading: const Icon(Icons.logout),
@@ -699,9 +762,5 @@ class _NavItem {
   final String label;
   final Widget Function(bool isEmbedded)? builder;
 
-  _NavItem({
-    required this.icon,
-    required this.label,
-    this.builder,
-  });
+  _NavItem({required this.icon, required this.label, this.builder});
 }

@@ -34,12 +34,14 @@ class SettingsView extends StatefulWidget {
   final UserModel user;
   final bool canManageBackup;
   final bool isEmbedded;
+  final VoidCallback? onBack;
 
   const SettingsView({
     super.key,
     required this.user,
     required this.canManageBackup,
     this.isEmbedded = false,
+    this.onBack,
   });
 
   @override
@@ -71,24 +73,30 @@ class _SettingsViewState extends State<SettingsView> {
       ),
     ];
     if (widget.canManageBackup) {
-      list.add(const _SettingsDestination(
-        title: 'Database Backup',
-        icon: Icons.storage_outlined,
-        selectedIcon: Icons.storage_rounded,
-      ));
+      list.add(
+        const _SettingsDestination(
+          title: 'Database Backup',
+          icon: Icons.storage_outlined,
+          selectedIcon: Icons.storage_rounded,
+        ),
+      );
     }
     // New consumer backup — SME Owner only (role_id == 1)
     if (widget.user.roleId == 1) {
-      list.add(const _SettingsDestination(
-        title: 'New Backup',
-        icon: Icons.download_outlined,
-        selectedIcon: Icons.download_rounded,
-      ));
-      list.add(const _SettingsDestination(
-        title: 'Advanced',
-        icon: Icons.admin_panel_settings_outlined,
-        selectedIcon: Icons.admin_panel_settings_rounded,
-      ));
+      list.add(
+        const _SettingsDestination(
+          title: 'New Backup',
+          icon: Icons.download_outlined,
+          selectedIcon: Icons.download_rounded,
+        ),
+      );
+      list.add(
+        const _SettingsDestination(
+          title: 'Advanced',
+          icon: Icons.admin_panel_settings_outlined,
+          selectedIcon: Icons.admin_panel_settings_rounded,
+        ),
+      );
     }
     return list;
   }
@@ -114,56 +122,104 @@ class _SettingsViewState extends State<SettingsView> {
 
   @override
   Widget build(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final bool isMobile = screenWidth < 700;
+
     return ListenableBuilder(
       listenable: themeController,
       builder: (context, _) {
         return Scaffold(
-          appBar: widget.isEmbedded 
-            ? null 
-            : AppBar(
-                title: const Text('Settings'),
-              ),
+          appBar: widget.isEmbedded
+              ? null
+              : AppBar(
+                  title: const Text('Settings'),
+                  // Show hamburger on mobile if not embedded
+                  leading: isMobile ? null : null, 
+                ),
+          // Use a drawer on mobile to save space
+          drawer: isMobile
+              ? Drawer(
+                  child: _SettingsSidebar(
+                    destinations: _destinations,
+                    selectedIndex: _selectedIndex,
+                    onBack: () {
+                      Navigator.pop(context); // Close drawer
+                      if (widget.onBack != null) {
+                        widget.onBack!();
+                      } else {
+                        Navigator.maybePop(context);
+                      }
+                    },
+                    showMobileBack: true,
+                    onDestinationSelected: (index) {
+                      setState(() => _selectedIndex = index);
+                      Navigator.pop(context); // Close drawer
+                    },
+                  ),
+                )
+              : null,
           body: Row(
             children: [
-              // ── Left Sidebar ──────────────────────────────────────────────
-              SizedBox(
-                width: _sidebarWidth,
-                child: _SettingsSidebar(
-                  destinations: _destinations,
-                  selectedIndex: _selectedIndex,
-                  onDestinationSelected: (index) {
-                    setState(() => _selectedIndex = index);
-                  },
+              // ── Left Sidebar (only on Desktop/Tablet) ─────────────────────
+              if (!isMobile)
+                SizedBox(
+                  width: _sidebarWidth,
+                  child: _SettingsSidebar(
+                    destinations: _destinations,
+                    selectedIndex: _selectedIndex,
+                    onDestinationSelected: (index) {
+                      setState(() => _selectedIndex = index);
+                    },
+                  ),
                 ),
-              ),
 
-              // ── Draggable Divider ─────────────────────────────────────────
-              MouseRegion(
-                cursor: SystemMouseCursors.resizeColumn,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onHorizontalDragUpdate: (details) {
-                    setState(() {
-                      _sidebarWidth = (_sidebarWidth + details.delta.dx)
-                          .clamp(_sidebarMinWidth, _sidebarMaxWidth);
-                    });
-                  },
-                  child: SizedBox(
-                    width: _dividerWidth,
-                    child: Center(
-                      child: VerticalDivider(
-                        width: 1,
-                        thickness: 1,
-                        color: Theme.of(context).dividerColor.withOpacity(0.25),
+              // ── Draggable Divider (only on Desktop/Tablet) ────────────────
+              if (!isMobile)
+                MouseRegion(
+                  cursor: SystemMouseCursors.resizeColumn,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragUpdate: (details) {
+                      setState(() {
+                        _sidebarWidth = (_sidebarWidth + details.delta.dx).clamp(
+                          _sidebarMinWidth,
+                          _sidebarMaxWidth,
+                        );
+                      });
+                    },
+                    child: SizedBox(
+                      width: _dividerWidth,
+                      child: Center(
+                        child: VerticalDivider(
+                          width: 1,
+                          thickness: 1,
+                          color:
+                              Theme.of(context).dividerColor.withOpacity(0.25),
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
 
               // ── Right Content Panel ───────────────────────────────────────
               Expanded(
-                child: _buildContent(),
+                child: Column(
+                  children: [
+                    // On mobile, show a simple title if no AppBar
+                    if (isMobile && widget.isEmbedded)
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                        child: Text(
+                          _destinations[_selectedIndex].title,
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    Expanded(child: _buildContent()),
+                  ],
+                ),
               ),
             ],
           ),
@@ -180,11 +236,15 @@ class _SettingsSidebar extends StatelessWidget {
   final List<_SettingsDestination> destinations;
   final int selectedIndex;
   final ValueChanged<int> onDestinationSelected;
+  final VoidCallback? onBack;
+  final bool showMobileBack;
 
   const _SettingsSidebar({
     required this.destinations,
     required this.selectedIndex,
     required this.onDestinationSelected,
+    this.onBack,
+    this.showMobileBack = false,
   });
 
   @override
@@ -197,6 +257,36 @@ class _SettingsSidebar extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── Back Button (Mobile Drawer Only) ──────────────────────────────
+          if (showMobileBack && onBack != null)
+            Padding(
+              padding: EdgeInsets.fromLTRB(
+                12,
+                MediaQuery.of(context).padding.top + 12,
+                12,
+                0,
+              ),
+              child: ListTile(
+                dense: true,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                leading: Icon(
+                  Icons.arrow_back_rounded,
+                  size: 20,
+                  color: colorScheme.onSurface.withOpacity(0.7),
+                ),
+                title: Text(
+                  'Back to Dashboard',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                onTap: onBack,
+              ),
+            ),
+
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 20, 16, 12),
             child: Text(
@@ -226,7 +316,9 @@ class _SettingsSidebar extends StatelessWidget {
                       borderRadius: BorderRadius.circular(10),
                     ),
                     selected: isSelected,
-                    selectedTileColor: colorScheme.primaryContainer.withOpacity(0.7),
+                    selectedTileColor: colorScheme.primaryContainer.withOpacity(
+                      0.7,
+                    ),
                     leading: Icon(
                       isSelected ? dest.selectedIcon : dest.icon,
                       size: 20,
@@ -238,8 +330,9 @@ class _SettingsSidebar extends StatelessWidget {
                       dest.title,
                       style: TextStyle(
                         fontSize: 14,
-                        fontWeight:
-                            isSelected ? FontWeight.w600 : FontWeight.normal,
+                        fontWeight: isSelected
+                            ? FontWeight.w600
+                            : FontWeight.normal,
                         color: isSelected
                             ? colorScheme.primary
                             : colorScheme.onSurface,
@@ -268,6 +361,7 @@ class _GeneralSettingsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final bool isMobile = MediaQuery.of(context).size.width < 700;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24),
@@ -279,28 +373,82 @@ class _GeneralSettingsTab extends StatelessWidget {
           const SizedBox(height: 12),
           _SettingsCard(
             children: [
-              ListTile(
-                leading: const Icon(Icons.brightness_medium_rounded),
-                title: const Text('Appearance'),
-                subtitle: Text(themeController.themeMode.name.toUpperCase()),
-                trailing: SegmentedButton<ThemeMode>(
-                  segments: const [
-                    ButtonSegment(
-                        value: ThemeMode.light, icon: Icon(Icons.light_mode)),
-                    ButtonSegment(
-                        value: ThemeMode.system, icon: Icon(Icons.settings)),
-                    ButtonSegment(
-                        value: ThemeMode.dark, icon: Icon(Icons.dark_mode)),
-                  ],
-                  selected: {themeController.themeMode},
-                  onSelectionChanged: (Set<ThemeMode> newSelection) {
-                    themeController.setThemeMode(newSelection.first);
-                  },
-                  showSelectedIcon: false,
-                  style: const ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                  ),
-                ),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final bool isNarrow = constraints.maxWidth < 450;
+                  final appearanceTile = ListTile(
+                    leading: const Icon(Icons.brightness_medium_rounded),
+                    title: const Text('Appearance'),
+                    subtitle: Text(themeController.themeMode.name.toUpperCase()),
+                    trailing: isNarrow
+                        ? null
+                        : SegmentedButton<ThemeMode>(
+                            segments: const [
+                              ButtonSegment(
+                                value: ThemeMode.light,
+                                icon: Icon(Icons.light_mode),
+                              ),
+                              ButtonSegment(
+                                value: ThemeMode.system,
+                                icon: Icon(Icons.settings),
+                              ),
+                              ButtonSegment(
+                                value: ThemeMode.dark,
+                                icon: Icon(Icons.dark_mode),
+                              ),
+                            ],
+                            selected: {themeController.themeMode},
+                            onSelectionChanged: (Set<ThemeMode> newSelection) {
+                              themeController.setThemeMode(newSelection.first);
+                            },
+                            showSelectedIcon: false,
+                            style: const ButtonStyle(
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                  );
+
+                  if (isNarrow) {
+                    return Column(
+                      children: [
+                        appearanceTile,
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                          child: SizedBox(
+                            width: double.infinity,
+                            child: SegmentedButton<ThemeMode>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: ThemeMode.light,
+                                  icon: Icon(Icons.light_mode),
+                                  label: Text('Light'),
+                                ),
+                                ButtonSegment(
+                                  value: ThemeMode.system,
+                                  icon: Icon(Icons.settings),
+                                  label: Text('System'),
+                                ),
+                                ButtonSegment(
+                                  value: ThemeMode.dark,
+                                  icon: Icon(Icons.dark_mode),
+                                  label: Text('Dark'),
+                                ),
+                              ],
+                              selected: {themeController.themeMode},
+                              onSelectionChanged: (Set<ThemeMode> newSelection) {
+                                themeController.setThemeMode(
+                                  newSelection.first,
+                                );
+                              },
+                              showSelectedIcon: false,
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  }
+                  return appearanceTile;
+                },
               ),
               const Divider(indent: 16, endIndent: 16),
               const ListTile(
@@ -313,87 +461,147 @@ class _GeneralSettingsTab extends StatelessWidget {
                 child: Wrap(
                   spacing: 12,
                   runSpacing: 12,
-                  children: [
-                    Colors.blue,
-                    Colors.indigo,
-                    Colors.deepPurple,
-                    Colors.teal,
-                    Colors.green,
-                    Colors.orange,
-                    Colors.redAccent,
-                    Colors.pinkAccent,
-                  ].map((color) {
-                    final isSelected =
-                        themeController.primaryColor.value == color.value;
-                    return GestureDetector(
-                      onTap: () => themeController.setPrimaryColor(color),
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: color,
-                          shape: BoxShape.circle,
-                          border: isSelected
-                              ? Border.all(
-                                  color: colorScheme.onSurface, width: 2)
-                              : null,
-                          boxShadow: [
-                            if (isSelected)
-                              BoxShadow(
-                                color: color.withOpacity(0.4),
-                                blurRadius: 8,
-                                spreadRadius: 2,
-                              )
-                          ],
-                        ),
-                        child: isSelected
-                            ? const Icon(Icons.check,
-                                color: Colors.white, size: 16)
-                            : null,
+                  children:
+                      [
+                        Colors.blue,
+                        Colors.indigo,
+                        Colors.deepPurple,
+                        Colors.teal,
+                        Colors.green,
+                        Colors.orange,
+                        Colors.redAccent,
+                        Colors.pinkAccent,
+                      ].map((color) {
+                        final isSelected =
+                            themeController.primaryColor.value == color.value;
+                        return GestureDetector(
+                          onTap: () => themeController.setPrimaryColor(color),
+                          child: Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              color: color,
+                              shape: BoxShape.circle,
+                              border: isSelected
+                                  ? Border.all(
+                                      color: colorScheme.onSurface,
+                                      width: 2,
+                                    )
+                                  : null,
+                              boxShadow: [
+                                if (isSelected)
+                                  BoxShadow(
+                                    color: color.withOpacity(0.4),
+                                    blurRadius: 8,
+                                    spreadRadius: 2,
+                                  ),
+                              ],
+                            ),
+                            child: isSelected
+                                ? const Icon(
+                                    Icons.check,
+                                    color: Colors.white,
+                                    size: 16,
+                                  )
+                                : null,
+                          ),
+                        );
+                      }).toList(),
+                ),
+              ),
+            ],
+          ),
+
+          if (!isMobile) ...[
+            const SizedBox(height: 28),
+
+            // ── Navigation Style ──────────────────────────────────────────────
+            _SectionHeader(
+              title: 'Navigation Style',
+              icon: Icons.explore_rounded,
+            ),
+            const SizedBox(height: 12),
+            _SettingsCard(
+              children: [
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final bool isNarrow = constraints.maxWidth < 450;
+                    final layoutTile = ListTile(
+                      leading: const Icon(Icons.grid_view_rounded),
+                      title: const Text('Layout Style'),
+                      subtitle: Text(
+                        themeController.navigationMode.name.toUpperCase(),
                       ),
+                      trailing: isNarrow
+                          ? null
+                          : SegmentedButton<AppNavigationMode>(
+                              segments: const [
+                                ButtonSegment(
+                                  value: AppNavigationMode.sidebar,
+                                  icon: Icon(Icons.menu_open_rounded),
+                                  label: Text('Sidebar'),
+                                ),
+                                ButtonSegment(
+                                  value: AppNavigationMode.header,
+                                  icon: Icon(Icons.view_headline_rounded),
+                                  label: Text('Header'),
+                                ),
+                              ],
+                              selected: {themeController.navigationMode},
+                              onSelectionChanged:
+                                  (Set<AppNavigationMode> newSelection) {
+                                themeController.setNavigationMode(
+                                  newSelection.first,
+                                );
+                              },
+                              showSelectedIcon: false,
+                              style: const ButtonStyle(
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
                     );
-                  }).toList(),
-                ),
-              ),
-            ],
-          ),
 
-          const SizedBox(height: 28),
-
-          // ── Navigation Style ──────────────────────────────────────────────
-          _SectionHeader(title: 'Navigation Style', icon: Icons.explore_rounded),
-          const SizedBox(height: 12),
-          _SettingsCard(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.grid_view_rounded),
-                title: const Text('Layout Style'),
-                subtitle: Text(themeController.navigationMode.name.toUpperCase()),
-                trailing: SegmentedButton<AppNavigationMode>(
-                  segments: const [
-                    ButtonSegment(
-                      value: AppNavigationMode.sidebar,
-                      icon: Icon(Icons.menu_open_rounded),
-                      label: Text('Sidebar'),
-                    ),
-                    ButtonSegment(
-                      value: AppNavigationMode.header,
-                      icon: Icon(Icons.view_headline_rounded),
-                      label: Text('Header'),
-                    ),
-                  ],
-                  selected: {themeController.navigationMode},
-                  onSelectionChanged: (Set<AppNavigationMode> newSelection) {
-                    themeController.setNavigationMode(newSelection.first);
+                    if (isNarrow) {
+                      return Column(
+                        children: [
+                          layoutTile,
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                            child: SizedBox(
+                              width: double.infinity,
+                              child: SegmentedButton<AppNavigationMode>(
+                                segments: const [
+                                  ButtonSegment(
+                                    value: AppNavigationMode.sidebar,
+                                    icon: Icon(Icons.menu_open_rounded),
+                                    label: Text('Sidebar'),
+                                  ),
+                                  ButtonSegment(
+                                    value: AppNavigationMode.header,
+                                    icon: Icon(Icons.view_headline_rounded),
+                                    label: Text('Header'),
+                                  ),
+                                ],
+                                selected: {themeController.navigationMode},
+                                onSelectionChanged:
+                                    (Set<AppNavigationMode> newSelection) {
+                                  themeController.setNavigationMode(
+                                    newSelection.first,
+                                  );
+                                },
+                                showSelectedIcon: false,
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+                    return layoutTile;
                   },
-                  showSelectedIcon: false,
-                  style: const ButtonStyle(
-                    visualDensity: VisualDensity.compact,
-                  ),
                 ),
-              ),
-            ],
-          ),
+              ],
+            ),
+          ],
 
           const SizedBox(height: 28),
 
@@ -542,8 +750,7 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
             setState(() {
               _isBackingUp = false;
               _backupError = true;
-              _statusMessage =
-                  err.toString().replaceFirst('Exception: ', '');
+              _statusMessage = err.toString().replaceFirst('Exception: ', '');
             });
           }
         },
@@ -589,8 +796,7 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // ── Manual Snapshot ───────────────────────────────────────────────
-          _SectionHeader(
-              title: 'Manual Snapshot', icon: Icons.backup_rounded),
+          _SectionHeader(title: 'Manual Snapshot', icon: Icons.backup_rounded),
           const SizedBox(height: 12),
           _SettingsCard(
             children: [
@@ -601,13 +807,18 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.backup_rounded,
-                            color: colorScheme.primary, size: 20),
+                        Icon(
+                          Icons.backup_rounded,
+                          color: colorScheme.primary,
+                          size: 20,
+                        ),
                         const SizedBox(width: 8),
                         const Text(
                           'Run Now',
                           style: TextStyle(
-                              fontWeight: FontWeight.w600, fontSize: 16),
+                            fontWeight: FontWeight.w600,
+                            fontSize: 16,
+                          ),
                         ),
                         const Spacer(),
                         _StatusBadge(
@@ -625,11 +836,14 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
                     const SizedBox(height: 16),
                     SwitchListTile(
                       contentPadding: EdgeInsets.zero,
-                      title: const Text('Sync to local failover DB',
-                          style: TextStyle(fontSize: 14)),
+                      title: const Text(
+                        'Sync to local failover DB',
+                        style: TextStyle(fontSize: 14),
+                      ),
                       subtitle: const Text(
-                          'Ensures local database is ready for read-only mode.',
-                          style: TextStyle(fontSize: 12)),
+                        'Ensures local database is ready for read-only mode.',
+                        style: TextStyle(fontSize: 12),
+                      ),
                       value: _syncLocal,
                       onChanged: (v) => setState(() => _syncLocal = v),
                     ),
@@ -643,8 +857,10 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       const SizedBox(height: 8),
-                      Text(_statusMessage,
-                          style: const TextStyle(fontSize: 12)),
+                      Text(
+                        _statusMessage,
+                        style: const TextStyle(fontSize: 12),
+                      ),
                     ],
                     const SizedBox(height: 16),
                     SizedBox(
@@ -656,11 +872,14 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
                                 width: 16,
                                 height: 16,
                                 child: CircularProgressIndicator(
-                                    strokeWidth: 2, color: Colors.white))
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
                             : const Icon(Icons.play_arrow_rounded),
-                        label: Text(_isBackingUp
-                            ? 'In Progress...'
-                            : 'Run Backup Now'),
+                        label: Text(
+                          _isBackingUp ? 'In Progress...' : 'Run Backup Now',
+                        ),
                       ),
                     ),
                   ],
@@ -673,14 +892,17 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
 
           // ── Automated Schedule ────────────────────────────────────────────
           _SectionHeader(
-              title: 'Automated Schedule',
-              icon: Icons.event_repeat_rounded),
+            title: 'Automated Schedule',
+            icon: Icons.event_repeat_rounded,
+          ),
           const SizedBox(height: 12),
           _SettingsCard(
             children: [
               SwitchListTile(
-                secondary: Icon(Icons.event_repeat_rounded,
-                    color: colorScheme.secondary),
+                secondary: Icon(
+                  Icons.event_repeat_rounded,
+                  color: colorScheme.secondary,
+                ),
                 title: const Text('Enable Automated Schedule'),
                 value: _scheduleEnabled,
                 onChanged: (v) => setState(() => _scheduleEnabled = v),
@@ -688,18 +910,17 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
               if (_scheduleEnabled) ...[
                 const Divider(indent: 16, endIndent: 16),
                 Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: DropdownButtonFormField<String>(
                     initialValue: _selectedSchedule,
-                    decoration:
-                        const InputDecoration(labelText: 'Frequency'),
+                    decoration: const InputDecoration(labelText: 'Frequency'),
                     items: _scheduleOptions
-                        .map((o) =>
-                            DropdownMenuItem(value: o, child: Text(o)))
+                        .map((o) => DropdownMenuItem(value: o, child: Text(o)))
                         .toList(),
-                    onChanged: (v) =>
-                        setState(() => _selectedSchedule = v!),
+                    onChanged: (v) => setState(() => _selectedSchedule = v!),
                   ),
                 ),
                 ListTile(
@@ -708,7 +929,9 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
                   trailing: const Icon(Icons.access_time_rounded),
                   onTap: () async {
                     final p = await showTimePicker(
-                        context: context, initialTime: _scheduledTime);
+                      context: context,
+                      initialTime: _scheduledTime,
+                    );
                     if (p != null) setState(() => _scheduledTime = p);
                   },
                 ),
@@ -719,15 +942,14 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
                     child: const Text('Save Schedule Preferences'),
                   ),
                 ),
-              ]
+              ],
             ],
           ),
 
           const SizedBox(height: 20),
 
           // ── Backup History ────────────────────────────────────────────────
-          _SectionHeader(
-              title: 'Backup History', icon: Icons.history_rounded),
+          _SectionHeader(title: 'Backup History', icon: Icons.history_rounded),
           const SizedBox(height: 12),
           _SettingsCard(
             children: [
@@ -735,27 +957,37 @@ class _BackupSettingsTabState extends State<_BackupSettingsTab> {
                 leading: const Icon(Icons.history_rounded),
                 title: const Text('Snapshots'),
                 trailing: IconButton(
-                    icon: const Icon(Icons.refresh),
-                    onPressed: _loadBackupFiles),
+                  icon: const Icon(Icons.refresh),
+                  onPressed: _loadBackupFiles,
+                ),
               ),
               if (_loadingFiles)
                 const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Center(child: CircularProgressIndicator()))
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: CircularProgressIndicator()),
+                )
               else if (_backupFiles.isEmpty)
                 const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: Text('No snapshots found.',
-                        style: TextStyle(color: Colors.grey)))
+                  padding: EdgeInsets.all(20),
+                  child: Text(
+                    'No snapshots found.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
+                )
               else
-                ..._backupFiles.take(10).map((f) => ListTile(
-                      dense: true,
-                      leading: const Icon(Icons.insert_drive_file_outlined),
-                      title: Text(f.filename),
-                      subtitle: Text(DateFormat('yyyy-MM-dd HH:mm')
-                          .format(f.createdAt)),
-                      trailing: Text(f.displaySize),
-                    )),
+                ..._backupFiles
+                    .take(10)
+                    .map(
+                      (f) => ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.insert_drive_file_outlined),
+                        title: Text(f.filename),
+                        subtitle: Text(
+                          DateFormat('yyyy-MM-dd HH:mm').format(f.createdAt),
+                        ),
+                        trailing: Text(f.displaySize),
+                      ),
+                    ),
             ],
           ),
 
@@ -809,13 +1041,15 @@ class _SectionHeader extends StatelessWidget {
         children: [
           Icon(icon, size: 18, color: Theme.of(context).colorScheme.primary),
           const SizedBox(width: 8),
-          Text(
-            title.toUpperCase(),
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: Theme.of(context).colorScheme.primary,
-              letterSpacing: 1.2,
+          Expanded(
+            child: Text(
+              title.toUpperCase(),
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.primary,
+                letterSpacing: 1.2,
+              ),
             ),
           ),
         ],
@@ -835,7 +1069,8 @@ class _SettingsCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(
-            color: Theme.of(context).dividerColor.withOpacity(0.1)),
+          color: Theme.of(context).dividerColor.withOpacity(0.1),
+        ),
       ),
       child: Column(children: children),
     );
@@ -850,10 +1085,14 @@ class _InfoRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      title:
-          Text(label, style: const TextStyle(fontSize: 14, color: Colors.grey)),
-      trailing:
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+      title: Text(
+        label,
+        style: const TextStyle(fontSize: 14, color: Colors.grey),
+      ),
+      trailing: Text(
+        value,
+        style: const TextStyle(fontWeight: FontWeight.w600),
+      ),
     );
   }
 }
@@ -862,8 +1101,11 @@ class _StatusBadge extends StatelessWidget {
   final bool success;
   final bool error;
   final bool running;
-  const _StatusBadge(
-      {required this.success, required this.error, required this.running});
+  const _StatusBadge({
+    required this.success,
+    required this.error,
+    required this.running,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -888,13 +1130,17 @@ class _StatusBadge extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withOpacity(0.5)),
       ),
-      child: Text(label,
-          style: TextStyle(
-              color: color, fontSize: 11, fontWeight: FontWeight.bold)),
+      child: Text(
+        label,
+        style: TextStyle(
+          color: color,
+          fontSize: 11,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }
-
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Advanced Settings Tab
@@ -911,7 +1157,7 @@ class _AdvancedSettingsTab extends StatelessWidget {
     }
 
     final theme = Theme.of(context);
-    
+
     return Padding(
       padding: const EdgeInsets.all(32.0),
       child: Column(
@@ -919,12 +1165,16 @@ class _AdvancedSettingsTab extends StatelessWidget {
         children: [
           Text(
             'Advanced',
-            style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Danger zone actions and advanced configuration.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 32),
           Container(
@@ -939,13 +1189,18 @@ class _AdvancedSettingsTab extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.warning_amber_rounded, color: theme.colorScheme.error),
+                    Icon(
+                      Icons.warning_amber_rounded,
+                      color: theme.colorScheme.error,
+                    ),
                     const SizedBox(width: 8),
-                    Text(
-                      'Account Closure & Data Export',
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        color: theme.colorScheme.error,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        'Account Closure & Data Export',
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          color: theme.colorScheme.error,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ],
@@ -968,7 +1223,10 @@ class _AdvancedSettingsTab extends StatelessWidget {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: theme.colorScheme.error,
                     foregroundColor: theme.colorScheme.onError,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
                   ),
                   icon: const Icon(Icons.exit_to_app),
                   label: const Text('Initiate Closure Sequence'),
@@ -996,7 +1254,7 @@ class _SecuritySettingsTab extends StatefulWidget {
 class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
   final AuthController _authController = AuthController();
   final UserController _userController = UserController();
-  
+
   bool _isLoading = true;
   late UserModel _user;
   late bool _email2faEnabled;
@@ -1008,11 +1266,11 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _tfaCodeController = TextEditingController();
-  
+
   bool _isOldPasswordVisible = false;
   bool _isNewPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
-  bool _useTfaForPasswordChange = false;
+  final bool _useTfaForPasswordChange = false;
 
   @override
   void initState() {
@@ -1134,15 +1392,17 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
           _isLoading = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Email 2FA ${enabled ? 'enabled' : 'disabled'}')),
+          SnackBar(
+            content: Text('Email 2FA ${enabled ? 'enabled' : 'disabled'}'),
+          ),
         );
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error: $e')));
       }
     }
   }
@@ -1157,7 +1417,9 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
     if (success == true && mounted) {
       await _refreshUser();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Authenticator App enabled successfully!')),
+        const SnackBar(
+          content: Text('Authenticator App enabled successfully!'),
+        ),
       );
     }
   }
@@ -1172,7 +1434,9 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Enter your password to disable 2FA via Authenticator App.'),
+            const Text(
+              'Enter your password to disable 2FA via Authenticator App.',
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: passwordController,
@@ -1185,7 +1449,10 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
           ],
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(backgroundColor: Colors.red),
@@ -1201,16 +1468,16 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
         await _authController.disableTOTP(passwordController.text);
         await _refreshUser();
         if (mounted) {
-           ScaffoldMessenger.of(context).showSnackBar(
+          ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Authenticator App disabled.')),
           );
         }
       } catch (e) {
         if (mounted) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Error disabling TOTP: $e')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('Error disabling TOTP: $e')));
         }
       }
     }
@@ -1225,7 +1492,10 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionHeader(title: 'Two-Factor Authentication', icon: Icons.shield_rounded),
+          _SectionHeader(
+            title: 'Two-Factor Authentication',
+            icon: Icons.shield_rounded,
+          ),
           const SizedBox(height: 12),
           const Text(
             'Add an extra layer of security to your account by requiring a second verification step during login.',
@@ -1239,7 +1509,9 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
               SwitchListTile(
                 secondary: const Icon(Icons.email_outlined),
                 title: const Text('Email Verification'),
-                subtitle: const Text('Receive a 6-digit code via email during login.'),
+                subtitle: const Text(
+                  'Receive a 6-digit code via email during login.',
+                ),
                 value: _email2faEnabled,
                 onChanged: _toggleEmail2fa,
               ),
@@ -1254,7 +1526,9 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
               ListTile(
                 leading: const Icon(Icons.phonelink_lock_rounded),
                 title: const Text('Authenticator App'),
-                subtitle: const Text('Use an app like Google Authenticator, Authy, or Ente.'),
+                subtitle: const Text(
+                  'Use an app like Google Authenticator, Authy, or Ente.',
+                ),
                 trailing: _totpEnabled
                     ? const Icon(Icons.check_circle, color: Colors.green)
                     : null,
@@ -1288,13 +1562,20 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
                   padding: EdgeInsets.only(left: 16, right: 16, bottom: 16),
                   child: Text(
                     'Verification is active. Ensure you have your backup codes saved.',
-                    style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic, color: Colors.green),
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                      color: Colors.green,
+                    ),
                   ),
-              ),
+                ),
             ],
           ),
           const SizedBox(height: 28),
-          _SectionHeader(title: 'Change Password', icon: Icons.password_rounded),
+          _SectionHeader(
+            title: 'Change Password',
+            icon: Icons.password_rounded,
+          ),
           const SizedBox(height: 12),
           _SettingsCard(
             children: [
@@ -1313,18 +1594,22 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
                             border: const OutlineInputBorder(),
                             suffixIcon: IconButton(
                               icon: Icon(
-                                _isOldPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                                _isOldPasswordVisible
+                                    ? Icons.visibility
+                                    : Icons.visibility_off,
                               ),
                               onPressed: () {
                                 setState(() {
-                                  _isOldPasswordVisible = !_isOldPasswordVisible;
+                                  _isOldPasswordVisible =
+                                      !_isOldPasswordVisible;
                                 });
                               },
                             ),
                           ),
                           obscureText: !_isOldPasswordVisible,
                           validator: (value) {
-                            if (!_useTfaForPasswordChange && (value?.isEmpty ?? true)) {
+                            if (!_useTfaForPasswordChange &&
+                                (value?.isEmpty ?? true)) {
                               return 'Current password is required';
                             }
                             return null;
@@ -1341,7 +1626,8 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
                                   border: OutlineInputBorder(),
                                 ),
                                 validator: (value) {
-                                  if (_useTfaForPasswordChange && (value?.isEmpty ?? true)) {
+                                  if (_useTfaForPasswordChange &&
+                                      (value?.isEmpty ?? true)) {
                                     return '2FA code is required';
                                   }
                                   return null;
@@ -1364,7 +1650,9 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _isNewPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                              _isNewPasswordVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
                             ),
                             onPressed: () {
                               setState(() {
@@ -1375,8 +1663,10 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
                         ),
                         obscureText: !_isNewPasswordVisible,
                         validator: (value) {
-                          if (value?.isEmpty ?? true) return 'New password is required';
-                          if (value!.length < 6) return 'Password must be at least 6 characters';
+                          if (value?.isEmpty ?? true)
+                            return 'New password is required';
+                          if (value!.length < 6)
+                            return 'Password must be at least 6 characters';
                           return null;
                         },
                       ),
@@ -1388,19 +1678,24 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
                           border: const OutlineInputBorder(),
                           suffixIcon: IconButton(
                             icon: Icon(
-                              _isConfirmPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                              _isConfirmPasswordVisible
+                                  ? Icons.visibility
+                                  : Icons.visibility_off,
                             ),
                             onPressed: () {
                               setState(() {
-                                _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                                _isConfirmPasswordVisible =
+                                    !_isConfirmPasswordVisible;
                               });
                             },
                           ),
                         ),
                         obscureText: !_isConfirmPasswordVisible,
                         validator: (value) {
-                          if (value?.isEmpty ?? true) return 'Please confirm new password';
-                          if (value != _newPasswordController.text) return 'Passwords do not match';
+                          if (value?.isEmpty ?? true)
+                            return 'Please confirm new password';
+                          if (value != _newPasswordController.text)
+                            return 'Passwords do not match';
                           return null;
                         },
                       ),

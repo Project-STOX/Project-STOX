@@ -12,7 +12,7 @@ class EndOfContractView extends StatefulWidget {
 class _EndOfContractViewState extends State<EndOfContractView> {
   int _currentStep = 0;
   final ExportApiService _exportService = ExportApiService();
-  
+
   // Step 1 State
   final Map<String, bool> _categories = {
     'users': true,
@@ -74,21 +74,28 @@ class _EndOfContractViewState extends State<EndOfContractView> {
       );
 
       setState(() => _statusMessage = 'Data compiled. Prompting download...');
-      
-      final timestamp = DateTime.now().toIso8601String().replaceAll(':', '').split('.')[0];
+
+      final timestamp = DateTime.now()
+          .toIso8601String()
+          .replaceAll(':', '')
+          .split('.')[0];
       final filename = 'stox_final_export_$timestamp.zip';
-      
+
       await downloadZip(bytes, filename);
-      
+
       if (!mounted) return;
-      
+
       setState(() => _statusMessage = 'Closure intent registered effectively.');
 
       showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => AlertDialog(
-          icon: const Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
+          icon: const Icon(
+            Icons.check_circle_outline,
+            size: 64,
+            color: Colors.green,
+          ),
           title: const Text('Export Complete'),
           content: const Text(
             'Your final data export has been downloaded successfully.\\n'
@@ -103,11 +110,10 @@ class _EndOfContractViewState extends State<EndOfContractView> {
                 Navigator.of(context).pop(); // Return to settings
               },
               child: const Text('Acknowledge'),
-            )
+            ),
           ],
         ),
       );
-      
     } catch (e) {
       _showError(e.toString());
     } finally {
@@ -135,14 +141,17 @@ class _EndOfContractViewState extends State<EndOfContractView> {
 
   // Formatting helpers
   String _formatCategoryKey(String key) {
-    return key.split('_').map((w) => w[0].toUpperCase() + w.substring(1)).join(' ');
+    return key
+        .split('_')
+        .map((w) => w[0].toUpperCase() + w.substring(1))
+        .join(' ');
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Account Closure & Data Export'),
@@ -153,7 +162,9 @@ class _EndOfContractViewState extends State<EndOfContractView> {
         currentStep: _currentStep,
         onStepContinue: () {
           if (_currentStep == 1 && (!_confirmDeletion || !_confirmDark)) {
-            _showError('You must explicitly acknowledge the termination conditions.');
+            _showError(
+              'You must explicitly acknowledge the termination conditions.',
+            );
             return;
           }
           if (_currentStep < 3) {
@@ -177,13 +188,25 @@ class _EndOfContractViewState extends State<EndOfContractView> {
               children: [
                 FilledButton.icon(
                   onPressed: _isExporting ? null : details.onStepContinue,
-                  icon: _isExporting 
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                    : Icon(isLastStep ? Icons.warning_rounded : Icons.arrow_forward),
-                  label: Text(isLastStep ? 'Permanently Terminate & Export' : 'Continue'),
-                  style: isLastStep 
-                    ? FilledButton.styleFrom(backgroundColor: colorScheme.error)
-                    : null,
+                  icon: _isExporting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : Icon(
+                          isLastStep
+                              ? Icons.warning_rounded
+                              : Icons.arrow_forward,
+                        ),
+                  label: Text(
+                    isLastStep ? 'Permanently Terminate & Export' : 'Continue',
+                  ),
+                  style: isLastStep
+                      ? FilledButton.styleFrom(
+                          backgroundColor: colorScheme.error,
+                        )
+                      : null,
                 ),
                 if (!isLastStep) ...[
                   const SizedBox(width: 12),
@@ -191,7 +214,7 @@ class _EndOfContractViewState extends State<EndOfContractView> {
                     onPressed: details.onStepCancel,
                     child: Text(_currentStep == 0 ? 'Cancel' : 'Back'),
                   ),
-                ]
+                ],
               ],
             ),
           );
@@ -205,10 +228,7 @@ class _EndOfContractViewState extends State<EndOfContractView> {
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  'Format Selection',
-                  style: theme.textTheme.titleMedium,
-                ),
+                Text('Format Selection', style: theme.textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 12,
@@ -219,8 +239,11 @@ class _EndOfContractViewState extends State<EndOfContractView> {
                       selected: _formats.contains('csv'),
                       onSelected: (val) {
                         setState(() {
-                          if (val) _formats.add('csv');
-                          else _formats.remove('csv');
+                          if (val) {
+                            _formats.add('csv');
+                          } else {
+                            _formats.remove('csv');
+                          }
                         });
                       },
                       tooltip: 'Best for Excel and spreadsheet manipulation',
@@ -230,8 +253,11 @@ class _EndOfContractViewState extends State<EndOfContractView> {
                       selected: _formats.contains('json'),
                       onSelected: (val) {
                         setState(() {
-                          if (val) _formats.add('json');
-                          else _formats.remove('json');
+                          if (val) {
+                            _formats.add('json');
+                          } else {
+                            _formats.remove('json');
+                          }
                         });
                       },
                       tooltip: 'Best for programmable database restoration',
@@ -241,19 +267,20 @@ class _EndOfContractViewState extends State<EndOfContractView> {
                       selected: _formats.contains('sql'),
                       onSelected: (val) {
                         setState(() {
-                          if (val) _formats.add('sql');
-                          else _formats.remove('sql');
+                          if (val) {
+                            _formats.add('sql');
+                          } else {
+                            _formats.remove('sql');
+                          }
                         });
                       },
-                      tooltip: 'Standard INSERT INTO statements for database cloning',
+                      tooltip:
+                          'Standard INSERT INTO statements for database cloning',
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
-                Text(
-                  'Granular Inclusion',
-                  style: theme.textTheme.titleMedium,
-                ),
+                Text('Granular Inclusion', style: theme.textTheme.titleMedium),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 12,
@@ -262,7 +289,8 @@ class _EndOfContractViewState extends State<EndOfContractView> {
                     return FilterChip(
                       label: Text(_formatCategoryKey(key)),
                       selected: _categories[key]!,
-                      onSelected: (val) => setState(() => _categories[key] = val),
+                      onSelected: (val) =>
+                          setState(() => _categories[key] = val),
                     );
                   }).toList(),
                 ),
@@ -284,16 +312,22 @@ class _EndOfContractViewState extends State<EndOfContractView> {
                 children: [
                   CheckboxListTile(
                     value: _confirmDeletion,
-                    onChanged: (val) => setState(() => _confirmDeletion = val ?? false),
-                    title: const Text('I understand my physical data is held securely as a backup for a maximum of 30 days before being permanently destroyed and irrecoverable from STOX systems.'),
+                    onChanged: (val) =>
+                        setState(() => _confirmDeletion = val ?? false),
+                    title: const Text(
+                      'I understand my physical data is held securely as a backup for a maximum of 30 days before being permanently destroyed and irrecoverable from STOX systems.',
+                    ),
                     controlAffinity: ListTileControlAffinity.leading,
                     activeColor: colorScheme.error,
                   ),
                   const Divider(),
                   CheckboxListTile(
                     value: _confirmDark,
-                    onChanged: (val) => setState(() => _confirmDark = val ?? false),
-                    title: const Text('I acknowledge that confirming this prompt will alert IT administrators to instantly revoke all personnel access to live STOX dashboards.'),
+                    onChanged: (val) =>
+                        setState(() => _confirmDark = val ?? false),
+                    title: const Text(
+                      'I acknowledge that confirming this prompt will alert IT administrators to instantly revoke all personnel access to live STOX dashboards.',
+                    ),
                     controlAffinity: ListTileControlAffinity.leading,
                     activeColor: colorScheme.error,
                   ),
@@ -310,8 +344,11 @@ class _EndOfContractViewState extends State<EndOfContractView> {
               controller: _feedbackController,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'e.g., Transitioning to an alternative ERP solution, lack of necessary metrics...',
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                hintText:
+                    'e.g., Transitioning to an alternative ERP solution, lack of necessary metrics...',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
                 filled: true,
               ),
             ),
@@ -323,7 +360,9 @@ class _EndOfContractViewState extends State<EndOfContractView> {
             content: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('To finalize the closure sequence, please authenticate using your current Master Password.'),
+                const Text(
+                  'To finalize the closure sequence, please authenticate using your current Master Password.',
+                ),
                 const SizedBox(height: 16),
                 SizedBox(
                   width: 400,
@@ -333,7 +372,9 @@ class _EndOfContractViewState extends State<EndOfContractView> {
                     decoration: InputDecoration(
                       labelText: 'SME Owner Password',
                       prefixIcon: const Icon(Icons.lock),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                       filled: true,
                     ),
                   ),
@@ -342,8 +383,11 @@ class _EndOfContractViewState extends State<EndOfContractView> {
                   const SizedBox(height: 24),
                   LinearProgressIndicator(color: colorScheme.error),
                   const SizedBox(height: 8),
-                  Text(_statusMessage, style: TextStyle(color: colorScheme.error)),
-                ]
+                  Text(
+                    _statusMessage,
+                    style: TextStyle(color: colorScheme.error),
+                  ),
+                ],
               ],
             ),
           ),

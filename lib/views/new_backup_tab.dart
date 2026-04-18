@@ -77,7 +77,9 @@ class _NewBackupTabState extends State<NewBackupTab> {
     } catch (e) {
       if (mounted) {
         setState(() => _loadingCategories = false);
-        _showError('Could not load categories: ${e.toString().replaceFirst('Exception: ', '')}');
+        _showError(
+          'Could not load categories: ${e.toString().replaceFirst('Exception: ', '')}',
+        );
       }
     }
   }
@@ -85,24 +87,36 @@ class _NewBackupTabState extends State<NewBackupTab> {
   Future<void> _loadSchedules() async {
     try {
       final schedules = await _service.getSchedules();
-      if (mounted) setState(() { _schedules = schedules; _loadingSchedules = false; });
+      if (mounted)
+        setState(() {
+          _schedules = schedules;
+          _loadingSchedules = false;
+        });
     } catch (_) {
-      if (mounted) setState(() { _loadingSchedules = false; });
+      if (mounted)
+        setState(() {
+          _loadingSchedules = false;
+        });
     }
   }
 
   void _showError(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      behavior: SnackBarBehavior.floating,
-      backgroundColor: Theme.of(context).colorScheme.error,
-      content: Text(msg),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: Theme.of(context).colorScheme.error,
+        content: Text(msg),
+      ),
+    );
   }
 
   // ─── Manual Backup ───────────────────────────────────────────────────────
 
-  Future<void> _runBackup({List<String>? categoryOverride, bool silent = false}) async {
+  Future<void> _runBackup({
+    List<String>? categoryOverride,
+    bool silent = false,
+  }) async {
     final cats = categoryOverride ?? _selected.toList();
     if (cats.isEmpty) return;
 
@@ -126,7 +140,10 @@ class _NewBackupTabState extends State<NewBackupTab> {
     _progressTimer?.cancel();
     if (!silent) {
       _progressTimer = Timer.periodic(const Duration(milliseconds: 80), (t) {
-        if (!mounted) { t.cancel(); return; }
+        if (!mounted) {
+          t.cancel();
+          return;
+        }
         setState(() {
           if (_progress < 0.85) _progress += 0.012;
         });
@@ -134,7 +151,8 @@ class _NewBackupTabState extends State<NewBackupTab> {
     }
 
     try {
-      if (!silent) setState(() => _statusMessage = 'Fetching data from server…');
+      if (!silent)
+        setState(() => _statusMessage = 'Fetching data from server…');
       final bytes = await _service.runBackup(cats, formats: fmts);
 
       _progressTimer?.cancel();
@@ -194,7 +212,10 @@ class _NewBackupTabState extends State<NewBackupTab> {
         });
       } else {
         // Background schedule — show snackbar
-        if (mounted) _showError('Scheduled backup failed: ${e.toString().replaceFirst('Exception: ', '')}');
+        if (mounted)
+          _showError(
+            'Scheduled backup failed: ${e.toString().replaceFirst('Exception: ', '')}',
+          );
       }
     }
   }
@@ -251,7 +272,10 @@ class _NewBackupTabState extends State<NewBackupTab> {
         title: const Text('Delete Schedule'),
         content: Text('Delete "${schedule.label}"?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Delete'),
@@ -262,7 +286,8 @@ class _NewBackupTabState extends State<NewBackupTab> {
     if (confirmed == true) {
       try {
         await _service.removeSchedule(schedule.id);
-        if (mounted) setState(() => _schedules.removeWhere((s) => s.id == schedule.id));
+        if (mounted)
+          setState(() => _schedules.removeWhere((s) => s.id == schedule.id));
       } catch (e) {
         _showError('Failed to delete schedule: ${e.toString()}');
       }
@@ -280,7 +305,6 @@ class _NewBackupTabState extends State<NewBackupTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           // ── Header Info ─────────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(16),
@@ -344,10 +368,15 @@ class _NewBackupTabState extends State<NewBackupTab> {
                 padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
                 child: Row(
                   children: [
-                    const Text('Select data to include:', style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Text(
+                      'Select data to include:',
+                      style: TextStyle(fontWeight: FontWeight.w600),
+                    ),
                     const Spacer(),
                     TextButton(
-                      onPressed: () => setState(() => _selected.addAll(_categories.map((c) => c.key))),
+                      onPressed: () => setState(
+                        () => _selected.addAll(_categories.map((c) => c.key)),
+                      ),
                       child: const Text('All'),
                     ),
                     TextButton(
@@ -358,7 +387,10 @@ class _NewBackupTabState extends State<NewBackupTab> {
                 ),
               ),
               if (_loadingCategories)
-                const Padding(padding: EdgeInsets.all(20), child: Center(child: CircularProgressIndicator()))
+                const Padding(
+                  padding: EdgeInsets.all(20),
+                  child: Center(child: CircularProgressIndicator()),
+                )
               else if (_categories.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(16),
@@ -368,17 +400,29 @@ class _NewBackupTabState extends State<NewBackupTab> {
                   ),
                 )
               else
-                ..._categories.map((cat) => CheckboxListTile(
-                  dense: true,
-                  value: _selected.contains(cat.key),
-                  onChanged: (v) => setState(() {
-                    if (v == true) { _selected.add(cat.key); } else { _selected.remove(cat.key); }
-                  }),
-                  title: Text(cat.label, style: const TextStyle(fontSize: 14)),
-                  subtitle: Text(cat.description, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  secondary: _categoryIcon(cat.key, colorScheme),
-                  controlAffinity: ListTileControlAffinity.trailing,
-                )),
+                ..._categories.map(
+                  (cat) => CheckboxListTile(
+                    dense: true,
+                    value: _selected.contains(cat.key),
+                    onChanged: (v) => setState(() {
+                      if (v == true) {
+                        _selected.add(cat.key);
+                      } else {
+                        _selected.remove(cat.key);
+                      }
+                    }),
+                    title: Text(
+                      cat.label,
+                      style: const TextStyle(fontSize: 14),
+                    ),
+                    subtitle: Text(
+                      cat.description,
+                      style: const TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                    secondary: _categoryIcon(cat.key, colorScheme),
+                    controlAffinity: ListTileControlAffinity.trailing,
+                  ),
+                ),
 
               const Divider(indent: 16, endIndent: 16),
 
@@ -388,7 +432,13 @@ class _NewBackupTabState extends State<NewBackupTab> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Preferred Formats:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                    const Text(
+                      'Preferred Formats:',
+                      style: TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                      ),
+                    ),
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 12,
@@ -399,8 +449,11 @@ class _NewBackupTabState extends State<NewBackupTab> {
                           selected: isSelected,
                           onSelected: (v) {
                             setState(() {
-                              if (v) { _selectedFormats.add(f['key']!); }
-                              else if (_selectedFormats.length > 1) { _selectedFormats.remove(f['key']!); }
+                              if (v) {
+                                _selectedFormats.add(f['key']!);
+                              } else if (_selectedFormats.length > 1) {
+                                _selectedFormats.remove(f['key']!);
+                              }
                             });
                           },
                         );
@@ -422,12 +475,17 @@ class _NewBackupTabState extends State<NewBackupTab> {
                       ClipRRect(
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
-                          value: _isRunning && _progress < 0.05 ? null : _progress,
+                          value: _isRunning && _progress < 0.05
+                              ? null
+                              : _progress,
                           minHeight: 8,
                           backgroundColor: colorScheme.surfaceContainerHighest,
                           valueColor: AlwaysStoppedAnimation(
-                            _error ? colorScheme.error :
-                            _done ? Colors.green : colorScheme.primary,
+                            _error
+                                ? colorScheme.error
+                                : _done
+                                ? Colors.green
+                                : colorScheme.primary,
                           ),
                         ),
                       ),
@@ -436,7 +494,11 @@ class _NewBackupTabState extends State<NewBackupTab> {
                         _statusMessage,
                         style: TextStyle(
                           fontSize: 12,
-                          color: _error ? colorScheme.error : _done ? Colors.green : colorScheme.onSurface,
+                          color: _error
+                              ? colorScheme.error
+                              : _done
+                              ? Colors.green
+                              : colorScheme.onSurface,
                         ),
                       ),
                     ],
@@ -449,19 +511,25 @@ class _NewBackupTabState extends State<NewBackupTab> {
                 child: SizedBox(
                   width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: _isRunning || _selected.isEmpty ? null : _runBackup,
+                    onPressed: _isRunning || _selected.isEmpty
+                        ? null
+                        : _runBackup,
                     icon: _isRunning
                         ? const SizedBox(
-                            width: 18, height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
                           )
                         : const Icon(Icons.download_rounded),
                     label: Text(
                       _isRunning
                           ? 'Backing up…'
                           : _selected.isEmpty
-                              ? 'Select at least one category'
-                              : 'Run Backup Now  (${_selected.length} selected)',
+                          ? 'Select at least one category'
+                          : 'Run Backup Now  (${_selected.length} selected)',
                     ),
                   ),
                 ),
@@ -472,41 +540,62 @@ class _NewBackupTabState extends State<NewBackupTab> {
           const SizedBox(height: 28),
 
           // ── Scheduled Backups ────────────────────────────────────────────
-          _SectionHeader(title: 'Automated Schedules', icon: Icons.schedule_rounded),
+          _SectionHeader(
+            title: 'Automated Schedules',
+            icon: Icons.schedule_rounded,
+          ),
           const SizedBox(height: 4),
           Padding(
             padding: const EdgeInsets.only(left: 4, bottom: 12),
             child: Text(
               'Scheduled backups fire automatically while the app is open. Max $maxSchedules schedules.',
-              style: TextStyle(fontSize: 12, color: colorScheme.onSurface.withValues(alpha: 0.6)),
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
             ),
           ),
 
           _Card(
             children: [
               ListTile(
-                leading: Icon(Icons.add_alarm_rounded, color: colorScheme.primary),
+                leading: Icon(
+                  Icons.add_alarm_rounded,
+                  color: colorScheme.primary,
+                ),
                 title: const Text('Add Automated Schedule'),
-                subtitle: Text('${_schedules.length}/$maxSchedules schedules active'),
+                subtitle: Text(
+                  '${_schedules.length}/$maxSchedules schedules active',
+                ),
                 trailing: FilledButton.tonalIcon(
-                  onPressed: _schedules.length >= maxSchedules ? null : _showAddScheduleDialog,
+                  onPressed: _schedules.length >= maxSchedules
+                      ? null
+                      : _showAddScheduleDialog,
                   icon: const Icon(Icons.add, size: 18),
                   label: const Text('New'),
                 ),
               ),
               if (_loadingSchedules)
-                const Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator()))
+                const Padding(
+                  padding: EdgeInsets.all(16),
+                  child: Center(child: CircularProgressIndicator()),
+                )
               else if (_schedules.isEmpty)
                 const Padding(
                   padding: EdgeInsets.fromLTRB(16, 8, 16, 20),
-                  child: Text('No schedules configured yet.', style: TextStyle(color: Colors.grey)),
+                  child: Text(
+                    'No schedules configured yet.',
+                    style: TextStyle(color: Colors.grey),
+                  ),
                 )
               else ...[
                 const Divider(indent: 16, endIndent: 16),
-                ..._schedules.map((s) => _ScheduleTile(
-                  schedule: s,
-                  onDelete: () => _deleteSchedule(s),
-                )),
+                ..._schedules.map(
+                  (s) => _ScheduleTile(
+                    schedule: s,
+                    onDelete: () => _deleteSchedule(s),
+                  ),
+                ),
               ],
             ],
           ),
@@ -547,21 +636,35 @@ class _ScheduleTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return ListTile(
       dense: true,
-      leading: Icon(Icons.event_repeat_rounded, size: 20, color: colorScheme.primary),
-      title: Text(schedule.label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+      leading: Icon(
+        Icons.event_repeat_rounded,
+        size: 20,
+        color: colorScheme.primary,
+      ),
+      title: Text(
+        schedule.label,
+        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+      ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(schedule.summary, style: const TextStyle(fontSize: 12)),
           Text(
             schedule.categories.join(', '),
-            style: TextStyle(fontSize: 11, color: colorScheme.onSurface.withValues(alpha: 0.5)),
+            style: TextStyle(
+              fontSize: 11,
+              color: colorScheme.onSurface.withValues(alpha: 0.5),
+            ),
             overflow: TextOverflow.ellipsis,
           ),
         ],
       ),
       trailing: IconButton(
-        icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error, size: 20),
+        icon: Icon(
+          Icons.delete_outline_rounded,
+          color: colorScheme.error,
+          size: 20,
+        ),
         tooltip: 'Delete schedule',
         onPressed: onDelete,
       ),
@@ -573,16 +676,17 @@ class _ScheduleTile extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 // Add Schedule Dialog
 // ─────────────────────────────────────────────────────────────────────────────
-typedef _OnSave = void Function(
-  String label,
-  List<String> categories,
-  String frequency,
-  String scheduledTime,
-  List<String> formats,
-  int? dayOfWeek,
-  int? dayOfMonth,
-  int? month,
-);
+typedef _OnSave =
+    void Function(
+      String label,
+      List<String> categories,
+      String frequency,
+      String scheduledTime,
+      List<String> formats,
+      int? dayOfWeek,
+      int? dayOfMonth,
+      int? month,
+    );
 
 class _AddScheduleDialog extends StatefulWidget {
   final List<ExportCategory> categories;
@@ -603,9 +707,29 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
   late Set<String> _selectedCats;
   final Set<String> _selectedFormats = {'csv'};
 
-  static const _weekdays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  static const _months = ['January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'];
+  static const _weekdays = [
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+  static const _months = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
 
   @override
   void initState() {
@@ -621,7 +745,8 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
   }
 
   void _updateLabel() {
-    _labelCtrl.text = '${_frequency[0].toUpperCase()}${_frequency.substring(1)} Backup';
+    _labelCtrl.text =
+        '${_frequency[0].toUpperCase()}${_frequency.substring(1)} Backup';
   }
 
   @override
@@ -637,18 +762,32 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
           children: [
             TextField(
               controller: _labelCtrl,
-              decoration: const InputDecoration(labelText: 'Schedule Name', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                labelText: 'Schedule Name',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 16),
 
             // Frequency
             DropdownButtonFormField<String>(
-              value: _frequency,
-              decoration: const InputDecoration(labelText: 'Frequency', border: OutlineInputBorder()),
+              initialValue: _frequency,
+              decoration: const InputDecoration(
+                labelText: 'Frequency',
+                border: OutlineInputBorder(),
+              ),
               items: ['daily', 'weekly', 'monthly', 'yearly']
-                  .map((f) => DropdownMenuItem(value: f, child: Text(f[0].toUpperCase() + f.substring(1))))
+                  .map(
+                    (f) => DropdownMenuItem(
+                      value: f,
+                      child: Text(f[0].toUpperCase() + f.substring(1)),
+                    ),
+                  )
                   .toList(),
-              onChanged: (v) => setState(() { _frequency = v!; _updateLabel(); }),
+              onChanged: (v) => setState(() {
+                _frequency = v!;
+                _updateLabel();
+              }),
             ),
             const SizedBox(height: 12),
 
@@ -656,10 +795,19 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Time', style: TextStyle(fontSize: 14)),
-              subtitle: Text(_time.format(context), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              subtitle: Text(
+                _time.format(context),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               trailing: const Icon(Icons.access_time_rounded),
               onTap: () async {
-                final p = await showTimePicker(context: context, initialTime: _time);
+                final p = await showTimePicker(
+                  context: context,
+                  initialTime: _time,
+                );
                 if (p != null) setState(() => _time = p);
               },
             ),
@@ -667,9 +815,15 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
             if (_frequency == 'weekly') ...[
               const SizedBox(height: 8),
               DropdownButtonFormField<int>(
-                value: _dayOfWeek,
-                decoration: const InputDecoration(labelText: 'Day of Week', border: OutlineInputBorder()),
-                items: List.generate(7, (i) => DropdownMenuItem(value: i, child: Text(_weekdays[i]))),
+                initialValue: _dayOfWeek,
+                decoration: const InputDecoration(
+                  labelText: 'Day of Week',
+                  border: OutlineInputBorder(),
+                ),
+                items: List.generate(
+                  7,
+                  (i) => DropdownMenuItem(value: i, child: Text(_weekdays[i])),
+                ),
                 onChanged: (v) => setState(() => _dayOfWeek = v!),
               ),
             ],
@@ -677,9 +831,16 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
             if (_frequency == 'monthly' || _frequency == 'yearly') ...[
               const SizedBox(height: 8),
               DropdownButtonFormField<int>(
-                value: _dayOfMonth,
-                decoration: const InputDecoration(labelText: 'Day of Month', border: OutlineInputBorder()),
-                items: List.generate(28, (i) => DropdownMenuItem(value: i + 1, child: Text('${i + 1}'))),
+                initialValue: _dayOfMonth,
+                decoration: const InputDecoration(
+                  labelText: 'Day of Month',
+                  border: OutlineInputBorder(),
+                ),
+                items: List.generate(
+                  28,
+                  (i) =>
+                      DropdownMenuItem(value: i + 1, child: Text('${i + 1}')),
+                ),
                 onChanged: (v) => setState(() => _dayOfMonth = v!),
               ),
             ],
@@ -687,15 +848,25 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
             if (_frequency == 'yearly') ...[
               const SizedBox(height: 8),
               DropdownButtonFormField<int>(
-                value: _month,
-                decoration: const InputDecoration(labelText: 'Month', border: OutlineInputBorder()),
-                items: List.generate(12, (i) => DropdownMenuItem(value: i + 1, child: Text(_months[i]))),
+                initialValue: _month,
+                decoration: const InputDecoration(
+                  labelText: 'Month',
+                  border: OutlineInputBorder(),
+                ),
+                items: List.generate(
+                  12,
+                  (i) =>
+                      DropdownMenuItem(value: i + 1, child: Text(_months[i])),
+                ),
                 onChanged: (v) => setState(() => _month = v!),
               ),
             ],
 
             const SizedBox(height: 16),
-            const Text('Formats to include:', style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text(
+              'Formats to include:',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 4),
             Row(
               children: [
@@ -703,8 +874,10 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
                   label: 'CSV',
                   isSelected: _selectedFormats.contains('csv'),
                   onToggle: (v) => setState(() {
-                    if (v) _selectedFormats.add('csv');
-                    else if (_selectedFormats.length > 1) _selectedFormats.remove('csv');
+                    if (v) {
+                      _selectedFormats.add('csv');
+                    } else if (_selectedFormats.length > 1)
+                      _selectedFormats.remove('csv');
                   }),
                 ),
                 const SizedBox(width: 8),
@@ -712,8 +885,10 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
                   label: 'JSON',
                   isSelected: _selectedFormats.contains('json'),
                   onToggle: (v) => setState(() {
-                    if (v) _selectedFormats.add('json');
-                    else if (_selectedFormats.length > 1) _selectedFormats.remove('json');
+                    if (v) {
+                      _selectedFormats.add('json');
+                    } else if (_selectedFormats.length > 1)
+                      _selectedFormats.remove('json');
                   }),
                 ),
                 const SizedBox(width: 8),
@@ -721,46 +896,66 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
                   label: 'SQL',
                   isSelected: _selectedFormats.contains('sql'),
                   onToggle: (v) => setState(() {
-                    if (v) _selectedFormats.add('sql');
-                    else if (_selectedFormats.length > 1) _selectedFormats.remove('sql');
+                    if (v) {
+                      _selectedFormats.add('sql');
+                    } else if (_selectedFormats.length > 1)
+                      _selectedFormats.remove('sql');
                   }),
                 ),
               ],
             ),
 
             const SizedBox(height: 16),
-            const Text('Categories to include:', style: TextStyle(fontWeight: FontWeight.w600)),
+            const Text(
+              'Categories to include:',
+              style: TextStyle(fontWeight: FontWeight.w600),
+            ),
             const SizedBox(height: 4),
-            ...widget.categories.map((cat) => CheckboxListTile(
-              dense: true,
-              value: _selectedCats.contains(cat.key),
-              onChanged: (v) => setState(() {
-                if (v == true) { _selectedCats.add(cat.key); } else { _selectedCats.remove(cat.key); }
-              }),
-              title: Text(cat.label, style: const TextStyle(fontSize: 13)),
-              controlAffinity: ListTileControlAffinity.leading,
-            )),
+            ...widget.categories.map(
+              (cat) => CheckboxListTile(
+                dense: true,
+                value: _selectedCats.contains(cat.key),
+                onChanged: (v) => setState(() {
+                  if (v == true) {
+                    _selectedCats.add(cat.key);
+                  } else {
+                    _selectedCats.remove(cat.key);
+                  }
+                }),
+                title: Text(cat.label, style: const TextStyle(fontSize: 13)),
+                controlAffinity: ListTileControlAffinity.leading,
+              ),
+            ),
           ],
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
         FilledButton(
-          onPressed: _selectedCats.isEmpty || _selectedFormats.isEmpty ? null : () {
-            final timeStr =
-                '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
-            widget.onSave(
-              _labelCtrl.text.trim().isEmpty ? 'Backup' : _labelCtrl.text.trim(),
-              _selectedCats.toList(),
-              _frequency,
-              timeStr,
-              _selectedFormats.toList(),
-              _frequency == 'weekly' ? _dayOfWeek : null,
-              (_frequency == 'monthly' || _frequency == 'yearly') ? _dayOfMonth : null,
-              _frequency == 'yearly' ? _month : null,
-            );
-            Navigator.pop(context);
-          },
+          onPressed: _selectedCats.isEmpty || _selectedFormats.isEmpty
+              ? null
+              : () {
+                  final timeStr =
+                      '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
+                  widget.onSave(
+                    _labelCtrl.text.trim().isEmpty
+                        ? 'Backup'
+                        : _labelCtrl.text.trim(),
+                    _selectedCats.toList(),
+                    _frequency,
+                    timeStr,
+                    _selectedFormats.toList(),
+                    _frequency == 'weekly' ? _dayOfWeek : null,
+                    (_frequency == 'monthly' || _frequency == 'yearly')
+                        ? _dayOfMonth
+                        : null,
+                    _frequency == 'yearly' ? _month : null,
+                  );
+                  Navigator.pop(context);
+                },
           child: const Text('Save Schedule'),
         ),
       ],
@@ -772,7 +967,11 @@ class _FormatChoice extends StatelessWidget {
   final String label;
   final bool isSelected;
   final ValueChanged<bool> onToggle;
-  const _FormatChoice({required this.label, required this.isSelected, required this.onToggle});
+  const _FormatChoice({
+    required this.label,
+    required this.isSelected,
+    required this.onToggle,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -825,7 +1024,9 @@ class _Card extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: Theme.of(context).dividerColor.withValues(alpha: 0.1)),
+        side: BorderSide(
+          color: Theme.of(context).dividerColor.withValues(alpha: 0.1),
+        ),
       ),
       child: Column(children: children),
     );

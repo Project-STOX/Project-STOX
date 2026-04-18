@@ -29,7 +29,7 @@ class _AccountViewState extends State<AccountView> {
 
   bool _tfaActive = false;
   bool _isLoading = false;
-  bool _useTfaForPasswordChange = false;
+  final bool _useTfaForPasswordChange = false;
   bool _verifyEmailChange = true;
 
   @override
@@ -54,7 +54,8 @@ class _AccountViewState extends State<AccountView> {
     try {
       final normalizedEmail = _emailController.text.trim().toLowerCase();
       final normalizedUsername = _usernameController.text.trim();
-      final emailChanged = normalizedEmail != widget.user.email.trim().toLowerCase();
+      final emailChanged =
+          normalizedEmail != widget.user.email.trim().toLowerCase();
       final verifyEmailChange = emailChanged && _verifyEmailChange;
 
       final updatedUser = await _userController.updateUser(
@@ -69,9 +70,9 @@ class _AccountViewState extends State<AccountView> {
         final message = verifyEmailChange
             ? 'Profile updated. Verify the new email address to finish the change.'
             : 'Profile updated successfully';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(message)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
         // If embedded, notify parent instead of popping the entire dashboard
         if (widget.isEmbedded) {
           widget.onUserUpdated?.call(updatedUser);
@@ -83,18 +84,19 @@ class _AccountViewState extends State<AccountView> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error updating profile: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error updating profile: $e')));
       }
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: widget.isEmbedded ? null : AppBar(title: const Text('Account Settings')),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(title: const Text('Account Settings')),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
@@ -106,7 +108,10 @@ class _AccountViewState extends State<AccountView> {
                   children: [
                     const Text(
                       'Profile Information',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -116,7 +121,8 @@ class _AccountViewState extends State<AccountView> {
                         border: OutlineInputBorder(),
                       ),
                       validator: (value) {
-                        if (value?.isEmpty ?? true) return 'Username is required';
+                        if (value?.isEmpty ?? true)
+                          return 'Username is required';
                         return null;
                       },
                     ),
@@ -131,18 +137,23 @@ class _AccountViewState extends State<AccountView> {
                       onChanged: (_) => setState(() {}),
                       validator: (value) {
                         if (value?.isEmpty ?? true) return 'Email is required';
-                        if (!value!.contains('@')) return 'Invalid email format';
+                        if (!value!.contains('@'))
+                          return 'Invalid email format';
                         return null;
                       },
                     ),
-                    if (_emailController.text.trim().toLowerCase() != widget.user.email.trim().toLowerCase()) ...[
+                    if (_emailController.text.trim().toLowerCase() !=
+                        widget.user.email.trim().toLowerCase()) ...[
                       const SizedBox(height: 16),
                       SwitchListTile(
                         contentPadding: EdgeInsets.zero,
                         title: const Text('Verify email change'),
-                        subtitle: const Text('Send a confirmation link to the new email address'),
+                        subtitle: const Text(
+                          'Send a confirmation link to the new email address',
+                        ),
                         value: _verifyEmailChange,
-                        onChanged: (value) => setState(() => _verifyEmailChange = value),
+                        onChanged: (value) =>
+                            setState(() => _verifyEmailChange = value),
                       ),
                     ],
                     const SizedBox(height: 32),

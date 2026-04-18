@@ -58,10 +58,15 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
       _isLoading = true;
     });
 
-    final hasPerm = await _authController.hasPermission(
+    final hasHist = await _authController.hasPermission(
       widget.user.roleId,
       'Historical data',
     );
+    final hasFore = await _authController.hasPermission(
+      widget.user.roleId,
+      'View forecasts',
+    );
+    final hasPerm = hasHist || hasFore;
     if (!mounted) {
       return;
     }
@@ -265,7 +270,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
                 style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 8),
-              Text('You do not have permission to view historical data.'),
+              Text('You do not have permission to view historical sales data or forecasts.'),
             ],
           ),
         ),
@@ -273,7 +278,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Historical Sales Data')),
+      appBar: widget.isEmbedded ? null : AppBar(title: const Text('Historical Sales Data')),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
