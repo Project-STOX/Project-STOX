@@ -30,6 +30,7 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> dict[str, object]:
+    print(f"DEBUG: Processing login request for {payload.email}")
     return AuthService.login_step_one(db, payload)
 
 
@@ -46,7 +47,7 @@ def has_permission(
 ) -> dict[str, bool]:
     user_with_role = AuthService._get_user_with_role(db, current_user.id)
     current_user.role = user_with_role.role if user_with_role is not None else None
-    return {"allowed": check_permission(current_user, permission)}
+    return {"allowed": check_permission(current_user, permission, db=db)}
 
 
 @router.get("/permissions/batch")
@@ -57,7 +58,7 @@ def has_permissions_batch(
 ) -> dict[str, bool]:
     user_with_role = AuthService._get_user_with_role(db, current_user.id)
     current_user.role = user_with_role.role if user_with_role is not None else None
-    return {p: check_permission(current_user, p) for p in permissions}
+    return {p: check_permission(current_user, p, db=db) for p in permissions}
 
 
 @router.post("/verify-2fa", response_model=TokenPairResponse)

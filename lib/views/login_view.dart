@@ -209,6 +209,14 @@ class _LoginViewState extends State<LoginView> {
                       )
                     : const Text("Login"),
               ),
+              const SizedBox(height: 24),
+              const Text(
+                "Can't login? Contact IT support",
+                style: TextStyle(
+                  color: Colors.grey,
+                  fontSize: 14,
+                ),
+              ),
             ],
           ),
         ),

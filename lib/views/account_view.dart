@@ -121,8 +121,9 @@ class _AccountViewState extends State<AccountView> {
                         border: OutlineInputBorder(),
                       ),
                       validator: (value) {
-                        if (value?.isEmpty ?? true)
+                        if (value?.isEmpty ?? true) {
                           return 'Username is required';
+                        }
                         return null;
                       },
                     ),
@@ -137,8 +138,9 @@ class _AccountViewState extends State<AccountView> {
                       onChanged: (_) => setState(() {}),
                       validator: (value) {
                         if (value?.isEmpty ?? true) return 'Email is required';
-                        if (!value!.contains('@'))
+                        if (!value!.contains('@')) {
                           return 'Invalid email format';
+                        }
                         return null;
                       },
                     ),

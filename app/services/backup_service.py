@@ -258,6 +258,9 @@ class BackupRunner:
                 # We do this via psql or dropdb/createdb if available
                 self._ensure_local_db_exists(target, psql)
 
+                # Terminate active connections to the local DB to allow restore
+                self._terminate_local_connections(target, psql)
+
                 # Command to restore into the local postgres
                 restore_env = os.environ.copy()
                 restore_env["PGPASSWORD"] = target["password"]
@@ -277,6 +280,8 @@ class BackupRunner:
                     "-d", target["dbname"],
                     "--clean",         # drop database objects before recreating
                     "--if-exists",
+                    "--no-owner",      # ignore ownership errors (common when syncing from Supabase)
+                    "--no-privileges", # ignore permission errors
                     "--no-password",
                     "-v",
                     str(out_path)
@@ -377,6 +382,38 @@ class BackupRunner:
                     "-c", f"CREATE DATABASE {target['dbname']}"
                 ]
                 subprocess.run(create_cmd, env=env, capture_output=True, shell=False)
+        except Exception:
+            pass
+
+    def _terminate_local_connections(self, target: dict[str, str], psql_path: str | None) -> None:
+        """Kicks out other users from the local DB so pg_restore can --clean it."""
+        if not psql_path:
+            return
+
+        env = os.environ.copy()
+        env["PGPASSWORD"] = target["password"]
+        env["PGSSLMODE"] = "prefer"
+        
+        # SQL to terminate all other backends for the target database
+        sql = (
+            f"SELECT pg_terminate_backend(pid) "
+            f"FROM pg_stat_activity "
+            f"WHERE datname = '{target['dbname']}' "
+            f"AND pid <> pg_backend_pid()"
+        )
+        
+        cmd = [
+            psql_path,
+            "-h", target["host"],
+            "-p", target["port"],
+            "-U", target["user"],
+            "-d", "postgres",
+            "-c", sql
+        ]
+        
+        try:
+            # We don't check for failure here; if it fails, pg_restore might still work or will fail with its own error
+            subprocess.run(cmd, env=env, capture_output=True, shell=False)
         except Exception:
             pass
 

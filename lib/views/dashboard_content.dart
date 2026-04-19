@@ -728,9 +728,15 @@ class _DashboardContentState extends State<DashboardContent> {
         margin: const EdgeInsets.all(16.0),
         padding: const EdgeInsets.all(16.0),
         decoration: BoxDecoration(
-          color: Colors.red.shade50,
+          color: Theme.of(context).brightness == Brightness.dark
+              ? Colors.red.withOpacity(0.1)
+              : Colors.red.shade50,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.red.shade200),
+          border: Border.all(
+            color: Theme.of(context).brightness == Brightness.dark
+                ? Colors.red.withOpacity(0.5)
+                : Colors.red.shade200,
+          ),
         ),
         child: Row(
           children: [
@@ -901,7 +907,9 @@ class _DashboardContentState extends State<DashboardContent> {
             child: LinearProgressIndicator(
               value: fillFraction,
               minHeight: 20,
-              backgroundColor: Colors.grey.shade200,
+              backgroundColor: Theme.of(context).brightness == Brightness.dark
+                  ? Colors.white10
+                  : Colors.grey.shade200,
               valueColor: AlwaysStoppedAnimation<Color>(gaugeColor),
             ),
           ),
@@ -1372,7 +1380,7 @@ class _DashboardContentState extends State<DashboardContent> {
                     ),
                     borderData: FlBorderData(
                       show: true,
-                      border: Border.all(color: Colors.grey.shade300),
+                      border: Border.all(color: Theme.of(context).dividerColor),
                     ),
                     lineBarsData: [
                       if (histSpots.isNotEmpty)
@@ -1533,14 +1541,31 @@ class _DashboardContentState extends State<DashboardContent> {
                 .take(5)
                 .map(
                   (p) => Card(
-                    color: Colors.red.shade50,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.red.shade200
+                        : Colors.red.shade50,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.red.withOpacity(0.5)
+                            : Colors.red.shade100,
+                      ),
+                    ),
                     child: ListTile(
                       leading: const Icon(Icons.warning, color: Colors.red),
-                      title: Text('${p['name']} (${p['product_code']})'),
+                      title: Text(
+                        '${p['name']} (${p['product_code']})',
+                        style: const TextStyle(color: Colors.black),
+                      ),
                       subtitle: Text(
                         'Qty: ${p['current_qty']} (Target: ${p['reorder_level']})',
+                        style: const TextStyle(color: Colors.black87),
                       ),
-                      trailing: Text(p['sku']),
+                      trailing: Text(
+                        p['sku'],
+                        style: const TextStyle(color: Colors.black54),
+                      ),
                     ),
                   ),
                 ),
@@ -1560,17 +1585,34 @@ class _DashboardContentState extends State<DashboardContent> {
                 .take(5)
                 .map(
                   (p) => Card(
-                    color: Colors.orange.shade50,
+                    color: Theme.of(context).brightness == Brightness.dark
+                        ? Colors.orange.shade200
+                        : Colors.orange.shade50,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      side: BorderSide(
+                        color: Theme.of(context).brightness == Brightness.dark
+                            ? Colors.orange.withOpacity(0.5)
+                            : Colors.orange.shade100,
+                      ),
+                    ),
                     child: ListTile(
                       leading: const Icon(
                         Icons.inventory_2,
                         color: Colors.orange,
                       ),
-                      title: Text('${p['name']} (${p['product_code']})'),
+                      title: Text(
+                        '${p['name']} (${p['product_code']})',
+                        style: const TextStyle(color: Colors.black),
+                      ),
                       subtitle: Text(
                         'Qty: ${p['current_qty']} (Limit: ${p['overstock_level']})',
+                        style: const TextStyle(color: Colors.black87),
                       ),
-                      trailing: Text(p['sku']),
+                      trailing: Text(
+                        p['sku'],
+                        style: const TextStyle(color: Colors.black54),
+                      ),
                     ),
                   ),
                 ),

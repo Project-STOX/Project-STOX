@@ -87,7 +87,7 @@ def update_user(
     current_user.role = user_with_role.role if user_with_role else None
     
     from app.core.security.rbac import check_permission
-    is_admin = check_permission(current_user, "Manage users")
+    is_admin = check_permission(current_user, "Manage users", db=db)
 
     if not (is_self or is_admin):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Insufficient admin permissions")

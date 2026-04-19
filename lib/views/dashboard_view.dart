@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable
+
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -21,6 +23,7 @@ import 'audit_log_view.dart';
 import 'dashboard_content.dart';
 import 'settings_view.dart';
 import '../services/api/export_api_service.dart';
+import '../services/api/system_service.dart';
 import '../utils/backup_downloader.dart';
 import '../utils/theme_controller.dart';
 import 'send_feedback_view.dart';
@@ -65,7 +68,10 @@ class _DashboardViewState extends State<DashboardView> {
 
   // ── Scheduled Backup Timer (SME Owner only) ────────────────────────────
   Timer? _scheduleTimer;
+  Timer? _healthTimer;
   final ExportApiService _exportService = ExportApiService();
+  final SystemService _systemService = SystemService();
+  bool _isReadOnly = false;
 
   @override
   void initState() {
@@ -77,6 +83,7 @@ class _DashboardViewState extends State<DashboardView> {
     if (_currentUser.roleId == 1) {
       _startScheduleTimer();
     }
+    _startHealthCheckTimer();
     themeController.addListener(_onThemeChanged);
   }
 
@@ -191,10 +198,27 @@ class _DashboardViewState extends State<DashboardView> {
     }
   }
 
+  void _startHealthCheckTimer() {
+    _checkHealth(); // Initial check
+    _healthTimer = Timer.periodic(const Duration(seconds: 45), (_) => _checkHealth());
+  }
+
+  Future<void> _checkHealth() async {
+    try {
+      final health = await _systemService.checkHealth();
+      if (mounted) {
+        setState(() {
+          _isReadOnly = health['read_only'] == true;
+        });
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     themeController.removeListener(_onThemeChanged);
     _scheduleTimer?.cancel();
+    _healthTimer?.cancel();
     super.dispose();
   }
 
@@ -426,6 +450,7 @@ class _DashboardViewState extends State<DashboardView> {
           drawer: showHeader ? null : _buildDrawer(context),
           body: Column(
             children: [
+              if (_isReadOnly) _buildReadOnlyBanner(context),
               if (showHeader) _buildTopNav(context),
               Expanded(
                 child: PopScope(
@@ -538,11 +563,6 @@ class _DashboardViewState extends State<DashboardView> {
         ),
       ),
       onSelected: (val) {
-        final isHeaderMode =
-            themeController.navigationMode == AppNavigationMode.header;
-        final bool showHeader =
-            isHeaderMode && MediaQuery.of(context).size.width >= 800;
-
         if (val == 'settings') {
           _navigateTo(
             _NavItem(
@@ -750,6 +770,34 @@ class _DashboardViewState extends State<DashboardView> {
               Navigator.pop(context);
               _logout(context);
             },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReadOnlyBanner(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      width: double.infinity,
+      color: theme.colorScheme.errorContainer,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.cloud_off_rounded,
+            size: 16,
+            color: theme.colorScheme.error,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'READ-ONLY MODE: Primary server unreachable. Using local snapshot.',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.error,
+            ),
           ),
         ],
       ),

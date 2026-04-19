@@ -130,8 +130,8 @@ class _TwoFactorViewState extends State<TwoFactorView> {
           children: [
             Text(
               isTotpMode
-                  ? "Enter the 6-digit code from your authenticator app"
-                  : "Enter the 6-digit code for ${widget.email}",
+                  ? "Enter the code from your authenticator app or a backup code"
+                  : "Enter the code sent to ${widget.email}",
               textAlign: TextAlign.center,
               style: const TextStyle(fontSize: 16),
             ),
@@ -139,13 +139,12 @@ class _TwoFactorViewState extends State<TwoFactorView> {
             TextField(
               controller: codeController,
               decoration: InputDecoration(
-                labelText: isTotpMode ? "Authenticator Code" : "Authentication Code",
+                labelText: isTotpMode ? "Code / Backup Code" : "Authentication Code",
                 border: const OutlineInputBorder(),
-                hintText: "000000",
+                hintText: isTotpMode ? "Enter code" : "000000",
               ),
-              keyboardType: TextInputType.number,
+              keyboardType: TextInputType.text,
               textAlign: TextAlign.center,
-              maxLength: 6,
             ),
             const SizedBox(height: 10),
             Text(

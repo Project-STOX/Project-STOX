@@ -340,6 +340,15 @@ class AuthService:
         access_token = create_access_token(user.id, user.role_name)
         refresh_token = create_refresh_token(user.id, user.role_name)
 
+        from app.db.database import is_failover_active
+        if is_failover_active():
+            print(f"INFO: Issuing non-persistent token pair for {user.email} in failover mode.")
+            return TokenPairResponse(
+                access_token=access_token,
+                refresh_token=refresh_token,
+                user=UserRead.from_user(user),
+            )
+
         refresh_entity = RefreshToken(
             user_id=user.id,
             token=refresh_token,

@@ -28,16 +28,26 @@ def _has_permission(db: Session, role_id: int | None, permission_name: str) -> b
     return db.scalar(stmt) is not None
 
 
-def check_permission(user: User, permission_name: str) -> bool:
+def check_permission(user: User, permission_name: str, db: Session | None = None) -> bool:
     """
-    Backwards compatibility wrapper for permission checks.
+    Check if a user has a specific permission.
+    If db session is not provided, it will create one using failover logic.
     """
-    from app.db.database import SessionLocal
-    db = SessionLocal()
-    try:
+    if db is not None:
         return _has_permission(db, user.role_id, permission_name)
-    finally:
-        db.close()
+
+    from app.db.database import get_db
+    try:
+        # Use next(get_db()) to trigger the failover logic in database.py
+        db_gen = get_db()
+        temp_db = next(db_gen)
+        try:
+            return _has_permission(temp_db, user.role_id, permission_name)
+        finally:
+            # We don't need to call next(db_gen) again as get_db is a simple generator
+            temp_db.close()
+    except Exception:
+        return False
 
 
 def require_permissions(*required_permissions: str) -> Callable:

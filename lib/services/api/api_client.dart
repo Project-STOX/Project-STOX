@@ -15,7 +15,7 @@ class ApiClient {
   final String baseUrl;
   final TokenStorage _tokenStorage;
   final http.Client _http;
-  final Duration _timeout = const Duration(seconds: 25);
+  final Duration _timeout = const Duration(seconds: 45);
 
   Uri _uri(String path, [Map<String, dynamic>? query]) {
     final normalizedBase = baseUrl.endsWith('/')

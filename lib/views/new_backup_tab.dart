@@ -6,11 +6,12 @@ import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 
 import '../models/user.dart';
+import '../services/api/backup_api_service.dart';
 import '../services/api/export_api_service.dart';
 import '../utils/backup_downloader.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// New Backup Tab — SME Owner only
+// Backup Data Tab — SME Owner only
 // ─────────────────────────────────────────────────────────────────────────────
 class NewBackupTab extends StatefulWidget {
   final UserModel user;
@@ -22,7 +23,15 @@ class NewBackupTab extends StatefulWidget {
 
 class _NewBackupTabState extends State<NewBackupTab> {
   final ExportApiService _service = ExportApiService();
+  final BackupApiService _dbBackupService = BackupApiService();
   final _uuid = const Uuid();
+
+  // Database Snapshots (Full PG Dump)
+  List<BackupFileInfo> _dbSnapshots = [];
+  bool _loadingSnapshots = true;
+  bool _isDbBackupRunning = false;
+  double _dbBackupProgress = 0;
+  String _dbBackupMessage = '';
 
   // Categories
   List<ExportCategory> _categories = [];
@@ -54,6 +63,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
     super.initState();
     _loadCategories();
     _loadSchedules();
+    _loadDbSnapshots();
   }
 
   @override
@@ -87,16 +97,34 @@ class _NewBackupTabState extends State<NewBackupTab> {
   Future<void> _loadSchedules() async {
     try {
       final schedules = await _service.getSchedules();
-      if (mounted)
+      if (mounted) {
         setState(() {
           _schedules = schedules;
           _loadingSchedules = false;
         });
+      }
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         setState(() {
           _loadingSchedules = false;
         });
+      }
+    }
+  }
+
+  Future<void> _loadDbSnapshots() async {
+    try {
+      final list = await _dbBackupService.listBackups();
+      if (mounted) {
+        setState(() {
+          _dbSnapshots = list;
+          _loadingSnapshots = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loadingSnapshots = false);
+      }
     }
   }
 
@@ -151,8 +179,9 @@ class _NewBackupTabState extends State<NewBackupTab> {
     }
 
     try {
-      if (!silent)
+      if (!silent) {
         setState(() => _statusMessage = 'Fetching data from server…');
+      }
       final bytes = await _service.runBackup(cats, formats: fmts);
 
       _progressTimer?.cancel();
@@ -212,10 +241,44 @@ class _NewBackupTabState extends State<NewBackupTab> {
         });
       } else {
         // Background schedule — show snackbar
-        if (mounted)
+        if (mounted) {
           _showError(
             'Scheduled backup failed: ${e.toString().replaceFirst('Exception: ', '')}',
           );
+        }
+      }
+    }
+  }
+
+  Future<void> _runDbBackup() async {
+    setState(() {
+      _isDbBackupRunning = true;
+      _dbBackupProgress = 0;
+      _dbBackupMessage = 'Initializing snapshot…';
+    });
+
+    try {
+      await for (final event in _dbBackupService.runBackup(sync: true)) {
+        if (!mounted) break;
+        setState(() {
+          _dbBackupProgress = event.progress / 100.0;
+          _dbBackupMessage = event.message;
+        });
+        if (event.event == 'done' || event.event == 'error') {
+          if (event.event == 'error') {
+            _showError('Snapshot error: ${event.message}');
+          }
+          break;
+        }
+      }
+      await _loadDbSnapshots();
+    } catch (e) {
+      if (mounted) {
+        _showError('Database backup connection failed: $e');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isDbBackupRunning = false);
       }
     }
   }
@@ -286,8 +349,9 @@ class _NewBackupTabState extends State<NewBackupTab> {
     if (confirmed == true) {
       try {
         await _service.removeSchedule(schedule.id);
-        if (mounted)
+        if (mounted) {
           setState(() => _schedules.removeWhere((s) => s.id == schedule.id));
+        }
       } catch (e) {
         _showError('Failed to delete schedule: ${e.toString()}');
       }
@@ -600,6 +664,95 @@ class _NewBackupTabState extends State<NewBackupTab> {
             ],
           ),
 
+          const SizedBox(height: 28),
+
+          // ── Database Snapshots ──────────────────────────────────────────
+          _SectionHeader(
+            title: 'Database Snapshots',
+            icon: Icons.storage_rounded,
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 12),
+            child: Text(
+              'Full PostgreSQL database dumps. These ensure infrastructure-level recovery and local failover synchronization.',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
+            ),
+          ),
+
+          _Card(
+            children: [
+              ListTile(
+                leading: Icon(
+                  Icons.backup_rounded,
+                  color: colorScheme.primary,
+                ),
+                title: const Text('Create Database Snapshot'),
+                subtitle: const Text('Dumps primary DB & syncs to localhost'),
+                trailing: FilledButton.icon(
+                  onPressed: _isDbBackupRunning ? null : _runDbBackup,
+                  icon: _isDbBackupRunning
+                      ? const SizedBox(
+                          width: 14,
+                          height: 14,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.play_arrow_rounded, size: 18),
+                  label: Text(_isDbBackupRunning ? 'Running…' : 'Start'),
+                ),
+              ),
+              if (_isDbBackupRunning)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      LinearProgressIndicator(value: _dbBackupProgress),
+                      const SizedBox(height: 4),
+                      Text(
+                        _dbBackupMessage,
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
+              const Divider(height: 1),
+              if (_loadingSnapshots)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                )
+              else if (_dbSnapshots.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(
+                    child: Text(
+                      'No snapshots found.',
+                      style: TextStyle(color: Colors.grey),
+                    ),
+                  ),
+                )
+              else
+                ..._dbSnapshots.take(5).map(
+                  (f) => ListTile(
+                    dense: true,
+                    leading: const Icon(Icons.insert_drive_file_outlined),
+                    title: Text(f.filename),
+                    subtitle: Text(
+                      DateFormat('yyyy-MM-dd HH:mm').format(f.createdAt),
+                    ),
+                    trailing: Text(f.displaySize),
+                  ),
+                ),
+            ],
+          ),
+
           const SizedBox(height: 40),
         ],
       ),
@@ -752,7 +905,7 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('New Backup Schedule'),
+      title: const Text('New Backup Data Schedule'),
       scrollable: true,
       content: SizedBox(
         width: 420,

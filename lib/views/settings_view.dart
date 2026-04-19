@@ -1,11 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
 
 import '../main.dart'; // To access global themeController
 import '../models/user.dart';
-import '../services/api/backup_api_service.dart';
 import 'new_backup_tab.dart';
 import 'end_of_contract_view.dart';
 import 'totp_setup_dialog.dart';
@@ -72,20 +70,11 @@ class _SettingsViewState extends State<SettingsView> {
         selectedIcon: Icons.security_rounded,
       ),
     ];
-    if (widget.canManageBackup) {
-      list.add(
-        const _SettingsDestination(
-          title: 'Database Backup',
-          icon: Icons.storage_outlined,
-          selectedIcon: Icons.storage_rounded,
-        ),
-      );
-    }
-    // New consumer backup — SME Owner only (role_id == 1)
+    // Manual data backup — SME Owner only (role_id == 1)
     if (widget.user.roleId == 1) {
       list.add(
         const _SettingsDestination(
-          title: 'New Backup',
+          title: 'Backup Data',
           icon: Icons.download_outlined,
           selectedIcon: Icons.download_rounded,
         ),
@@ -109,9 +98,7 @@ class _SettingsViewState extends State<SettingsView> {
         return _GeneralSettingsTab(user: widget.user);
       case 'Security':
         return _SecuritySettingsTab(user: widget.user);
-      case 'Database Backup':
-        return _BackupSettingsTab();
-      case 'New Backup':
+      case 'Backup Data':
         return NewBackupTab(user: widget.user);
       case 'Advanced':
         return _AdvancedSettingsTab(user: widget.user);
@@ -134,7 +121,7 @@ class _SettingsViewState extends State<SettingsView> {
               : AppBar(
                   title: const Text('Settings'),
                   // Show hamburger on mobile if not embedded
-                  leading: isMobile ? null : null, 
+                  leading: isMobile ? null : null,
                 ),
           // Use a drawer on mobile to save space
           drawer: isMobile
@@ -181,10 +168,8 @@ class _SettingsViewState extends State<SettingsView> {
                     behavior: HitTestBehavior.opaque,
                     onHorizontalDragUpdate: (details) {
                       setState(() {
-                        _sidebarWidth = (_sidebarWidth + details.delta.dx).clamp(
-                          _sidebarMinWidth,
-                          _sidebarMaxWidth,
-                        );
+                        _sidebarWidth = (_sidebarWidth + details.delta.dx)
+                            .clamp(_sidebarMinWidth, _sidebarMaxWidth);
                       });
                     },
                     child: SizedBox(
@@ -193,8 +178,9 @@ class _SettingsViewState extends State<SettingsView> {
                         child: VerticalDivider(
                           width: 1,
                           thickness: 1,
-                          color:
-                              Theme.of(context).dividerColor.withOpacity(0.25),
+                          color: Theme.of(
+                            context,
+                          ).dividerColor.withOpacity(0.25),
                         ),
                       ),
                     ),
@@ -278,10 +264,7 @@ class _SettingsSidebar extends StatelessWidget {
                 ),
                 title: Text(
                   'Back to Dashboard',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: colorScheme.onSurface,
-                  ),
+                  style: TextStyle(fontSize: 14, color: colorScheme.onSurface),
                 ),
                 onTap: onBack,
               ),
@@ -379,7 +362,9 @@ class _GeneralSettingsTab extends StatelessWidget {
                   final appearanceTile = ListTile(
                     leading: const Icon(Icons.brightness_medium_rounded),
                     title: const Text('Appearance'),
-                    subtitle: Text(themeController.themeMode.name.toUpperCase()),
+                    subtitle: Text(
+                      themeController.themeMode.name.toUpperCase(),
+                    ),
                     trailing: isNarrow
                         ? null
                         : SegmentedButton<ThemeMode>(
@@ -435,11 +420,12 @@ class _GeneralSettingsTab extends StatelessWidget {
                                 ),
                               ],
                               selected: {themeController.themeMode},
-                              onSelectionChanged: (Set<ThemeMode> newSelection) {
-                                themeController.setThemeMode(
-                                  newSelection.first,
-                                );
-                              },
+                              onSelectionChanged:
+                                  (Set<ThemeMode> newSelection) {
+                                    themeController.setThemeMode(
+                                      newSelection.first,
+                                    );
+                                  },
                               showSelectedIcon: false,
                             ),
                           ),
@@ -550,10 +536,10 @@ class _GeneralSettingsTab extends StatelessWidget {
                               selected: {themeController.navigationMode},
                               onSelectionChanged:
                                   (Set<AppNavigationMode> newSelection) {
-                                themeController.setNavigationMode(
-                                  newSelection.first,
-                                );
-                              },
+                                    themeController.setNavigationMode(
+                                      newSelection.first,
+                                    );
+                                  },
                               showSelectedIcon: false,
                               style: const ButtonStyle(
                                 visualDensity: VisualDensity.compact,
@@ -585,10 +571,10 @@ class _GeneralSettingsTab extends StatelessWidget {
                                 selected: {themeController.navigationMode},
                                 onSelectionChanged:
                                     (Set<AppNavigationMode> newSelection) {
-                                  themeController.setNavigationMode(
-                                    newSelection.first,
-                                  );
-                                },
+                                      themeController.setNavigationMode(
+                                        newSelection.first,
+                                      );
+                                    },
                                 showSelectedIcon: false,
                               ),
                             ),
@@ -617,406 +603,6 @@ class _GeneralSettingsTab extends StatelessWidget {
               _InfoRow(label: 'Role', value: user.role),
             ],
           ),
-          const SizedBox(height: 40),
-        ],
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tab 1 — Database Backup Settings
-// ─────────────────────────────────────────────────────────────────────────────
-class _BackupSettingsTab extends StatefulWidget {
-  @override
-  State<_BackupSettingsTab> createState() => _BackupSettingsTabState();
-}
-
-class _BackupSettingsTabState extends State<_BackupSettingsTab> {
-  final BackupApiService _backupService = BackupApiService();
-
-  // ── Backup state ──────────────────────────────────────────────────────────
-  List<BackupFileInfo> _backupFiles = [];
-  bool _loadingFiles = false;
-  bool _isBackingUp = false;
-  int _progress = 0;
-  String _statusMessage = '';
-  bool _backupSuccess = false;
-  bool _backupError = false;
-  StreamSubscription<BackupSseEvent>? _backupStream;
-
-  // ── Config state ──────────────────────────────────────────────────────────
-  bool _scheduleEnabled = false;
-  String _selectedSchedule = 'Daily';
-  TimeOfDay _scheduledTime = const TimeOfDay(hour: 2, minute: 0);
-  bool _syncLocal = false;
-
-  static const _scheduleOptions = ['Hourly', 'Daily', 'Weekly'];
-
-  @override
-  void initState() {
-    super.initState();
-    _loadBackupFiles();
-    _loadConfig();
-  }
-
-  @override
-  void dispose() {
-    _backupStream?.cancel();
-    super.dispose();
-  }
-
-  Future<void> _loadConfig() async {
-    try {
-      final config = await _backupService.getConfig();
-      if (mounted) {
-        setState(() {
-          _scheduleEnabled = config['schedule_enabled'] ?? false;
-          _selectedSchedule = config['frequency'] ?? 'Daily';
-          _syncLocal = config['sync_local'] ?? false;
-          final timeStr = config['time'] ?? '02:00';
-          final parts = timeStr.split(':');
-          if (parts.length == 2) {
-            _scheduledTime = TimeOfDay(
-              hour: int.tryParse(parts[0]) ?? 2,
-              minute: int.tryParse(parts[1]) ?? 0,
-            );
-          }
-        });
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _saveConfig() async {
-    final timeStr =
-        '${_scheduledTime.hour.toString().padLeft(2, '0')}:${_scheduledTime.minute.toString().padLeft(2, '0')}';
-    final config = {
-      'schedule_enabled': _scheduleEnabled,
-      'frequency': _selectedSchedule,
-      'time': timeStr,
-      'sync_local': _syncLocal,
-    };
-    try {
-      await _backupService.saveConfig(config);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            behavior: SnackBarBehavior.floating,
-            content: Text('Backup settings saved successfully'),
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Theme.of(context).colorScheme.error,
-            content: Text('Failed to save settings: $e'),
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _loadBackupFiles() async {
-    if (!mounted) return;
-    setState(() => _loadingFiles = true);
-    try {
-      final files = await _backupService.listBackups();
-      if (mounted) setState(() => _backupFiles = files);
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _loadingFiles = false);
-    }
-  }
-
-  Future<void> _startBackup() async {
-    if (_isBackingUp) return;
-    setState(() {
-      _isBackingUp = true;
-      _progress = 0;
-      _statusMessage = 'Initializing…';
-      _backupSuccess = false;
-      _backupError = false;
-    });
-
-    try {
-      final stream = _backupService.runBackup(sync: _syncLocal);
-      _backupStream = stream.listen(
-        _onSseEvent,
-        onError: (Object err) {
-          if (mounted) {
-            setState(() {
-              _isBackingUp = false;
-              _backupError = true;
-              _statusMessage = err.toString().replaceFirst('Exception: ', '');
-            });
-          }
-        },
-        cancelOnError: true,
-      );
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isBackingUp = false;
-          _backupError = true;
-          _statusMessage = e.toString().replaceFirst('Exception: ', '');
-        });
-      }
-    }
-  }
-
-  void _onSseEvent(BackupSseEvent event) {
-    if (!mounted) return;
-    setState(() {
-      _progress = event.progress;
-      _statusMessage = event.message;
-
-      if (event.event == 'done') {
-        _isBackingUp = false;
-        _backupSuccess = true;
-        _backupError = false;
-        _loadBackupFiles();
-      } else if (event.event == 'error') {
-        _isBackingUp = false;
-        _backupSuccess = false;
-        _backupError = true;
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // ── Manual Snapshot ───────────────────────────────────────────────
-          _SectionHeader(title: 'Manual Snapshot', icon: Icons.backup_rounded),
-          const SizedBox(height: 12),
-          _SettingsCard(
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.backup_rounded,
-                          color: colorScheme.primary,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Run Now',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const Spacer(),
-                        _StatusBadge(
-                          success: _backupSuccess,
-                          error: _backupError,
-                          running: _isBackingUp,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Creates a full export of current data. If sync is enabled, it also updates the local failover database.',
-                      style: TextStyle(fontSize: 13, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 16),
-                    SwitchListTile(
-                      contentPadding: EdgeInsets.zero,
-                      title: const Text(
-                        'Sync to local failover DB',
-                        style: TextStyle(fontSize: 14),
-                      ),
-                      subtitle: const Text(
-                        'Ensures local database is ready for read-only mode.',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                      value: _syncLocal,
-                      onChanged: (v) => setState(() => _syncLocal = v),
-                    ),
-                    if (_isBackingUp ||
-                        _progress > 0 ||
-                        _backupError ||
-                        _backupSuccess) ...[
-                      const SizedBox(height: 12),
-                      LinearProgressIndicator(
-                        value: _progress / 100,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        _statusMessage,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ],
-                    const SizedBox(height: 16),
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton.icon(
-                        onPressed: _isBackingUp ? null : _startBackup,
-                        icon: _isBackingUp
-                            ? const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : const Icon(Icons.play_arrow_rounded),
-                        label: Text(
-                          _isBackingUp ? 'In Progress...' : 'Run Backup Now',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Automated Schedule ────────────────────────────────────────────
-          _SectionHeader(
-            title: 'Automated Schedule',
-            icon: Icons.event_repeat_rounded,
-          ),
-          const SizedBox(height: 12),
-          _SettingsCard(
-            children: [
-              SwitchListTile(
-                secondary: Icon(
-                  Icons.event_repeat_rounded,
-                  color: colorScheme.secondary,
-                ),
-                title: const Text('Enable Automated Schedule'),
-                value: _scheduleEnabled,
-                onChanged: (v) => setState(() => _scheduleEnabled = v),
-              ),
-              if (_scheduleEnabled) ...[
-                const Divider(indent: 16, endIndent: 16),
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 8,
-                  ),
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _selectedSchedule,
-                    decoration: const InputDecoration(labelText: 'Frequency'),
-                    items: _scheduleOptions
-                        .map((o) => DropdownMenuItem(value: o, child: Text(o)))
-                        .toList(),
-                    onChanged: (v) => setState(() => _selectedSchedule = v!),
-                  ),
-                ),
-                ListTile(
-                  title: const Text('Start Time'),
-                  subtitle: Text(_scheduledTime.format(context)),
-                  trailing: const Icon(Icons.access_time_rounded),
-                  onTap: () async {
-                    final p = await showTimePicker(
-                      context: context,
-                      initialTime: _scheduledTime,
-                    );
-                    if (p != null) setState(() => _scheduledTime = p);
-                  },
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: OutlinedButton(
-                    onPressed: _saveConfig,
-                    child: const Text('Save Schedule Preferences'),
-                  ),
-                ),
-              ],
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Backup History ────────────────────────────────────────────────
-          _SectionHeader(title: 'Backup History', icon: Icons.history_rounded),
-          const SizedBox(height: 12),
-          _SettingsCard(
-            children: [
-              ListTile(
-                leading: const Icon(Icons.history_rounded),
-                title: const Text('Snapshots'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.refresh),
-                  onPressed: _loadBackupFiles,
-                ),
-              ),
-              if (_loadingFiles)
-                const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Center(child: CircularProgressIndicator()),
-                )
-              else if (_backupFiles.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.all(20),
-                  child: Text(
-                    'No snapshots found.',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                )
-              else
-                ..._backupFiles
-                    .take(10)
-                    .map(
-                      (f) => ListTile(
-                        dense: true,
-                        leading: const Icon(Icons.insert_drive_file_outlined),
-                        title: Text(f.filename),
-                        subtitle: Text(
-                          DateFormat('yyyy-MM-dd HH:mm').format(f.createdAt),
-                        ),
-                        trailing: Text(f.displaySize),
-                      ),
-                    ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── Failover Notice ───────────────────────────────────────────────
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colorScheme.secondaryContainer.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: colorScheme.secondaryContainer),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(Icons.info_outline, color: colorScheme.secondary),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Text(
-                    'Local Failover Policy: If Supabase becomes unreachable, the app automatically switches to the local PostgreSQL instance (localhost:5432). '
-                    'The local DB operates in READ-ONLY mode to prevent data diverge until the primary server is restored.',
-                    style: TextStyle(fontSize: 13, height: 1.4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-
           const SizedBox(height: 40),
         ],
       ),
@@ -1097,50 +683,7 @@ class _InfoRow extends StatelessWidget {
   }
 }
 
-class _StatusBadge extends StatelessWidget {
-  final bool success;
-  final bool error;
-  final bool running;
-  const _StatusBadge({
-    required this.success,
-    required this.error,
-    required this.running,
-  });
 
-  @override
-  Widget build(BuildContext context) {
-    if (!running && !success && !error) return const SizedBox.shrink();
-    final Color color;
-    final String label;
-    if (running) {
-      color = Colors.blue;
-      label = 'Running';
-    } else if (success) {
-      color = Colors.green;
-      label = 'Done';
-    } else {
-      color = Colors.red;
-      label = 'Failed';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.5)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-        ),
-      ),
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Advanced Settings Tab
@@ -1663,10 +1206,12 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
                         ),
                         obscureText: !_isNewPasswordVisible,
                         validator: (value) {
-                          if (value?.isEmpty ?? true)
+                          if (value?.isEmpty ?? true) {
                             return 'New password is required';
-                          if (value!.length < 6)
+                          }
+                          if (value!.length < 6) {
                             return 'Password must be at least 6 characters';
+                          }
                           return null;
                         },
                       ),
@@ -1692,10 +1237,12 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
                         ),
                         obscureText: !_isConfirmPasswordVisible,
                         validator: (value) {
-                          if (value?.isEmpty ?? true)
+                          if (value?.isEmpty ?? true) {
                             return 'Please confirm new password';
-                          if (value != _newPasswordController.text)
+                          }
+                          if (value != _newPasswordController.text) {
                             return 'Passwords do not match';
+                          }
                           return null;
                         },
                       ),

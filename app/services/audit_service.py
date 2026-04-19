@@ -21,6 +21,11 @@ class AuditService:
         if user_id is None:
             return
             
+        from app.db.database import is_failover_active
+        if is_failover_active():
+            print(f"INFO: Skipping audit log '{action}' in failover mode.")
+            return
+
         log = AuditLog(
             user_id=user_id,
             action=action,

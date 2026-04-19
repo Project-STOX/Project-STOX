@@ -1,16 +1,17 @@
 import logging
+from typing import Any
 # Forced reload - 2026-04-18 11:03 - Stable Local Revert
 
 
-from fastapi import FastAPI
-from fastapi import HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.audit_middleware import AuditMiddleware
 from app.core.config import get_settings
-from app.db.database import engine
+from app.db.database import engine, is_db_fallback_active
 from app.models import Base
 from app.routes import (
     admin_router,
@@ -31,14 +32,22 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.app_name, version=settings.app_version, debug=settings.debug)
 
-app.add_middleware(AuditMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # More permissive for testing/failover mode
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+class DebugMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin")
+        print(f"DEBUG: Incoming {request.method} request to {request.url.path} from Origin: {origin}")
+        return await call_next(request)
+
+app.add_middleware(DebugMiddleware)
+app.add_middleware(AuditMiddleware)
 
 
 @app.exception_handler(HTTPException)
@@ -72,9 +81,14 @@ async def unhandled_exception_handler(_: Request, exc: Exception) -> JSONRespons
     )
 
 
-@app.get("/health", tags=["system"])
-def health_check() -> dict[str, str]:
-    return {"status": "ok"}
+@app.get(settings.api_prefix + "/health", tags=["system"])
+def health_check() -> dict[str, Any]:
+    is_fallback = is_db_fallback_active()
+    return {
+        "status": "ok",
+        "database_mode": "failover" if is_fallback else "primary",
+        "read_only": is_fallback or settings.local_only_mode
+    }
 
 
 app.include_router(item_router, prefix=settings.api_prefix)
@@ -92,14 +106,23 @@ app.include_router(export_router, prefix=settings.api_prefix)
 
 @app.on_event("startup")
 def on_startup() -> None:
-    try:
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
+    from app.db.database import local_engine, is_db_fallback_active
+
+    # Pre-warm the failover cache (synchronous probe, capped at DB_CONNECT_TIMEOUT_SECONDS).
+    # This ensures the first user request is never blocked by a Supabase probe.
+    fallback = is_db_fallback_active()
+
+    if not fallback:
+        logger.info("Primary DB (Supabase) connected successfully.")
         if settings.create_tables_on_startup:
             Base.metadata.create_all(bind=engine)
-    except Exception as exc:
-        logger.warning(
-            "Database startup check failed; continuing without eager DB validation: %s",
-            exc,
-        )
-
+    else:
+        logger.warning("Primary DB unreachable — verifying local failover DB...")
+        try:
+            with local_engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            logger.info("Local failover DB (localhost) connected. Running in READ-ONLY mode.")
+        except Exception as exc:
+            logger.warning(
+                "Local DB also unreachable: %s — API may be degraded.", exc
+            )

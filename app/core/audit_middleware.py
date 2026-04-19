@@ -6,7 +6,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
 from app.core.security.jwt import decode_token
-from app.db.database import SessionLocal
+from app.db.database import get_db
 from app.services.audit_service import AuditService
 
 
@@ -39,8 +39,10 @@ class AuditMiddleware(BaseHTTPMiddleware):
         # Singularize and capitalize entity_type for display (e.g., 'products' -> 'Product')
         display_entity = entity_type.rstrip('s').capitalize() if entity_type != "unknown" else "Entity"
         descriptive_action = f"{verb} {display_entity}"
-
-        db = SessionLocal()
+        
+        # Use get_db to respect failover logic (primary vs local)
+        db_gen = get_db()
+        db = next(db_gen)
         try:
             # Prevent ForeignKeyViolation by ensuring the user still exists in the DB
             if user_id:
