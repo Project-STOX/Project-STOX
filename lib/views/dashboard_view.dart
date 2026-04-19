@@ -791,12 +791,15 @@ class _DashboardViewState extends State<DashboardView> {
             color: theme.colorScheme.error,
           ),
           const SizedBox(width: 8),
-          Text(
-            'READ-ONLY MODE: Primary server unreachable. Using local snapshot.',
-            style: TextStyle(
-              fontSize: 12,
-              fontWeight: FontWeight.bold,
-              color: theme.colorScheme.error,
+          Expanded(
+            child: Text(
+              'READ-ONLY MODE: Primary server unreachable. Using local snapshot.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: theme.colorScheme.error,
+              ),
             ),
           ),
         ],
