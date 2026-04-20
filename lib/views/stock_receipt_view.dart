@@ -757,11 +757,11 @@ class _StockReceiptViewState extends State<StockReceiptView> {
       return;
     }
 
-    if (quantityReceived <= quantityDamaged) {
+    if (quantityDamaged > quantityReceived) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-            'Quantity received must be larger than quantity damaged.',
+            'Quantity damaged cannot be larger than quantity received.',
           ),
         ),
       );

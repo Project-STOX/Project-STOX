@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # Formats tried in order when parsing a string value for received_at.
@@ -13,6 +13,7 @@ _DATETIME_FORMATS = [
     "%d/%m/%Y %H:%M:%S",
     "%Y-%m-%d %H:%M:%S",
     "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%dT%H:%M:%S.%f",
     "%Y-%m-%dT%H:%M:%SZ",
     "%m/%d/%Y",         # date-only M/D/YYYY
     "%d/%m/%Y",         # date-only D/M/YYYY
@@ -30,6 +31,13 @@ def _parse_received_at(v: Any) -> datetime | None:
         raw = v.strip()
         if not raw:
             return None
+        # Try standard ISO format first
+        try:
+            # Handle 'Z' suffix for older python versions if necessary
+            return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+
         for fmt in _DATETIME_FORMATS:
             try:
                 return datetime.strptime(raw, fmt)
@@ -37,7 +45,7 @@ def _parse_received_at(v: Any) -> datetime | None:
                 continue
         raise ValueError(
             f"Unable to parse '{raw}' as a date/datetime. "
-            "Accepted formats include M/D/YYYY H:MM, M/D/YYYY, YYYY-MM-DD, etc."
+            "Accepted formats include ISO 8601, M/D/YYYY H:MM, M/D/YYYY, YYYY-MM-DD, etc."
         )
     raise TypeError(f"Unsupported type for received_at: {type(v)}")
 
@@ -55,6 +63,12 @@ class StockReceiptBase(BaseModel):
     @classmethod
     def parse_received_at(cls, v: Any) -> datetime | None:
         return _parse_received_at(v)
+
+    @model_validator(mode="after")
+    def validate_damaged_qty(self) -> "StockReceiptBase":
+        if self.quantity_damaged > self.quantity:
+            raise ValueError("Damaged quantity cannot be greater than the total quantity received")
+        return self
 
 
 class StockReceiptCreate(StockReceiptBase):
@@ -74,6 +88,13 @@ class StockReceiptUpdate(BaseModel):
     @classmethod
     def parse_received_at(cls, v: Any) -> datetime | None:
         return _parse_received_at(v)
+
+    @model_validator(mode="after")
+    def validate_damaged_qty(self) -> "StockReceiptUpdate":
+        if self.quantity is not None and self.quantity_damaged is not None:
+            if self.quantity_damaged > self.quantity:
+                raise ValueError("Damaged quantity cannot be greater than the total quantity received")
+        return self
 
 
 class StockReceiptRead(StockReceiptBase):
@@ -96,6 +117,12 @@ class StockReceiptImportRow(BaseModel):
     @classmethod
     def parse_received_at(cls, v: Any) -> datetime | None:
         return _parse_received_at(v)
+
+    @model_validator(mode="after")
+    def validate_damaged_qty(self) -> "StockReceiptImportRow":
+        if self.quantity_damaged > self.quantity:
+            raise ValueError("Damaged quantity cannot be greater than the total quantity received")
+        return self
 
 
 class StockReceiptImportRequest(BaseModel):

@@ -357,6 +357,12 @@ class StockReceiptService:
         next_damaged = int(updates.get("quantity_damaged", receipt.quantity_damaged))
         next_reference_no = updates.get("reference_no", receipt.reference_no)
 
+        if next_damaged > next_quantity:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Damaged quantity cannot be greater than the total quantity received",
+            )
+
         next_product = db.get(Product, next_product_id)
         if next_product is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid product_id")
@@ -372,22 +378,10 @@ class StockReceiptService:
         next_val = next_quantity
 
         if receipt.product_id == next_product_id:
-            adjusted_qty = old_product.current_qty - old_val + next_val
-            if adjusted_qty < 0:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Stock receipt update would make product quantity negative",
-                )
-            old_product.current_qty = adjusted_qty
+            old_product.current_qty = old_product.current_qty - old_val + next_val
             old_product.status_flag = _product_status(old_product.current_qty, old_product.reorder_level)
         else:
-            source_adjusted = old_product.current_qty - old_val
-            if source_adjusted < 0:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="Stock receipt update would make source product quantity negative",
-                )
-            old_product.current_qty = source_adjusted
+            old_product.current_qty -= old_val
             old_product.status_flag = _product_status(old_product.current_qty, old_product.reorder_level)
             next_product.current_qty += next_val
             next_product.status_flag = _product_status(next_product.current_qty, next_product.reorder_level)
@@ -412,13 +406,7 @@ class StockReceiptService:
         product = db.get(Product, receipt.product_id)
         if product is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Linked product does not exist")
-        next_qty = product.current_qty - receipt.quantity
-        if next_qty < 0:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Stock receipt deletion would make product quantity negative",
-            )
-        product.current_qty = next_qty
+        product.current_qty -= receipt.quantity
         product.status_flag = _product_status(product.current_qty, product.reorder_level)
         db.delete(receipt)
         db.commit()

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'services/supabase_service.dart';
+import 'services/api/api_config.dart';
 
 // Import your views
 import 'views/login_view.dart';
@@ -17,8 +18,9 @@ final themeController = ThemeController();
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 1. Initialize DB
+  // 1. Initialize DB and API Config
   await SupabaseService.initializeIfConfigured();
+  await ApiConfig.initialize();
 
   runApp(const MyApp());
 }
