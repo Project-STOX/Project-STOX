@@ -2,7 +2,7 @@
 backup_routes.py
 ----------------
 FastAPI routes for the local PostgreSQL backup feature.
-Requires the "Setup backup" permission for triggering a backup or
+Requires the "Backup data" permission for triggering a backup or
 reading backup metadata.  The permission check is RBAC-driven via
 role_permission table just like every other protected route.
 """
@@ -27,7 +27,7 @@ router = APIRouter(prefix="/backup", tags=["backup"])
 
 @router.get("/list")
 def get_backup_list(
-    _: User = Depends(require_permissions("Setup backup")),
+    _: User = Depends(require_permissions("Backup data")),
 ) -> list[dict]:
     """Return metadata for all existing local backup dump files."""
     return list_backups()
@@ -36,7 +36,7 @@ def get_backup_list(
 @router.post("/run")
 def run_backup(
     sync: bool = False,
-    _: User = Depends(require_permissions("Setup backup")),
+    _: User = Depends(require_permissions("Backup data")),
 ) -> StreamingResponse:
     """
     Trigger a pg_dump of the remote Supabase database and stream
@@ -58,7 +58,7 @@ def run_backup(
 
 @router.get("/config")
 def get_config(
-    _: User = Depends(require_permissions("Setup backup")),
+    _: User = Depends(require_permissions("Backup data")),
 ) -> dict:
     """Return the current backup schedule configuration."""
     return get_backup_config()
@@ -67,7 +67,7 @@ def get_config(
 @router.put("/config")
 def update_config(
     payload: dict,
-    _: User = Depends(require_permissions("Setup backup")),
+    _: User = Depends(require_permissions("Backup data")),
 ) -> dict:
     """Update the backup schedule configuration."""
     save_backup_config(payload)

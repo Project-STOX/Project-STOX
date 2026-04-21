@@ -18,6 +18,8 @@ from starlette.background import BackgroundTask
 from sqlalchemy.orm import Session
 import os
 from typing import Any
+from app.core.security.rbac import require_permissions
+
 
 from app.core.security.dependencies import get_current_user
 from app.db.database import get_db
@@ -58,7 +60,7 @@ class FeedbackRequest(BaseModel):
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.get("/categories")
-def list_categories(_: User = Depends(_require_sme_owner)) -> list[dict[str, str]]:
+def list_categories(_: User = Depends(require_permissions("Backup data"))) -> list[dict[str, str]]:
     """Return all available export categories with display labels."""
     return [
         {"key": "users", "label": "Users", "description": "All user accounts and their assigned roles"},
@@ -93,7 +95,7 @@ def submit_feedback(
 
 @router.get("/schedules")
 def list_schedules(
-    current_user: User = Depends(_require_sme_owner),
+    current_user: User = Depends(require_permissions("Backup data")),
     db: Session = Depends(get_db),
 ) -> list[dict[str, Any]]:
     """Return all backup schedules for the current SME owner."""
@@ -123,7 +125,7 @@ def list_schedules(
 @router.post("/schedules")
 def create_schedule(
     payload: dict[str, Any] = Body(...),
-    current_user: User = Depends(_require_sme_owner),
+    current_user: User = Depends(require_permissions("Backup data")),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Create a new backup schedule."""
@@ -156,7 +158,7 @@ def create_schedule(
 @router.delete("/schedules/{schedule_id}")
 def delete_schedule(
     schedule_id: int,
-    current_user: User = Depends(_require_sme_owner),
+    current_user: User = Depends(require_permissions("Backup data")),
     db: Session = Depends(get_db),
 ) -> dict[str, str]:
     """Delete a backup schedule."""
@@ -176,7 +178,7 @@ def delete_schedule(
 @router.patch("/schedules/{schedule_id}/mark-run")
 def mark_schedule_run(
     schedule_id: int,
-    current_user: User = Depends(_require_sme_owner),
+    current_user: User = Depends(require_permissions("Backup data")),
     db: Session = Depends(get_db),
 ) -> dict[str, Any]:
     """Update the last_run_at timestamp for a schedule."""
@@ -196,7 +198,7 @@ def mark_schedule_run(
 @router.post("/run")
 def run_export(
     payload: dict[str, Any] = Body(...),
-    current_user: User = Depends(_require_sme_owner),
+    current_user: User = Depends(require_permissions("Backup data")),
     db: Session = Depends(get_db),
 ) -> FileResponse:
     """

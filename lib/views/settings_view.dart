@@ -70,8 +70,8 @@ class _SettingsViewState extends State<SettingsView> {
         selectedIcon: Icons.security_rounded,
       ),
     ];
-    // Manual data backup — SME Owner only (role_id == 1)
-    if (widget.user.roleId == 1) {
+    // Manual data backup — based on permissions
+    if (widget.canManageBackup) {
       list.add(
         const _SettingsDestination(
           title: 'Backup Data',
@@ -79,6 +79,9 @@ class _SettingsViewState extends State<SettingsView> {
           selectedIcon: Icons.download_rounded,
         ),
       );
+    }
+    // Advanced (Danger Zone) — SME Owner only
+    if (widget.user.roleId == 1) {
       list.add(
         const _SettingsDestination(
           title: 'Advanced',
@@ -1036,7 +1039,7 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _SectionHeader(
-            title: 'Two-Factor Authentication',
+            title: 'Authentication',
             icon: Icons.shield_rounded,
           ),
           const SizedBox(height: 12),
