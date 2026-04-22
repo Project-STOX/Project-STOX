@@ -1,11 +1,11 @@
 from fastapi import HTTPException, status
-from sqlalchemy import select
-from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import String, select
+from sqlalchemy.orm import Session
 
 from app.core.security.input_sanitizer import sanitize_text
 from app.models.notification import Notification
 from app.models.user import User
-from app.schemas.notification import NotificationRead
+from app.schemas.notification import NotificationRead, NotificationSenderRead
 
 
 class NotificationService:
@@ -13,13 +13,43 @@ class NotificationService:
 
     @staticmethod
     def list_for_user(db: Session, user_id: int) -> list[NotificationRead]:
-        notifications = db.scalars(
-            select(Notification)
+        # Cast type to String so legacy DB values (e.g. "Report") don't trigger enum lookup errors.
+        stmt = (
+            select(
+                Notification.id.label("notification_id"),
+                Notification.sender_id,
+                Notification.recipient_id,
+                Notification.message,
+                Notification.type.cast(String).label("type"),
+                Notification.sent_at,
+                User.id.label("sender_user_id"),
+                User.full_name.label("sender_full_name"),
+            )
+            .join(User, Notification.sender_id == User.id, isouter=True)
             .where(Notification.recipient_id == user_id)
-            .options(selectinload(Notification.sender))
             .order_by(Notification.sent_at.desc())
-        ).all()
-        return [NotificationRead.from_notification(notification) for notification in notifications]
+        )
+        rows = db.execute(stmt).all()
+
+        notifications: list[NotificationRead] = []
+        for row in rows:
+            sender_payload = None
+            if row.sender_user_id is not None and row.sender_full_name is not None:
+                sender_payload = NotificationSenderRead(id=row.sender_user_id, username=row.sender_full_name)
+
+            notifications.append(
+                NotificationRead(
+                    notification_id=row.notification_id,
+                    sender_id=row.sender_id,
+                    recipient_id=row.recipient_id,
+                    message=row.message,
+                    type=str(row.type) if row.type is not None else "",
+                    sent_at=row.sent_at,
+                    sender=sender_payload,
+                )
+            )
+
+        return notifications
 
     @classmethod
     def send_notifications(
