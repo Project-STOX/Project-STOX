@@ -4,7 +4,9 @@ import '../models/user.dart';
 import 'two_factor_view.dart'; // import the 2FA screen
 
 class LoginView extends StatefulWidget {
-  const LoginView({super.key});
+  final AuthController? authController;
+
+  const LoginView({super.key, this.authController});
 
   @override
   _LoginViewState createState() => _LoginViewState();
@@ -13,7 +15,7 @@ class LoginView extends StatefulWidget {
 class _LoginViewState extends State<LoginView> {
   static const String _loginLogoAssetPath = 'assets/images/stox_logo.png';
 
-  final AuthController authController = AuthController();
+  late final AuthController authController;
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   bool _obscurePassword = true;
@@ -24,6 +26,7 @@ class _LoginViewState extends State<LoginView> {
   @override
   void initState() {
     super.initState();
+    authController = widget.authController ?? AuthController();
     _checkAutoLogin();
   }
 

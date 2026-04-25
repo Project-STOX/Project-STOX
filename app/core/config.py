@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     login_challenge_expire_minutes: int = Field(default=5, alias="LOGIN_CHALLENGE_EXPIRE_MINUTES")
     supabase_url: str = Field(default="", alias="SUPABASE_URL")
     supabase_anon_key: str = Field(default="", alias="SUPABASE_ANON_KEY")
+    supabase_auth_timeout_seconds: int = Field(default=10, alias="SUPABASE_AUTH_TIMEOUT_SECONDS")
+    supabase_otp_create_user: bool = Field(default=True, alias="SUPABASE_OTP_CREATE_USER")
+    allow_local_2fa_fallback: bool = Field(default=False, alias="ALLOW_LOCAL_2FA_FALLBACK")
 
     # Local Backup/Failover DB Settings
     local_db_user: str = Field(default="postgres", alias="LOCAL_DB_USER")

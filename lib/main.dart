@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'services/supabase_service.dart';
 import 'services/api/api_config.dart';
 
-// Import your views
+// Imported views
 import 'views/login_view.dart';
 import 'views/dashboard_view.dart';
 import 'views/product_list_view.dart';

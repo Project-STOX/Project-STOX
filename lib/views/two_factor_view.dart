@@ -7,6 +7,7 @@ class TwoFactorView extends StatefulWidget {
   final String email;
   final bool rememberMe;
   final bool isTotp;
+  final AuthController? authController;
 
   const TwoFactorView({
     super.key,
@@ -14,6 +15,7 @@ class TwoFactorView extends StatefulWidget {
     required this.email,
     this.rememberMe = true,
     this.isTotp = false,
+    this.authController,
   });
 
   @override
@@ -21,7 +23,7 @@ class TwoFactorView extends StatefulWidget {
 }
 
 class _TwoFactorViewState extends State<TwoFactorView> {
-  final AuthController authController = AuthController();
+  late final AuthController authController;
   final TextEditingController codeController = TextEditingController();
   bool isLoading = false;
 
@@ -31,6 +33,7 @@ class _TwoFactorViewState extends State<TwoFactorView> {
   @override
   void initState() {
     super.initState();
+    authController = widget.authController ?? AuthController();
     _startCountdown();
   }
 

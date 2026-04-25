@@ -52,6 +52,24 @@ Notes:
 - Do not expose database credentials or service role secrets in Flutter.
 - Flutter should call FastAPI endpoints only.
 
+### Supabase Email OTP (2FA) Settings
+
+Backend email-based 2FA now uses Supabase Auth OTP delivery and verification (no terminal OTP fallback by default).
+
+Required backend environment variables:
+
+```env
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_ANON_KEY=your_supabase_anon_or_publishable_key
+SUPABASE_AUTH_TIMEOUT_SECONDS=10
+ALLOW_LOCAL_2FA_FALLBACK=false
+```
+
+If OTP emails are still not delivered, verify Supabase dashboard settings:
+- Authentication -> Providers -> Email is enabled.
+- Authentication -> URL Configuration and Email Templates are configured for OTP/token delivery.
+- SMTP settings are configured (or default sender limits are not exceeded).
+
 ## Supabase CLI
 
 ```bash

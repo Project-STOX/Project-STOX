@@ -30,7 +30,6 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)) -> dict[str, object]:
-    print(f"DEBUG: Processing login request for {payload.email}")
     return AuthService.login_step_one(db, payload)
 
 
@@ -63,7 +62,6 @@ def has_permissions_batch(
 
 @router.post("/verify-2fa", response_model=TokenPairResponse)
 def verify_2fa(payload: Verify2FARequest, db: Session = Depends(get_db)) -> TokenPairResponse:
-    print(f"DEBUG: verify_2fa payload: {payload}")
     return AuthService.verify_2fa_and_issue_tokens(db, payload.login_challenge, payload.code)
 
 

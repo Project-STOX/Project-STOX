@@ -10,3 +10,5 @@ pyotp
 qrcode[pil]
 email-validator
 python-multipart
+pytest
+certifi

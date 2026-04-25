@@ -1,5 +1,11 @@
 from datetime import UTC, datetime, timedelta
+import json
+import logging
+import random
+import ssl
 from secrets import token_urlsafe
+from urllib.parse import urlparse
+from urllib import error, request
 
 from fastapi import HTTPException, status
 from sqlalchemy import or_, select
@@ -20,8 +26,9 @@ from app.services.audit_service import AuditService
 from app.services.totp_service import TOTPService
 
 settings = get_settings()
+_log = logging.getLogger(__name__)
 
-_LOGIN_CHALLENGES: dict[str, dict[str, int | str]] = {}
+_LOGIN_CHALLENGES: dict[str, dict[str, object]] = {}
 _PENDING_SETUPS: dict[int, dict[str, object]] = {}
 
 
@@ -30,6 +37,161 @@ def _utc_now() -> datetime:
 
 
 class AuthService:
+    @staticmethod
+    def _supabase_ssl_context() -> ssl.SSLContext:
+        """Return an SSL context with a reliable CA bundle for HTTPS calls."""
+        context = ssl.create_default_context()
+        try:
+            import certifi
+
+            return ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            # Fall back to platform certificates if certifi is unavailable.
+            return context
+
+    @staticmethod
+    def _supabase_base_url() -> str:
+        url = settings.supabase_url.strip()
+        # Defensive fix for a common typo seen in local env files.
+        if url.startswith("hhttps://"):
+            url = "https://" + url[len("hhttps://"):]
+        return url.rstrip("/")
+
+    @staticmethod
+    def _is_valid_supabase_url() -> bool:
+        parsed = urlparse(AuthService._supabase_base_url())
+        return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
+
+    @staticmethod
+    def _is_supabase_auth_configured() -> bool:
+        return bool(
+            AuthService._supabase_base_url()
+            and settings.supabase_anon_key.strip()
+            and AuthService._is_valid_supabase_url()
+        )
+
+    @staticmethod
+    def _supabase_headers() -> dict[str, str]:
+        key = settings.supabase_anon_key.strip()
+        return {
+            "apikey": key,
+            "Authorization": f"Bearer {key}",
+            "Content-Type": "application/json",
+        }
+
+    @staticmethod
+    def _send_supabase_email_otp(email_address: str) -> None:
+        if not AuthService._is_valid_supabase_url():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid SUPABASE_URL in backend configuration.",
+            )
+
+        url = f"{AuthService._supabase_base_url()}/auth/v1/otp"
+        payload = {
+            "email": email_address,
+            "create_user": settings.supabase_otp_create_user,
+        }
+        data = json.dumps(payload).encode("utf-8")
+
+        req = request.Request(
+            url,
+            data=data,
+            headers=AuthService._supabase_headers(),
+            method="POST",
+        )
+
+        try:
+            with request.urlopen(
+                req,
+                timeout=settings.supabase_auth_timeout_seconds,
+                context=AuthService._supabase_ssl_context(),
+            ) as response:
+                if response.status < 200 or response.status >= 300:
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail="Failed to send 2FA email via Supabase.",
+                    )
+        except error.HTTPError as exc:
+            raw_body = exc.read().decode("utf-8", errors="ignore")
+            _log.warning("Supabase OTP request failed (%s): %s", exc.code, raw_body)
+            body_json: dict[str, object] = {}
+            try:
+                body_json = json.loads(raw_body) if raw_body else {}
+            except Exception:
+                body_json = {}
+
+            body_code = str(body_json.get("error_code", ""))
+            body_msg = str(body_json.get("msg", ""))
+
+            if exc.code == 429:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many OTP requests. Please wait before trying again.",
+                ) from exc
+
+            if exc.code == 422 and (
+                body_code == "otp_disabled" or "signups not allowed for otp" in body_msg.lower()
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=(
+                        "Supabase Email OTP is currently disabled for this project. "
+                        "Enable Email provider and OTP/signups in Supabase Auth settings."
+                    ),
+                ) from exc
+
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Supabase rejected the OTP email request. Check Supabase Auth email settings and API key.",
+            ) from exc
+        except error.URLError as exc:
+            _log.warning("Supabase OTP request network failure: %s", exc)
+            if "unknown url type" in str(exc.reason).lower():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Invalid SUPABASE_URL in backend configuration.",
+                ) from exc
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not reach Supabase to send the OTP email.",
+            ) from exc
+
+    @staticmethod
+    def _verify_supabase_email_otp(email_address: str, code: str) -> bool:
+        url = f"{AuthService._supabase_base_url()}/auth/v1/verify"
+        payload = {
+            "email": email_address,
+            "token": code,
+            "type": "email",
+        }
+        data = json.dumps(payload).encode("utf-8")
+
+        req = request.Request(
+            url,
+            data=data,
+            headers=AuthService._supabase_headers(),
+            method="POST",
+        )
+
+        try:
+            with request.urlopen(
+                req,
+                timeout=settings.supabase_auth_timeout_seconds,
+                context=AuthService._supabase_ssl_context(),
+            ) as response:
+                return 200 <= response.status < 300
+        except error.HTTPError as exc:
+            # Invalid/expired token is expected as 4xx and should simply fail verification.
+            if 400 <= exc.code < 500:
+                return False
+            raw_body = exc.read().decode("utf-8", errors="ignore")
+            _log.warning("Supabase OTP verify failed (%s): %s", exc.code, raw_body)
+            return False
+        except Exception as exc:
+            _log.warning("Unexpected Supabase OTP verify failure: %s", exc)
+            return False
+
     @staticmethod
     def _get_user_with_role(db: Session, user_id: int) -> User | None:
         stmt = (
@@ -93,60 +255,38 @@ class AuthService:
         user = db.get(User, user_id)
         if not user or not user.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        
+
         challenge = token_urlsafe(32)
-        
-        # In a real Supabase integration, we would call Supabase Auth API here.
-        # If supabase_url and supabase_anon_key are configured, we attempt an OTP request.
-        if settings.supabase_url and settings.supabase_anon_key:
-            try:
-                import json
-                from urllib import request, error
 
-                url = f"{settings.supabase_url.rstrip('/')}/auth/v1/otp"
-                headers = {
-                    "apikey": settings.supabase_anon_key,
-                    "Content-Type": "application/json",
-                }
-                data = json.dumps({"email": user.email, "create_user": False}).encode("utf-8")
-                
-                req = request.Request(url, data=data, headers=headers, method="POST")
-                with request.urlopen(req, timeout=5) as response:
-                    if response.status >= 200 and response.status < 300:
-                        # Supabase doesn't return the code to us (it sends it directly).
-                        # We would need to verify it via Supabase as well.
-                        # For this hybrid implementation, we store a placeholder or wait for verify logic.
-                        pass
-            except error.HTTPError as he:
-                if he.code == 429:
-                    raise HTTPException(
-                        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                        detail="Supabase free limit exceeded. Please try again later or use the default code."
-                    )
-                print(f"Failed to call Supabase OTP ({he.code}): {he.read().decode('utf-8')}")
-            except Exception as e:
-                print(f"Unexpected error calling Supabase OTP: {e}")
+        if AuthService._is_supabase_auth_configured():
+            AuthService._send_supabase_email_otp(user.email)
+            provider = "supabase"
+            code: str | None = None
+        elif settings.allow_local_2fa_fallback:
+            # Fallback is disabled by default and should only be used for local-only development.
+            provider = "local"
+            code = str(random.randint(100000, 999999))
+            _log.warning(
+                "Using local 2FA fallback because Supabase auth is not configured. "
+                "No email will be sent for user %s.",
+                user.email,
+            )
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Supabase email OTP is not configured on the backend.",
+            )
 
-        import random
-        # Generate a random 6-digit code as a primary method or fallback
-        code = str(random.randint(100000, 999999))
-        
-        # Log the code to terminal as requested for development/debugging
-        print(f"\n{'='*40}")
-        print(f"  2FA LOGIN CHALLENGE GENERATED")
-        print(f"  User: {user.email}")
-        print(f"  OTP Code: {code}")
-        print(f"{'='*40}\n")
-        
         _LOGIN_CHALLENGES[challenge] = {
             "user_id": user_id,
             "code": code,
+            "provider": provider,
             "expire_at": int((_utc_now() + timedelta(minutes=settings.login_challenge_expire_minutes)).timestamp())
         }
 
         return {
             "login_challenge": challenge,
-            "message": f"A 2FA code has been sent to {user.email}. Please check your inbox or the backend terminal."
+            "message": f"A 2FA code has been sent to {user.email}. Please check your email inbox."
         }
 
     @staticmethod
@@ -223,38 +363,13 @@ class AuthService:
 
         # Handle email-based 2FA verification
         else:
-            # Security Check: Standard check against stored code
-            is_valid = (code == challenge_data["code"])
-
-            # If Supabase is configured, attempt to verify the token there as well
-            if settings.supabase_url and settings.supabase_anon_key:
-                try:
-                    import json
-                    from urllib import request, error
-
-                    url = f"{settings.supabase_url.rstrip('/')}/auth/v1/verify"
-                    headers = {
-                        "apikey": settings.supabase_anon_key,
-                        "Content-Type": "application/json",
-                    }
-                    for verify_type in ["magiclink", "email"]:
-                        payload = {
-                            "email": user.email,
-                            "token": code,
-                            "type": verify_type
-                        }
-                        data = json.dumps(payload).encode("utf-8")
-
-                        req = request.Request(url, data=data, headers=headers, method="POST")
-                        try:
-                            with request.urlopen(req, timeout=10) as response:
-                                if response.status >= 200 and response.status < 300:
-                                    is_valid = True
-                                    break  # Success!
-                        except error.HTTPError:
-                            continue  # Try next type
-                except Exception as e:
-                    print(f"Unexpected error during Supabase verification: {e}")
+            provider = str(challenge_data.get("provider", "local"))
+            if provider == "supabase" and AuthService._is_supabase_auth_configured():
+                is_valid = AuthService._verify_supabase_email_otp(user.email, code)
+            else:
+                # Local fallback validation (used only when explicitly enabled in env).
+                stored_code = challenge_data.get("code")
+                is_valid = isinstance(stored_code, str) and code == stored_code
 
         if not is_valid:
             # Brute force protection: track and limit failed attempts
