@@ -79,10 +79,7 @@ class _DashboardViewState extends State<DashboardView> {
     _currentUser = widget.user;
     authController.cacheUser(_currentUser);
     _loadSidebarState();
-    // Start the schedule checker only for SME Owner (role_id == 1)
-    if (_currentUser.roleId == 1) {
-      _startScheduleTimer();
-    }
+    // Removed hardcoded role check - now handled in _loadSidebarState based on permissions
     _startHealthCheckTimer();
     themeController.addListener(_onThemeChanged);
   }
@@ -237,7 +234,7 @@ class _DashboardViewState extends State<DashboardView> {
       'View audit log',
       'Import data',
       'View forecasts',
-      'Setup backup',
+      'Backup data',
     ];
 
     final permissionsMap = await authController
@@ -262,8 +259,13 @@ class _DashboardViewState extends State<DashboardView> {
       _canViewAuditLog = permissionsMap['View audit log'] ?? false;
       _canImportData = permissionsMap['Import data'] ?? false;
       _canViewForecasts = permissionsMap['View forecasts'] ?? false;
-      _canSetupBackup = permissionsMap['Setup backup'] ?? false;
+      _canSetupBackup = permissionsMap['Backup data'] ?? false;
       _isSidebarLoading = false;
+
+      // Start the schedule checker if the user has the permission
+      if (_canSetupBackup) {
+        _startScheduleTimer();
+      }
     });
   }
 
