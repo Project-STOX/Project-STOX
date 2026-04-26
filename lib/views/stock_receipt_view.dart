@@ -900,7 +900,6 @@ class _StockReceiptViewState extends State<StockReceiptView> {
   Widget _buildReceiptCard(StockReceipt receipt) {
     return Card(
       child: ListTile(
-        onTap: () => _openReceiptEditor(receipt: receipt),
         leading: const CircleAvatar(child: Icon(Icons.receipt_long)),
         title: Text(_receiptTitle(receipt)),
         subtitle: Text(_receiptSubtitle(receipt)),
@@ -1007,7 +1006,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
                   const SizedBox(height: 8),
                   if (_receipts.isNotEmpty)
                     Text(
-                      'Tap a receipt to edit it. Use the trash icon to delete.',
+                      'Use the pencil icon to edit a receipt. Use the trash icon to delete.',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   if (_receipts.isEmpty)

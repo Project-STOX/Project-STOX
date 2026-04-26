@@ -3,7 +3,7 @@ from decimal import Decimal
 from datetime import date
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select, text
+from sqlalchemy import func, select, text, cast, String, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -80,7 +80,14 @@ class ReportService:
         if end_date is not None:
             stmt = stmt.where(HistoricalSale.sale_date <= end_date)
         if product_query:
-            stmt = stmt.where(Product.name.ilike(f"%{product_query}%") | Product.product_code.ilike(f"%{product_query}%") | Product.sku.ilike(f"%{product_query}%"))
+            stmt = stmt.where(
+                or_(
+                    Product.name.ilike(f"%{product_query}%"),
+                    Product.product_code.ilike(f"%{product_query}%"),
+                    Product.sku.ilike(f"%{product_query}%"),
+                    cast(Product.serial_no, String).ilike(f"%{product_query}%")
+                )
+            )
         if supplier_query:
             stmt = stmt.where(Supplier.name.ilike(f"%{supplier_query}%"))
 

@@ -85,6 +85,15 @@ def list_products(
     )
 
 
+@router.get("/products/suggestions", response_model=list[str])
+def get_product_suggestions(
+    query: str = Query(..., min_length=1),
+    db: Session = Depends(get_db),
+    _: User = Depends(require_any_permissions("Manage products", "Manage stock", "Manage suppliers", "View forecasts")),
+) -> list[str]:
+    return ProductService.search_suggestions(db, query)
+
+
 @router.post("/products", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
 def create_product(
     payload: ProductCreate,

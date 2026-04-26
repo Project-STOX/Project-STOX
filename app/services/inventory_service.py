@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 
 from fastapi import HTTPException, status
 
-from sqlalchemy import Select, select
+from sqlalchemy import Select, select, cast, String, or_
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.security.input_sanitizer import sanitize_text
@@ -168,11 +168,40 @@ class ProductService:
             stmt = stmt.where(Product.status_flag == sanitize_text(status_flag.upper(), max_length=32))
         if search:
             search_value = f"%{sanitize_text(search, max_length=255)}%"
-            stmt = stmt.where(Product.name.ilike(search_value) | Product.sku.ilike(search_value) | Product.product_code.ilike(search_value))
+            stmt = stmt.where(
+                or_(
+                    Product.name.ilike(search_value),
+                    Product.sku.ilike(search_value),
+                    Product.product_code.ilike(search_value),
+                    cast(Product.serial_no, String).ilike(search_value)
+                )
+            )
         products = list(db.scalars(stmt).all())
         for product in products:
             product.status_flag = _normalize_status(product.status_flag, product.current_qty, product.reorder_level)
         return products
+
+    @staticmethod
+    def search_suggestions(db: Session, query: str) -> list[str]:
+        if not query:
+            return []
+        
+        search_value = f"%{sanitize_text(query, max_length=100)}%"
+        
+        stmt_name = select(Product.name).where(Product.name.ilike(search_value)).distinct().limit(5)
+        stmt_sku = select(Product.sku).where(Product.sku.ilike(search_value)).distinct().limit(5)
+        stmt_code = select(Product.product_code).where(Product.product_code.ilike(search_value)).distinct().limit(5)
+        stmt_serial = select(cast(Product.serial_no, String)).where(cast(Product.serial_no, String).ilike(search_value)).distinct().limit(5)
+        
+        results = []
+        results.extend(db.scalars(stmt_name).all())
+        results.extend(db.scalars(stmt_sku).all())
+        results.extend(db.scalars(stmt_code).all())
+        results.extend(db.scalars(stmt_serial).all())
+        
+        # Filter None and empty strings, then deduplicate
+        suggestions = sorted(list(set(str(r) for r in results if r)))
+        return suggestions[:10]
 
     @staticmethod
     def get_product(db: Session, product_id: int) -> Product:

@@ -55,21 +55,21 @@ class _ManageProductsViewState extends State<ManageProductsView> {
 
   void _scheduleFilter() {
     _filterDebounce?.cancel();
-    _filterDebounce = Timer(const Duration(milliseconds: 180), _filterProducts);
+    _filterDebounce = Timer(const Duration(milliseconds: 500), () {
+      loadProducts(search: searchQuery);
+    });
   }
 
-  void loadProducts() async {
+  void loadProducts({String? search}) async {
     try {
-      final data = await controller.fetchProducts();
+      final data = await controller.fetchProducts(search: search);
       if (!mounted) return;
       setState(() {
         products = data;
-        filteredProducts = data;
-        _sortProducts();
+        _filterProductsLocal();
       });
     } catch (e) {
       if (!mounted) return;
-      // Handle error, perhaps show snackbar
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Error loading products: $e')));
@@ -89,29 +89,14 @@ class _ManageProductsViewState extends State<ManageProductsView> {
     }
   }
 
-  void _filterProducts() {
+  void _filterProductsLocal() {
     if (!mounted) return;
     setState(() {
       filteredProducts = products.where((p) {
-        final query = searchQuery.toLowerCase().trim();
-        final productName = _safeLower(p['product_name']);
-        final sku = _safeLower(p['sku']);
-        final productCode = _safeLower(p['product_code']);
-        final supplierName = _safeLower(
-          (p['supplier'] as Map?)?['supplier_name'],
-        );
-        final serialNo = _safeLower(p['serial_no']);
         final statusFlag = _safeText(p['status_flag'], fallback: 'In Stock');
-
-        final matchesSearch =
-            productName.contains(query) ||
-            sku.contains(query) ||
-            productCode.contains(query) ||
-            supplierName.contains(query) ||
-            serialNo.contains(query);
         final matchesStatus =
             selectedStatus == 'All' || statusFlag == selectedStatus;
-        return matchesSearch && matchesStatus;
+        return matchesStatus;
       }).toList();
       _sortProducts();
     });
@@ -186,14 +171,36 @@ class _ManageProductsViewState extends State<ManageProductsView> {
         children: [
           Padding(
             padding: const EdgeInsets.all(8.0),
-            child: TextField(
-              decoration: const InputDecoration(
-                labelText: 'Search',
-                prefixIcon: Icon(Icons.search),
-              ),
-              onChanged: (value) {
-                searchQuery = value;
-                _scheduleFilter();
+            child: Autocomplete<String>(
+              optionsBuilder: (TextEditingValue textEditingValue) async {
+                if (textEditingValue.text.isEmpty) {
+                  return const Iterable<String>.empty();
+                }
+                return await controller.fetchSearchSuggestions(textEditingValue.text);
+              },
+              onSelected: (String selection) {
+                setState(() {
+                  searchQuery = selection;
+                });
+                loadProducts(search: searchQuery);
+              },
+              fieldViewBuilder: (context, textController, focusNode, onFieldSubmitted) {
+                return TextField(
+                  controller: textController,
+                  focusNode: focusNode,
+                  decoration: const InputDecoration(
+                    labelText: 'Search (Name, Serial, Code, SKU)',
+                    prefixIcon: Icon(Icons.search),
+                  ),
+                  onChanged: (value) {
+                    searchQuery = value;
+                    _scheduleFilter();
+                  },
+                  onSubmitted: (value) {
+                    searchQuery = value;
+                    loadProducts(search: value);
+                  },
+                );
               },
             ),
           ),

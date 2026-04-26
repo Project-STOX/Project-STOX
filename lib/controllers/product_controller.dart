@@ -36,8 +36,8 @@ String _displayStatus(String? status) {
 class ProductController {
   final InventoryApiService _api = InventoryApiService();
 
-  Future<List<Map<String, dynamic>>> fetchProducts() async {
-    final products = await _api.listProducts();
+  Future<List<Map<String, dynamic>>> fetchProducts({String? search}) async {
+    final products = await _api.listProducts(search: search);
     final suppliers = await fetchSuppliers();
     final supplierById = <int, Supplier>{
       for (final supplier in suppliers) supplier.supplierId: supplier,
@@ -66,6 +66,10 @@ class ProductController {
             : _supplierToMap(supplier),
       };
     }).toList();
+  }
+
+  Future<List<String>> fetchSearchSuggestions(String query) async {
+    return await _api.getProductSuggestions(query);
   }
 
   Future<void> addProduct(

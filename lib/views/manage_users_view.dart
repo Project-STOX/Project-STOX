@@ -263,7 +263,7 @@ class _ManageUsersViewState extends State<ManageUsersView> {
                             ),
                           ],
                         ),
-                        onTap: () => _showUserDetails(user),
+                        onTap: null,
                       ),
                     );
                   },

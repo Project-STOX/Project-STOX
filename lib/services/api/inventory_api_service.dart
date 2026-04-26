@@ -37,8 +37,23 @@ class InventoryApiService {
     return results;
   }
 
-  Future<List<Map<String, dynamic>>> listProducts() {
-    return _fetchAll('/inventory/products');
+  Future<List<Map<String, dynamic>>> listProducts({String? search}) {
+    return _fetchAll(
+      '/inventory/products',
+      query: search != null ? {'search': search} : null,
+    );
+  }
+
+  Future<List<String>> getProductSuggestions(String query) async {
+    final data = await _api.get(
+      '/inventory/products/suggestions',
+      query: {'query': query},
+      authorized: true,
+    );
+    if (data is List) {
+      return data.map((e) => e.toString()).toList();
+    }
+    return [];
   }
 
   Future<List<Map<String, dynamic>>> listSuppliers() {
