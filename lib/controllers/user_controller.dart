@@ -43,6 +43,7 @@ class UserController {
     int? roleId,
     bool? isActive,
     bool? tfaActive,
+    bool? totpEnabled,
     bool verifyEmailChange = false,
     int? actorUserId,
   }) async {
@@ -53,6 +54,7 @@ class UserController {
       roleId: roleId,
       isActive: isActive,
       tfaActive: tfaActive,
+      totpEnabled: totpEnabled,
     );
   }
 

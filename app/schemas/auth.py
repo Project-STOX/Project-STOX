@@ -29,6 +29,12 @@ class LogoutRequest(BaseModel):
     refresh_token: str
 
 
+class VerifyEmailRequest(BaseModel):
+    email: str | None = Field(default=None, min_length=3, max_length=255)
+    code: str | None = Field(default=None, min_length=1, max_length=10)
+    access_token: str | None = Field(default=None, min_length=1)
+
+
 class TokenPairResponse(BaseModel):
     access_token: str
     refresh_token: str

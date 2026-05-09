@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     frontend_origin: str = Field(default="http://localhost:3000", alias="FRONTEND_ORIGIN")
     frontend_origins: str = Field(default="", alias="FRONTEND_ORIGINS")
+    backend_origin: str = Field(default="http://localhost:8000", alias="BACKEND_ORIGIN")
     jwt_secret_key: str = Field(default="change-me-in-production", alias="JWT_SECRET_KEY")
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(default=15, alias="ACCESS_TOKEN_EXPIRE_MINUTES")

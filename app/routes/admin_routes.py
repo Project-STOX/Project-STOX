@@ -49,7 +49,8 @@ def create_user(
     db: Session = Depends(get_db),
     _: User = Depends(require_permissions("Manage users")),
 ) -> UserRead:
-    existing = db.scalar(select(User).where(User.email == payload.email.lower().strip()))
+    normalized_email = payload.email.lower().strip()
+    existing = db.scalar(select(User).where(User.email == normalized_email))
     if existing is not None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User already exists")
 
@@ -59,13 +60,25 @@ def create_user(
 
     user = User(
         full_name=sanitize_text(payload.username, max_length=50),
-        email=payload.email.lower().strip(),
+        email=normalized_email,
         password_hash=hash_password(payload.password),
         role_id=payload.role_id,
-        is_active=True,
+        is_active=not payload.verify_email,
         tfa_active=False,
+        totp_enabled=False,
     )
     db.add(user)
+
+    if payload.verify_email:
+        from app.services.auth_service import AuthService
+
+        try:
+            db.flush()
+            AuthService.send_email_verification(db, user)
+        except Exception:
+            db.rollback()
+            raise
+
     db.commit()
     db.refresh(user)
     return UserRead.from_user(user)
@@ -118,6 +131,12 @@ def update_user(
             
     if "tfa_active" in changes:
         user.tfa_active = bool(changes["tfa_active"])
+
+    if "totp_enabled" in changes:
+        user.totp_enabled = bool(changes["totp_enabled"])
+        if not user.totp_enabled:
+            user.totp_secret = None
+            user.backup_codes = None
 
     if "role_id" in changes:
         if not is_admin:

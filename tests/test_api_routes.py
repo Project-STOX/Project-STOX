@@ -1,9 +1,13 @@
+import json
 from types import SimpleNamespace
+from typing import Any, cast
 from unittest.mock import Mock
 
 import app.routes.auth_routes as auth_routes
+import app.routes.admin_routes as admin_routes
 import app.routes.forecast_routes as forecast_routes
 import app.routes.inventory_routes as inventory_routes
+import app.services.auth_service as auth_service
 
 
 def _fake_product():
@@ -123,6 +127,186 @@ def test_me_returns_current_user(client):
     assert response.status_code == 200
     assert response.json()["email"] == "admin@stox.local"
     assert response.json()["role"] == "Admin"
+
+
+def test_create_user_without_verification_creates_active_user(client, fake_db, monkeypatch):
+    fake_db.get = lambda model, key: SimpleNamespace(id=1, role_name="Admin") if model.__name__ == "Role" else None
+    fake_db.refresh = lambda obj: setattr(obj, "id", 101)
+
+    monkeypatch.setattr(
+        admin_routes.UserRead,
+        "from_user",
+        classmethod(
+            lambda cls, user: {
+                "id": user.id,
+                "email": user.email,
+                "full_name": user.full_name,
+                "role": "Admin",
+                "role_id": user.role_id,
+                "username": user.full_name,
+                "is_active": user.is_active,
+                "tfa_active": user.tfa_active,
+                "totp_enabled": user.totp_enabled,
+            }
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "New User",
+            "email": "new.user@stox.local",
+            "password": "Secret123!",
+            "role_id": 1,
+            "verify_email": False,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["is_active"] is True
+
+
+def test_create_user_with_verification_sends_email_and_marks_inactive(client, fake_db, monkeypatch):
+    fake_db.get = lambda model, key: SimpleNamespace(id=1, role_name="Admin") if model.__name__ == "Role" else None
+    fake_db.refresh = lambda obj: setattr(obj, "id", 102)
+
+    sent_to: list[str] = []
+
+    def fake_send_email_verification(db, user):
+        sent_to.append(user.email)
+
+    monkeypatch.setattr(
+        auth_service.AuthService,
+        "send_email_verification",
+        staticmethod(fake_send_email_verification),
+    )
+    monkeypatch.setattr(
+        admin_routes.UserRead,
+        "from_user",
+        classmethod(
+            lambda cls, user: {
+                "id": user.id,
+                "email": user.email,
+                "full_name": user.full_name,
+                "role": "Admin",
+                "role_id": user.role_id,
+                "username": user.full_name,
+                "is_active": user.is_active,
+                "tfa_active": user.tfa_active,
+                "totp_enabled": user.totp_enabled,
+            }
+        ),
+    )
+
+    response = client.post(
+        "/api/v1/admin/users",
+        json={
+            "username": "Pending User",
+            "email": "pending.user@stox.local",
+            "password": "Secret123!",
+            "role_id": 1,
+            "verify_email": True,
+        },
+    )
+
+    assert response.status_code == 201
+    assert response.json()["is_active"] is False
+    assert sent_to == ["pending.user@stox.local"]
+
+
+def test_verify_email_activates_pending_user(client, fake_db, monkeypatch):
+    pending_email = "pending.user@stox.local"
+    auth_service._PENDING_EMAIL_VERIFICATIONS[pending_email] = {
+        "user_id": 1,
+        "expire_at": 9999999999,
+    }
+    fake_db.scalar_result = SimpleNamespace(id=1, email=pending_email, is_active=False)
+
+    monkeypatch.setattr(
+        auth_service.AuthService,
+        "_fetch_supabase_user",
+        staticmethod(lambda access_token: {"email": pending_email}),
+    )
+
+    response = client.post(
+        "/api/v1/auth/verify-email",
+        json={"access_token": "access-token-from-callback"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["message"] == "Email verified successfully."
+    assert fake_db.scalar_result.is_active is True
+    assert pending_email not in auth_service._PENDING_EMAIL_VERIFICATIONS
+
+
+def test_verify_email_callback_serves_html(client):
+    response = client.get("/api/v1/auth/verify-email/callback")
+
+    assert response.status_code == 200
+    assert "Verifying your email" in response.text
+    assert "api/v1/auth/verify-email" in response.text
+
+
+def test_send_supabase_signup_confirmation_posts_to_signup_endpoint(monkeypatch):
+    captured = {}
+
+    class FakeResponse:
+        status = 200
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def fake_urlopen(req, timeout, context):
+        captured["url"] = req.full_url
+        captured["body"] = json.loads(req.data.decode("utf-8"))
+        return FakeResponse()
+
+    monkeypatch.setattr(auth_service.settings, "supabase_url", "https://project.supabase.co", raising=False)
+    monkeypatch.setattr(auth_service.settings, "supabase_anon_key", "anon-key", raising=False)
+    monkeypatch.setattr(auth_service.request, "urlopen", fake_urlopen)
+
+    auth_service.AuthService._send_supabase_signup_confirmation(
+        "new.user@stox.local",
+        redirect_to="http://localhost:8000/api/v1/auth/verify-email/callback",
+    )
+
+    assert captured["url"] == (
+        "https://project.supabase.co/auth/v1/signup"
+        "?redirect_to=http%3A%2F%2Flocalhost%3A8000%2Fapi%2Fv1%2Fauth%2Fverify-email%2Fcallback"
+    )
+    assert captured["body"]["email"] == "new.user@stox.local"
+    assert captured["body"]["password"].endswith("Aa1!")
+
+
+def test_send_email_verification_registers_pending_state_with_callback(monkeypatch):
+    captured = {}
+    pending_email = "Pending.User@stox.local"
+
+    def fake_send_signup_confirmation(email_address, redirect_to=None):
+        captured["email"] = email_address
+        captured["redirect_to"] = redirect_to
+
+    monkeypatch.setattr(auth_service.settings, "supabase_url", "https://project.supabase.co", raising=False)
+    monkeypatch.setattr(auth_service.settings, "supabase_anon_key", "anon-key", raising=False)
+    monkeypatch.setattr(auth_service.settings, "backend_origin", "http://localhost:8000", raising=False)
+    monkeypatch.setattr(
+        auth_service.AuthService,
+        "_send_supabase_signup_confirmation",
+        staticmethod(fake_send_signup_confirmation),
+    )
+
+    auth_service.AuthService.send_email_verification(
+        cast(Any, None),
+        cast(Any, SimpleNamespace(id=77, email=pending_email)),
+    )
+
+    assert captured["email"] == pending_email
+    assert captured["redirect_to"] == "http://localhost:8000/api/v1/auth/verify-email/callback"
+    assert auth_service._PENDING_EMAIL_VERIFICATIONS[pending_email.lower()]["user_id"] == 77
+    auth_service._PENDING_EMAIL_VERIFICATIONS.pop(pending_email.lower(), None)
 
 
 def test_forecast_generate_returns_service_payload(client, monkeypatch):

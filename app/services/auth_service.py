@@ -4,7 +4,7 @@ import logging
 import random
 import ssl
 from secrets import token_urlsafe
-from urllib.parse import urlparse
+from urllib.parse import urlencode, urlparse
 from urllib import error, request
 
 from fastapi import HTTPException, status
@@ -30,6 +30,7 @@ _log = logging.getLogger(__name__)
 
 _LOGIN_CHALLENGES: dict[str, dict[str, object]] = {}
 _PENDING_SETUPS: dict[int, dict[str, object]] = {}
+_PENDING_EMAIL_VERIFICATIONS: dict[str, dict[str, object]] = {}
 
 
 def _utc_now() -> datetime:
@@ -80,7 +81,7 @@ class AuthService:
         }
 
     @staticmethod
-    def _send_supabase_email_otp(email_address: str) -> None:
+    def _send_supabase_email_otp(email_address: str, redirect_to: str | None = None) -> None:
         if not AuthService._is_valid_supabase_url():
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -92,6 +93,8 @@ class AuthService:
             "email": email_address,
             "create_user": settings.supabase_otp_create_user,
         }
+        if redirect_to:
+            payload["redirect_to"] = redirect_to
         data = json.dumps(payload).encode("utf-8")
 
         req = request.Request(
@@ -158,6 +161,145 @@ class AuthService:
             ) from exc
 
     @staticmethod
+    def _send_supabase_signup_confirmation(email_address: str, redirect_to: str | None = None) -> None:
+        if not AuthService._is_valid_supabase_url():
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Invalid SUPABASE_URL in backend configuration.",
+            )
+
+        signup_password = f"{token_urlsafe(32)}Aa1!"
+        base_url = f"{AuthService._supabase_base_url()}/auth/v1/signup"
+        if redirect_to:
+            base_url = f"{base_url}?{urlencode({'redirect_to': redirect_to})}"
+
+        payload = {
+            "email": email_address,
+            "password": signup_password,
+        }
+        data = json.dumps(payload).encode("utf-8")
+
+        req = request.Request(
+            base_url,
+            data=data,
+            headers=AuthService._supabase_headers(),
+            method="POST",
+        )
+
+        try:
+            with request.urlopen(
+                req,
+                timeout=settings.supabase_auth_timeout_seconds,
+                context=AuthService._supabase_ssl_context(),
+            ) as response:
+                if response.status < 200 or response.status >= 300:
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail="Failed to send email verification link via Supabase.",
+                    )
+        except error.HTTPError as exc:
+            raw_body = exc.read().decode("utf-8", errors="ignore")
+            _log.warning("Supabase signup request failed (%s): %s", exc.code, raw_body)
+            body_json: dict[str, object] = {}
+            try:
+                body_json = json.loads(raw_body) if raw_body else {}
+            except Exception:
+                body_json = {}
+
+            body_code = str(body_json.get("error_code", ""))
+            body_msg = str(body_json.get("msg", ""))
+
+            if exc.code == 429:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="Too many verification email requests. Please wait before trying again.",
+                ) from exc
+
+            if exc.code in {400, 422} and (
+                body_code == "user_already_exists"
+                or body_code == "email_exists"
+                or "user already registered" in body_msg.lower()
+                or "already registered" in body_msg.lower()
+            ):
+                resend_url = f"{AuthService._supabase_base_url()}/auth/v1/resend"
+                resend_payload = {
+                    "email": email_address,
+                    "type": "signup",
+                }
+                if redirect_to:
+                    resend_payload["emailRedirectTo"] = redirect_to
+
+                resend_req = request.Request(
+                    resend_url,
+                    data=json.dumps(resend_payload).encode("utf-8"),
+                    headers=AuthService._supabase_headers(),
+                    method="POST",
+                )
+
+                try:
+                    with request.urlopen(
+                        resend_req,
+                        timeout=settings.supabase_auth_timeout_seconds,
+                        context=AuthService._supabase_ssl_context(),
+                    ) as response:
+                        if response.status < 200 or response.status >= 300:
+                            raise HTTPException(
+                                status_code=status.HTTP_502_BAD_GATEWAY,
+                                detail="Failed to resend email verification link via Supabase.",
+                            )
+                        return
+                except error.HTTPError as resend_exc:
+                    resend_raw_body = resend_exc.read().decode("utf-8", errors="ignore")
+                    _log.warning("Supabase resend request failed (%s): %s", resend_exc.code, resend_raw_body)
+                    if resend_exc.code == 429:
+                        raise HTTPException(
+                            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                            detail="Too many verification email requests. Please wait before trying again.",
+                        ) from resend_exc
+                    raise HTTPException(
+                        status_code=status.HTTP_502_BAD_GATEWAY,
+                        detail="Supabase rejected the verification resend request. Check Supabase Auth email settings and API key.",
+                    ) from resend_exc
+                except error.URLError as resend_exc:
+                    _log.warning("Supabase resend request network failure: %s", resend_exc)
+                    if "unknown url type" in str(resend_exc.reason).lower():
+                        raise HTTPException(
+                            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Invalid SUPABASE_URL in backend configuration.",
+                        ) from resend_exc
+                    raise HTTPException(
+                        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                        detail="Could not reach Supabase to resend the verification link.",
+                    ) from resend_exc
+
+            if exc.code == 422 and (
+                body_code == "signup_disabled" or "signups not allowed" in body_msg.lower()
+            ):
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail=(
+                        "Supabase signup-based verification is currently disabled for this project. "
+                        "Enable email signups in Supabase Auth settings."
+                    ),
+                ) from exc
+
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Supabase rejected the verification link request. Check Supabase Auth email settings and API key.",
+            ) from exc
+        except error.URLError as exc:
+            _log.warning("Supabase signup request network failure: %s", exc)
+            if "unknown url type" in str(exc.reason).lower():
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Invalid SUPABASE_URL in backend configuration.",
+                ) from exc
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Could not reach Supabase to send the verification link.",
+            ) from exc
+
+    @staticmethod
     def _verify_supabase_email_otp(email_address: str, code: str) -> bool:
         url = f"{AuthService._supabase_base_url()}/auth/v1/verify"
         payload = {
@@ -191,6 +333,118 @@ class AuthService:
         except Exception as exc:
             _log.warning("Unexpected Supabase OTP verify failure: %s", exc)
             return False
+
+    @staticmethod
+    def _fetch_supabase_user(access_token: str) -> dict[str, object]:
+        url = f"{AuthService._supabase_base_url()}/auth/v1/user"
+        req = request.Request(
+            url,
+            headers={
+                **AuthService._supabase_headers(),
+                "Authorization": f"Bearer {access_token.strip()}",
+            },
+            method="GET",
+        )
+
+        try:
+            with request.urlopen(
+                req,
+                timeout=settings.supabase_auth_timeout_seconds,
+                context=AuthService._supabase_ssl_context(),
+            ) as response:
+                raw_body = response.read().decode("utf-8", errors="ignore")
+                data = json.loads(raw_body) if raw_body else {}
+                return data if isinstance(data, dict) else {}
+        except error.HTTPError as exc:
+            raw_body = exc.read().decode("utf-8", errors="ignore")
+            _log.warning("Supabase user lookup failed (%s): %s", exc.code, raw_body)
+            return {}
+        except Exception as exc:
+            _log.warning("Unexpected Supabase user lookup failure: %s", exc)
+            return {}
+
+    @staticmethod
+    def send_email_verification(db: Session, user: User) -> None:
+        if not AuthService._is_supabase_auth_configured():
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Supabase email verification is not configured on the backend.",
+            )
+
+        callback_url = f"{settings.backend_origin.rstrip('/')}/api/v1/auth/verify-email/callback"
+        AuthService._send_supabase_signup_confirmation(user.email, redirect_to=callback_url)
+        _PENDING_EMAIL_VERIFICATIONS[user.email.strip().lower()] = {
+            "user_id": user.id,
+            "expire_at": int((_utc_now() + timedelta(minutes=settings.login_challenge_expire_minutes)).timestamp()),
+        }
+
+    @staticmethod
+    def verify_email_and_activate_user(
+        db: Session,
+        email: str | None = None,
+        code: str | None = None,
+        access_token: str | None = None,
+    ) -> dict[str, str]:
+        normalized_email = email.strip().lower() if email else None
+
+        if access_token:
+            supabase_user = AuthService._fetch_supabase_user(access_token)
+            email_from_token = str(supabase_user.get("email", "")).strip().lower()
+            if not email_from_token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or expired verification session.",
+                )
+            normalized_email = email_from_token
+
+        if not normalized_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="email or access_token is required",
+            )
+
+        pending = _PENDING_EMAIL_VERIFICATIONS.get(normalized_email)
+        if access_token:
+            pending = pending or {"expire_at": int((_utc_now() + timedelta(minutes=settings.login_challenge_expire_minutes)).timestamp())}
+        else:
+            if not pending:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="No pending email verification found for this account.",
+                )
+
+            if int(pending["expire_at"]) < int(_utc_now().timestamp()):
+                _PENDING_EMAIL_VERIFICATIONS.pop(normalized_email, None)
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="The email verification request has expired. Please request a new verification email.",
+                )
+
+        user = db.scalar(select(User).where(User.email == normalized_email))
+        if user is None:
+            _PENDING_EMAIL_VERIFICATIONS.pop(normalized_email, None)
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+        if user.is_active:
+            _PENDING_EMAIL_VERIFICATIONS.pop(normalized_email, None)
+            return {"message": "Email is already verified."}
+
+        if access_token:
+            user.is_active = True
+            db.commit()
+            _PENDING_EMAIL_VERIFICATIONS.pop(normalized_email, None)
+            return {"message": "Email verified successfully."}
+
+        if not code or not AuthService._verify_supabase_email_otp(normalized_email, code.strip()):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired verification code.",
+            )
+
+        user.is_active = True
+        db.commit()
+        _PENDING_EMAIL_VERIFICATIONS.pop(normalized_email, None)
+        return {"message": "Email verified successfully."}
 
     @staticmethod
     def _get_user_with_role(db: Session, user_id: int) -> User | None:

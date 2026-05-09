@@ -301,6 +301,7 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
   late int _selectedRoleId;
   bool _isActive = false;
   bool _tfaActive = false;
+  bool _totpEnabled = false;
   bool _isLoading = false;
 
   @override
@@ -311,6 +312,7 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
     _selectedRoleId = widget.user.roleId;
     _isActive = widget.user.isActive;
     _tfaActive = widget.user.tfaActive;
+    _totpEnabled = widget.user.totpEnabled;
   }
 
   @override
@@ -330,6 +332,7 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
         roleId: _selectedRoleId,
         isActive: _isActive,
         tfaActive: _tfaActive,
+        totpEnabled: _totpEnabled,
         actorUserId: widget.adminId,
       );
       // Check for changes to notify
@@ -408,6 +411,11 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
               title: const Text('2FA Enabled'),
               value: _tfaActive,
               onChanged: (value) => setState(() => _tfaActive = value),
+            ),
+            SwitchListTile(
+              title: const Text('TOTP Enabled'),
+              value: _totpEnabled,
+              onChanged: (value) => setState(() => _totpEnabled = value),
             ),
           ],
         ),

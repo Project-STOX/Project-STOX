@@ -62,6 +62,7 @@ class AdminApiService {
     int? roleId,
     bool? isActive,
     bool? tfaActive,
+    bool? totpEnabled,
   }) async {
     final payload = <String, dynamic>{
       'username': ?username,
@@ -69,6 +70,7 @@ class AdminApiService {
       'role_id': ?roleId,
       'is_active': ?isActive,
       'tfa_active': ?tfaActive,
+      'totp_enabled': ?totpEnabled,
     };
     final data = await _api.put(
       '/admin/users/$userId',
