@@ -47,11 +47,13 @@ class _ImportDataViewState extends State<ImportDataView> {
   };
 
   @override
+  // initialize state and check permission
   void initState() {
     super.initState();
     _checkAccess();
   }
 
+  // check if user has permission to import data
   Future<void> _checkAccess() async {
     final hasPermission = await _authController.hasPermission(
       widget.user.roleId,
@@ -82,6 +84,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     });
   }
 
+  // open file picker and process selected CSV file
   Future<void> _pickFile(String dataType) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
@@ -149,7 +152,7 @@ class _ImportDataViewState extends State<ImportDataView> {
       // Show preview dialog
       await _showPreviewDialog(dataType, rows);
 
-      // TODO: Process `rows` and upload to your database here.
+
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -158,11 +161,12 @@ class _ImportDataViewState extends State<ImportDataView> {
     }
   }
 
+  // decode CSV content into list of rows
   static List<List<dynamic>> _parseCsv(String content) {
     return Csv().decode(content);
   }
 
-  // Validate CSV headers against expected headers for the data type
+  // validate CSV headers match expected format
   String? _validateHeaders(List<String> actualHeaders, String dataType) {
     final expected = _expectedHeaders[dataType];
     if (expected == null) return 'Unknown data type: $dataType';
@@ -182,7 +186,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     return null; // Valid
   }
 
-  // Check for potential duplicates in the database
+  // check if data being imported already exists in database
   Future<String?> _checkForDuplicates(String dataType, List<List<dynamic>> rows) async {
     if (rows.length < 2) return null; // No data rows
 
@@ -207,6 +211,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     return null;
   }
 
+  // check if product SKUs already exist
   Future<String?> _checkProductDuplicates(List<String> headers, List<List<dynamic>> rows) async {
     final skuIndex = headers.indexOf('sku');
     if (skuIndex == -1) return null;
@@ -222,6 +227,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     return null;
   }
 
+  // check if supplier names already exist
   Future<String?> _checkSupplierDuplicates(List<String> headers, List<List<dynamic>> rows) async {
     final nameIndex = headers.indexOf('supplier name');
     if (nameIndex == -1) return null;
@@ -237,8 +243,8 @@ class _ImportDataViewState extends State<ImportDataView> {
     return null;
   }
 
+  // check if stock receipt IDs already exist
   Future<String?> _checkStockReceiptDuplicates(List<String> headers, List<List<dynamic>> rows) async {
-    // For stock receipts, check if receipt_id already exists
     final idIndex = headers.indexOf('receipt id');
     if (idIndex == -1) return null;
 
@@ -253,8 +259,8 @@ class _ImportDataViewState extends State<ImportDataView> {
     return null;
   }
 
+  // check if sale records for same product and date already exist
   Future<String?> _checkSalesDuplicates(List<String> headers, List<List<dynamic>> rows) async {
-    // For sales, check combination of product_code and sale_date
     final productCodeIndex = headers.indexOf('product code');
     final dateIndex = headers.indexOf('sale date');
     if (productCodeIndex == -1 || dateIndex == -1) return null;
@@ -289,6 +295,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     return null;
   }
 
+  // show data preview before importing
   Future<void> _showPreviewDialog(String dataType, List<List<dynamic>> rows) async {
     if (rows.isEmpty || rows.length < 2) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -409,6 +416,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     }
   }
 
+  // route data import based on type
   Future<void> _importData(String dataType, List<List<dynamic>> rows) async {
     if (rows.length < 2) return; // No data rows
 
@@ -443,6 +451,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     }
   }
 
+  // import products to database
   Future<void> _importProducts(List<String> headers, List<List<dynamic>> rows) async {
     for (final row in rows) {
       final productData = _mapRowToProduct(headers, row);
@@ -469,6 +478,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     );
   }
 
+  // import suppliers to database
   Future<void> _importSuppliers(List<String> headers, List<List<dynamic>> rows) async {
     for (final row in rows) {
       final supplierData = _mapRowToSupplier(headers, row);
@@ -491,6 +501,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     );
   }
 
+  // import stock receipts to database
   Future<void> _importStockReceipts(List<String> headers, List<List<dynamic>> rows) async {
     final productCodeToId = await _fetchProductCodeToIdMap();
 
@@ -518,6 +529,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     );
   }
 
+  // import sales history to database
   Future<void> _importSalesHistory(List<String> headers, List<List<dynamic>> rows) async {
     final validProductCodes = await _fetchKnownProductCodes();
 
@@ -554,6 +566,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     );
   }
 
+  // convert CSV row to product data map
   Map<String, dynamic> _mapRowToProduct(List<String> headers, List<dynamic> row) {
     final Map<String, dynamic> data = {};
     for (int i = 0; i < headers.length && i < row.length; i++) {
@@ -614,6 +627,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     return data;
   }
 
+  // convert CSV row to supplier data map
   Map<String, dynamic> _mapRowToSupplier(List<String> headers, List<dynamic> row) {
     final Map<String, dynamic> data = {};
     for (int i = 0; i < headers.length && i < row.length; i++) {
@@ -648,6 +662,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     return data;
   }
 
+  // convert CSV row to stock receipt data map
   Map<String, dynamic> _mapRowToStockReceipt(
     List<String> headers,
     List<dynamic> row,
@@ -691,6 +706,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     return data;
   }
 
+  // convert CSV row to sale data map
   Map<String, dynamic> _mapRowToSale(List<String> headers, List<dynamic> row) {
     final Map<String, dynamic> data = {};
     for (int i = 0; i < headers.length && i < row.length; i++) {
@@ -716,10 +732,12 @@ class _ImportDataViewState extends State<ImportDataView> {
     return data;
   }
 
+  // format product code to uppercase
   String _normalizeProductCode(String value) {
     return value.trim().toUpperCase();
   }
 
+  // convert dynamic value to integer
   int _toInt(dynamic value) {
     if (value == null) return 0;
     if (value is num) return value.toInt();
@@ -728,6 +746,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     return double.tryParse(str)?.toInt() ?? 0;
   }
 
+  // get all existing product codes from database
   Future<Set<String>> _fetchKnownProductCodes() async {
     final response = await _inventoryApi.listProducts();
     final productCodes = <String>{};
@@ -742,6 +761,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     return productCodes;
   }
 
+  // map product codes to their database IDs
   Future<Map<String, int>> _fetchProductCodeToIdMap() async {
     final response = await _inventoryApi.listProducts();
     final productCodeToId = <String, int>{};
@@ -761,6 +781,7 @@ class _ImportDataViewState extends State<ImportDataView> {
     return productCodeToId;
   }
 
+  // download CSV template file
   Future<void> _downloadTemplate(String templateName) async {
     try {
       final csvString = await rootBundle.loadString('lib/csv_templates/$templateName');
@@ -784,6 +805,7 @@ class _ImportDataViewState extends State<ImportDataView> {
   }
 
   @override
+  // build import UI with file upload sections
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(

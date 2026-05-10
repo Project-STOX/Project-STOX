@@ -16,6 +16,7 @@ class SendFeedbackView extends StatefulWidget {
   });
 
   @override
+// Handles createState.
   State<SendFeedbackView> createState() => _SendFeedbackViewState();
 }
 
@@ -36,6 +37,7 @@ class _SendFeedbackViewState extends State<SendFeedbackView> {
     'Other'
   ];
 
+// Handles _submitFeedback.
   Future<void> _submitFeedback() async {
     final message = _messageController.text.trim();
     if (message.isEmpty) {
@@ -86,6 +88,7 @@ class _SendFeedbackViewState extends State<SendFeedbackView> {
   }
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -184,6 +187,7 @@ class _SendFeedbackViewState extends State<SendFeedbackView> {
             child: FilledButton.icon(
               onPressed: _isSending ? null : _submitFeedback,
               icon: _isSending 
+// Handles SizedBox.
                 ? const SizedBox(
                     width: 18, 
                     height: 18, 

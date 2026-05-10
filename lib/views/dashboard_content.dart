@@ -10,6 +10,7 @@ class DashboardContent extends StatefulWidget {
   const DashboardContent({super.key, required this.canViewForecasts});
 
   @override
+// Handles createState.
   State<DashboardContent> createState() => _DashboardContentState();
 }
 
@@ -43,6 +44,7 @@ class _DashboardContentState extends State<DashboardContent> {
   double? _calculatedEoq;
 
   @override
+// Handles initState.
   void initState() {
     super.initState();
     _loadSummary();
@@ -53,12 +55,14 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   @override
+// Handles dispose.
   void dispose() {
     _holdingCostCtrl.dispose();
     _orderingCostCtrl.dispose();
     super.dispose();
   }
 
+// Handles _sqrt.
   double _sqrt(double x) {
     if (x <= 0) return 0;
     double r = x;
@@ -68,6 +72,7 @@ class _DashboardContentState extends State<DashboardContent> {
     return r;
   }
 
+// Handles _computeEoq.
   void _computeEoq() {
     final fd = _forecastData;
     if (fd == null) return;
@@ -87,6 +92,7 @@ class _DashboardContentState extends State<DashboardContent> {
 
   bool _isGeneratingForecast = false;
 
+// Handles _generateAndRefresh.
   Future<void> _generateAndRefresh() async {
     if (!mounted) return;
     setState(() {
@@ -126,6 +132,7 @@ class _DashboardContentState extends State<DashboardContent> {
     }
   }
 
+// Handles _loadSummary.
   Future<void> _loadSummary() async {
     setState(() {
       _isLoadingSummary = true;
@@ -149,6 +156,7 @@ class _DashboardContentState extends State<DashboardContent> {
     }
   }
 
+// Handles _loadAlerts.
   Future<void> _loadAlerts() async {
     setState(() {
       _isLoadingAlerts = true;
@@ -172,6 +180,7 @@ class _DashboardContentState extends State<DashboardContent> {
     }
   }
 
+// Handles _loadProducts.
   Future<void> _loadProducts() async {
     try {
       final products = await _productController.fetchProducts();
@@ -185,6 +194,7 @@ class _DashboardContentState extends State<DashboardContent> {
     }
   }
 
+// Handles _fetchForecast.
   Future<void> _fetchForecast() async {
     if (_selectedProduct == null) return;
     setState(() {
@@ -214,6 +224,7 @@ class _DashboardContentState extends State<DashboardContent> {
     }
   }
 
+// Handles _buildSummaryCard.
   Widget _buildSummaryCard(
     String title,
     String subtitle,
@@ -263,6 +274,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+// Handles _buildProductImportanceCard.
   Widget _buildProductImportanceCard(
     String label,
     Map<String, dynamic>? data,
@@ -293,6 +305,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+// Handles _buildTopSummary.
   Widget _buildTopSummary() {
     if (_isLoadingSummary) {
       return const Center(child: CircularProgressIndicator());
@@ -321,6 +334,7 @@ class _DashboardContentState extends State<DashboardContent> {
               ElevatedButton.icon(
                 onPressed: _isGeneratingForecast ? null : _generateAndRefresh,
                 icon: _isGeneratingForecast
+// Handles SizedBox.
                     ? const SizedBox(
                         width: 16,
                         height: 16,
@@ -403,6 +417,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+// Handles _buildGlobalForecastChart.
   Widget _buildGlobalForecastChart() {
     if (_isLoadingSummary) return const SizedBox.shrink();
     if (_summaryData == null) return const SizedBox.shrink();
@@ -722,6 +737,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+// Handles _buildForecastSection.
   Widget _buildForecastSection() {
     if (!widget.canViewForecasts) {
       return Container(
@@ -845,6 +861,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+// Handles _buildStockGauge.
   Widget _buildStockGauge(
     String status,
     int current,
@@ -938,6 +955,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+// Handles _buildForecastAnalyticsPanel.
   Widget _buildForecastAnalyticsPanel() {
     if (_isLoadingForecast) {
       return const Center(
@@ -1420,6 +1438,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+// Handles _buildStatChip.
   Widget _buildStatChip(
     IconData icon,
     String label,
@@ -1457,6 +1476,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+// Handles _buildRecommendationRow.
   Widget _buildRecommendationRow(String label, String value, Color color) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -1485,6 +1505,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+// Handles _buildLegendItem.
   Widget _buildLegendItem(String name, Color color) {
     return Row(
       children: [
@@ -1495,6 +1516,7 @@ class _DashboardContentState extends State<DashboardContent> {
     );
   }
 
+// Handles _buildAlertsSection.
   Widget _buildAlertsSection() {
     if (_isLoadingAlerts) {
       return const Center(child: CircularProgressIndicator());
@@ -1623,6 +1645,7 @@ class _DashboardContentState extends State<DashboardContent> {
   }
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     return SingleChildScrollView(
       child: Column(

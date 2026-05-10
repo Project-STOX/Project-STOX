@@ -13,12 +13,14 @@ class _ProductListViewState extends State<ProductListView> {
   final ProductController controller = ProductController();
   List<Product> products = [];
 
+  // Initialize state and load products when widget is created
   @override
   void initState() {
     super.initState();
     loadProducts();
   }
 
+  // Fetch products from controller and update the state
   void loadProducts() async {
     try {
       final data = await controller.fetchProducts();
@@ -32,6 +34,7 @@ class _ProductListViewState extends State<ProductListView> {
     }
   }
 
+  // Build the product list UI with a scaffold and list view
   @override
   Widget build(BuildContext context) {
     return Scaffold(

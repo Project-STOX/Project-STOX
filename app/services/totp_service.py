@@ -12,14 +12,14 @@ class TOTPService:
     BACKUP_CODES_COUNT = 10
     BACKUP_CODE_LENGTH = 8
 
+    # generate new totp secret
     @staticmethod
     def generate_secret() -> str:
-        """Generate a new TOTP secret (base32 encoded random bytes)."""
         return pyotp.random_base32()
 
+    # generate backup codes for account recovery
     @staticmethod
     def generate_backup_codes() -> list[str]:
-        """Generate a list of backup codes for account recovery."""
         backup_codes = []
         for _ in range(TOTPService.BACKUP_CODES_COUNT):
             # Generate alphanumeric backup codes
@@ -28,15 +28,16 @@ class TOTPService:
             backup_codes.append(code)
         return backup_codes
 
+    # generate OTP provisioning URI for QR codes
     @staticmethod
     def get_provisioning_uri(email: str, secret: str, app_name: str = "STOX") -> str:
-        """Generate the otpauth provisioning URI for QR codes."""
         totp = pyotp.TOTP(secret)
         return totp.provisioning_uri(
             name=email,
             issuer_name=app_name
         )
 
+    # generate QR code for TOTP setup
     @staticmethod
     def generate_qr_code(email: str, secret: str, app_name: str = "STOX") -> str:
 
@@ -58,6 +59,7 @@ class TOTPService:
         img_str = base64.b64encode(buffered.getvalue()).decode()
         return f"data:image/png;base64,{img_str}"
 
+    # verify TOTP code against secret
     @staticmethod
     def verify_totp_code(secret: str, code: str, window: int = 1) -> bool:
         """
@@ -72,6 +74,7 @@ class TOTPService:
         # Allow slight time drift (current and previous time window)
         return totp.verify(code, valid_window=window)
 
+    # verify and use backup code for login
     @staticmethod
     def use_backup_code(backup_codes: list[str] | None, code: str) -> Tuple[bool, list[str] | None]:
         """

@@ -25,10 +25,11 @@ _BACKUP_DIR = Path("backups")
 # Default config file (persisted locally)
 _CONFIG_PATH = Path("backup_config.json")
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
+# Helpers
+ 
+
+# Parse database connection details from a DSN URL
 def _parse_dsn(database_url: str) -> dict[str, str]:
     """Extract connection components from the SQLAlchemy DATABASE_URL."""
     # Strip driver prefix (e.g. "postgresql+psycopg://..." -> "postgresql://...")
@@ -43,6 +44,7 @@ def _parse_dsn(database_url: str) -> dict[str, str]:
     }
 
 
+# Get connection details for the local PostgreSQL backup target instance
 def _local_dsn() -> dict[str, str]:
     """Return connection details for the LOCAL (backup target) PostgreSQL instance."""
     settings = get_settings()
@@ -55,12 +57,14 @@ def _local_dsn() -> dict[str, str]:
     }
 
 
+# Create and return the backup directory path
 def get_backup_dir() -> Path:
     """Return (and create if necessary) the backup storage directory."""
     _BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     return _BACKUP_DIR
 
 
+# List all backup dump files with metadata sorted by newest first
 def list_backups() -> list[dict]:
     """Return metadata for all backup dump files, newest first."""
     directory = get_backup_dir()
@@ -78,6 +82,7 @@ def list_backups() -> list[dict]:
     return result
 
 
+# Read the backup schedule configuration from disk
 def get_backup_config() -> dict:
     """Read the backup schedule config from disk."""
     if _CONFIG_PATH.exists():
@@ -93,22 +98,24 @@ def get_backup_config() -> dict:
     }
 
 
+# Save the backup schedule configuration to disk
 def save_backup_config(config: dict) -> None:
     """Save the backup schedule config to disk."""
     _CONFIG_PATH.write_text(json.dumps(config, indent=2))
 
 
-# ---------------------------------------------------------------------------
-# SSE event emitter
-# ---------------------------------------------------------------------------
 
+# SSE event emitter
+ 
+
+# Format an SSE (Server-Sent Event) frame with event type and data
 def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
 
-# ---------------------------------------------------------------------------
+ 
 # Core backup runner (synchronous, meant to run inside a thread)
-# ---------------------------------------------------------------------------
+ 
 
 class BackupRunner:
     """
@@ -116,17 +123,20 @@ class BackupRunner:
     The caller drains the queue via async iteration.
     """
 
+    # Initialize the BackupRunner with optional local sync enabled
     def __init__(self, sync_local: bool = False) -> None:
         # Thread-safe queue for SSE frames
         self._queue: asyncio.Queue[str | None] = asyncio.Queue()
         self._loop: asyncio.AbstractEventLoop | None = None
         self.sync_local = sync_local
 
+    # Schedule an SSE frame to be sent in a thread-safe manner
     def _put(self, frame: str) -> None:
         """Thread-safe: schedule a put on the event loop."""
         if self._loop is not None:
             self._loop.call_soon_threadsafe(self._queue.put_nowait, frame)
 
+    # Execute the pg_dump backup process and emit SSE progress events
     def _run_backup(self) -> None:
         """
         Blocking function that runs pg_dump and emits SSE events.
@@ -350,6 +360,7 @@ class BackupRunner:
             # Sentinel: stop the async iterator
             self._put(None)  # type: ignore[arg-type]
 
+    # Create the local database if it does not already exist
     def _ensure_local_db_exists(self, target: dict[str, str], psql_path: str | None) -> None:
         """Attempts to create the local database if it does not exist."""
         if not psql_path:
@@ -385,6 +396,7 @@ class BackupRunner:
         except Exception:
             pass
 
+    # Terminate other user connections to the local database before restore
     def _terminate_local_connections(self, target: dict[str, str], psql_path: str | None) -> None:
         """Kicks out other users from the local DB so pg_restore can --clean it."""
         if not psql_path:
@@ -417,6 +429,7 @@ class BackupRunner:
         except Exception:
             pass
 
+    # Run backup in a thread and yield SSE frames as an async generator
     async def run(self) -> AsyncIterator[str]:
         """
         Async generator that yields SSE frames while the backup runs in a thread.

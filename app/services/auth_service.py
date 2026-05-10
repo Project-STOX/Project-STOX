@@ -34,12 +34,14 @@ _PENDING_EMAIL_VERIFICATIONS: dict[str, dict[str, object]] = {}
 
 
 def _utc_now() -> datetime:
+    # get current utc time
     return datetime.now(UTC)
 
 
 class AuthService:
     @staticmethod
     def _supabase_ssl_context() -> ssl.SSLContext:
+        # make ssl context for supabase
         """Return an SSL context with a reliable CA bundle for HTTPS calls."""
         context = ssl.create_default_context()
         try:
@@ -52,6 +54,7 @@ class AuthService:
 
     @staticmethod
     def _supabase_base_url() -> str:
+        # clean supabase url
         url = settings.supabase_url.strip()
         # Defensive fix for a common typo seen in local env files.
         if url.startswith("hhttps://"):
@@ -60,11 +63,13 @@ class AuthService:
 
     @staticmethod
     def _is_valid_supabase_url() -> bool:
+        # check url is valid
         parsed = urlparse(AuthService._supabase_base_url())
         return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
     @staticmethod
     def _is_supabase_auth_configured() -> bool:
+        # check supabase auth settings
         return bool(
             AuthService._supabase_base_url()
             and settings.supabase_anon_key.strip()
@@ -73,6 +78,7 @@ class AuthService:
 
     @staticmethod
     def _supabase_headers() -> dict[str, str]:
+        # build supabase headers
         key = settings.supabase_anon_key.strip()
         return {
             "apikey": key,
@@ -82,6 +88,7 @@ class AuthService:
 
     @staticmethod
     def _send_supabase_email_otp(email_address: str, redirect_to: str | None = None) -> None:
+        # send otp email
         if not AuthService._is_valid_supabase_url():
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -162,6 +169,7 @@ class AuthService:
 
     @staticmethod
     def _send_supabase_signup_confirmation(email_address: str, redirect_to: str | None = None) -> None:
+        # send signup email
         if not AuthService._is_valid_supabase_url():
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -301,6 +309,7 @@ class AuthService:
 
     @staticmethod
     def _verify_supabase_email_otp(email_address: str, code: str) -> bool:
+        # verify otp code
         url = f"{AuthService._supabase_base_url()}/auth/v1/verify"
         payload = {
             "email": email_address,
@@ -336,6 +345,7 @@ class AuthService:
 
     @staticmethod
     def _fetch_supabase_user(access_token: str) -> dict[str, object]:
+        # get supabase user data
         url = f"{AuthService._supabase_base_url()}/auth/v1/user"
         req = request.Request(
             url,
@@ -365,6 +375,7 @@ class AuthService:
 
     @staticmethod
     def send_email_verification(db: Session, user: User) -> None:
+        # start email verify flow
         if not AuthService._is_supabase_auth_configured():
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -385,6 +396,7 @@ class AuthService:
         code: str | None = None,
         access_token: str | None = None,
     ) -> dict[str, str]:
+        # verify email and activate user
         normalized_email = email.strip().lower() if email else None
 
         if access_token:
@@ -448,6 +460,7 @@ class AuthService:
 
     @staticmethod
     def _get_user_with_role(db: Session, user_id: int) -> User | None:
+        # load user with role
         stmt = (
             select(User)
             .where(User.id == user_id)
@@ -461,6 +474,7 @@ class AuthService:
 
     @staticmethod
     def login_step_one(db: Session, payload: LoginRequest) -> dict[str, object]:
+        # check password and start login
         identifier = sanitize_text(payload.email.strip(), max_length=255)
         normalized = identifier.lower()
         stmt = (
@@ -506,6 +520,7 @@ class AuthService:
 
     @staticmethod
     def generate_2fa_challenge(db: Session, user_id: int) -> dict:
+        # create login challenge
         user = db.get(User, user_id)
         if not user or not user.is_active:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
@@ -545,6 +560,7 @@ class AuthService:
 
     @staticmethod
     def generate_totp_challenge(db: Session, user_id: int) -> dict:
+        # create totp challenge
         """Generate a TOTP challenge for login. Returns challenge ID for verification."""
         user = db.get(User, user_id)
         if not user or not user.is_active:
@@ -574,6 +590,7 @@ class AuthService:
 
     @staticmethod
     def verify_2fa_and_issue_tokens(db: Session, login_challenge: str, code: str) -> TokenPairResponse:
+        # verify 2fa and make tokens
         challenge_data = _LOGIN_CHALLENGES.get(login_challenge)
         if not challenge_data:
             raise HTTPException(
@@ -662,6 +679,7 @@ class AuthService:
 
     @staticmethod
     def refresh_tokens(db: Session, raw_refresh_token: str) -> TokenPairResponse:
+        # issue new tokens
         payload = AuthService._decode_refresh_token_or_401(raw_refresh_token)
         user = AuthService._get_user_with_role(db, int(payload["sub"]))
         if user is None or not user.is_active:
@@ -677,6 +695,7 @@ class AuthService:
 
     @staticmethod
     def logout(db: Session, raw_refresh_token: str) -> None:
+        # revoke refresh token
         # First, find the session associated with this token to identify the user
         token = db.scalar(select(RefreshToken).where(RefreshToken.token == raw_refresh_token))
         if token is not None:
@@ -694,6 +713,7 @@ class AuthService:
 
     @staticmethod
     def _decode_refresh_token_or_401(raw_refresh_token: str) -> dict:
+        # read refresh token or fail
         try:
             payload = decode_token(raw_refresh_token)
         except Exception as exc:
@@ -706,6 +726,7 @@ class AuthService:
 
     @staticmethod
     def _issue_token_pair(db: Session, user: User) -> TokenPairResponse:
+        # make access and refresh tokens
         access_token = create_access_token(user.id, user.role_name)
         refresh_token = create_refresh_token(user.id, user.role_name)
 
@@ -741,6 +762,7 @@ class AuthService:
         new_password: str,
         two_factor_code: str | None = None,
     ) -> None:
+        # change user password
         if not verify_password(current_password, user.password_hash):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid credentials")
         if current_password == new_password:
@@ -760,12 +782,13 @@ class AuthService:
 
     @staticmethod
     def check_user_password(user: User, password: str) -> bool:
-        """Utility for verifying password before high security actions without altering session."""
+        # compare password
         from app.core.security.password import verify_password
         return verify_password(password, user.password_hash)
 
     @staticmethod
     def delete_account(db: Session, *, user: User, two_factor_code: str | None = None) -> None:
+        # delete current account
         user_id = user.id
         # Log before deletion to avoid foreign key issues
         AuditService.write_log(
@@ -785,7 +808,7 @@ class AuthService:
     # TOTP Methods
     @staticmethod
     def setup_totp(db: Session, user: User) -> TOTPSetupResponse:
-        """Initiate TOTP setup for a user. Returns secret, QR code, and backup codes."""
+        # start totp setup
         if user.totp_enabled:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -820,7 +843,7 @@ class AuthService:
 
     @staticmethod
     def verify_totp_setup(db: Session, user: User, totp_code: str) -> TOTPVerifySetupResponse:
-        """Verify TOTP setup with a 6-digit code and enable TOTP for the user."""
+        # confirm totp setup
         pending = _PENDING_SETUPS.get(user.id)
         
         if not pending or int(pending["expires_at"]) < int(_utc_now().timestamp()):
@@ -865,7 +888,7 @@ class AuthService:
 
     @staticmethod
     def disable_totp(db: Session, user: User, password: str) -> None:
-        """Disable TOTP for a user. Requires password verification."""
+        # turn off totp
         if not user.totp_enabled:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -894,5 +917,5 @@ class AuthService:
 
     @staticmethod
     def verify_totp_code_for_login(secret: str, code: str) -> bool:
-        """Verify a TOTP code during login. Supports both TOTP codes and backup codes."""
+        # check totp code for login
         return TOTPService.verify_totp_code(secret, code, window=1)

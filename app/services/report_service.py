@@ -17,6 +17,7 @@ from app.schemas.reports import AuditLogRead, HistoricalSaleImportRow, Historica
 
 class ReportService:
     @staticmethod
+    # Sync PostgreSQL sequence for historical_sales table to match existing rows
     def _sync_historical_sales_sequence(db: Session) -> None:
         # Keep PostgreSQL sequence aligned with existing rows to avoid duplicate PK on insert.
         db.execute(
@@ -33,6 +34,7 @@ class ReportService:
         db.commit()
 
     @staticmethod
+    # Retrieve audit logs with user details, limited to most recent entries
     def list_audit_logs(db: Session, limit: int = 500) -> list[AuditLogRead]:
         rows = db.execute(
             select(AuditLog, User.full_name)
@@ -57,6 +59,7 @@ class ReportService:
         ]
 
     @staticmethod
+    # Query historical sales with optional filtering by date, product, and supplier
     def list_historical_sales(
         db: Session,
         *,
@@ -109,6 +112,7 @@ class ReportService:
         ]
 
     @staticmethod
+    # Import historical sales from CSV rows with validation and error handling
     def import_historical_sales(db: Session, rows: list[HistoricalSaleImportRow]) -> dict[str, object]:
         inserted = 0
         rejected = []

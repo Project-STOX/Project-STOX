@@ -9,6 +9,7 @@ class NotificationsListView extends StatefulWidget {
   const NotificationsListView({super.key, required this.userId, this.isEmbedded = false});
 
   @override
+// Handles createState.
   State<NotificationsListView> createState() => _NotificationsListViewState();
 }
 
@@ -17,6 +18,7 @@ class _NotificationsListViewState extends State<NotificationsListView> {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
 
+// Handles _parseSentAt.
   DateTime? _parseSentAt(dynamic raw) {
     if (raw == null) return null;
     if (raw is DateTime) return raw;
@@ -29,11 +31,13 @@ class _NotificationsListViewState extends State<NotificationsListView> {
   }
 
   @override
+// Handles initState.
   void initState() {
     super.initState();
     _fetchNotifications();
   }
 
+// Handles _fetchNotifications.
   Future<void> _fetchNotifications() async {
     setState(() => _isLoading = true);
     try {
@@ -52,6 +56,7 @@ class _NotificationsListViewState extends State<NotificationsListView> {
     }
   }
 
+// Handles _getTypeColor.
   Color _getTypeColor(String type) {
     switch (type) {
       case 'Info': return Colors.blue;
@@ -64,6 +69,7 @@ class _NotificationsListViewState extends State<NotificationsListView> {
     }
   }
 
+// Handles _getTypeIcon.
   IconData _getTypeIcon(String type) {
     switch (type) {
       case 'Info': return Icons.info;
@@ -77,6 +83,7 @@ class _NotificationsListViewState extends State<NotificationsListView> {
   }
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: widget.isEmbedded
@@ -91,8 +98,10 @@ class _NotificationsListViewState extends State<NotificationsListView> {
               ],
             ),
       body: _isLoading
+// Handles Center.
           ? const Center(child: CircularProgressIndicator())
           : _notifications.isEmpty
+// Handles Center.
               ? const Center(child: Text('No notifications found'))
               : ListView.builder(
                   itemCount: _notifications.length,

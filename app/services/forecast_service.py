@@ -10,12 +10,14 @@ from app.schemas.forecast import ForecastGenerateResponse, ForecastResultItem
 
 
 class ForecastService:
+    # calculate moving average from list of values
     @staticmethod
     def _moving_average(values: list[int]) -> float:
         if not values:
             return 0.0
         return float(sum(values) / len(values))
 
+    # calculate exponential smoothing forecast
     @staticmethod
     def _exponential_smoothing(values: list[int], alpha: float) -> float:
         if not values:
@@ -25,6 +27,7 @@ class ForecastService:
             smoothed = alpha * float(value) + (1 - alpha) * smoothed
         return smoothed
 
+    # generate demand forecast using moving average and exponential smoothing
     @staticmethod
     def generate_forecast(db: Session, *, alpha: float, windows: list[int]) -> ForecastGenerateResponse:
         from sqlalchemy.orm import joinedload

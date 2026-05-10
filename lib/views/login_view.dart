@@ -23,6 +23,7 @@ class _LoginViewState extends State<LoginView> {
   bool _isAutoLoggingIn = true;
   bool _isLoggingIn = false;
 
+  // Initialize auth controller and check for auto login
   @override
   void initState() {
     super.initState();
@@ -30,6 +31,7 @@ class _LoginViewState extends State<LoginView> {
     _checkAutoLogin();
   }
 
+  // Check if user session exists and auto login if valid
   Future<void> _checkAutoLogin() async {
     try {
       // Add a 5-second timeout to prevent hangups if the backend is slow/unreachable
@@ -60,6 +62,7 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
+  // Handle user login with email and password
   void login() async {
     if (_isLoggingIn) return;
     setState(() => _isLoggingIn = true);
@@ -114,6 +117,7 @@ class _LoginViewState extends State<LoginView> {
     }
   }
 
+  // Build login UI with email and password fields
   @override
   Widget build(BuildContext context) {
     if (_isAutoLoggingIn) {

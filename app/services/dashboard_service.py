@@ -31,6 +31,8 @@ class DashboardService:
     def get_summary(
         db: Session, *, supplier_id: int | None = None, activity_limit: int = 10
     ) -> DashboardSummaryResponse:
+        # build main dashboard numbers and recent activity
+
         filters = []
         if supplier_id is not None:
             filters.append(Product.supplier_id == supplier_id)
@@ -67,6 +69,8 @@ class DashboardService:
         ) or Decimal("0.00")
 
         def get_forecast_worth(w_days: int) -> Decimal:
+            # get forecast value for one window size
+
             q = select(func.coalesce(func.sum(DemandForecast.predicted_qty * Product.unit_cost), 0)).join(Product, DemandForecast.product_id == Product.id).where(DemandForecast.window_days == f"{w_days}days", DemandForecast.method == "EXPONENTIAL_SMOOTHING")
             if supplier_id is not None:
                 q = q.where(Product.supplier_id == supplier_id)
@@ -76,6 +80,8 @@ class DashboardService:
         forecast_worth_60d = get_forecast_worth(60)
 
         def get_product_importance(asc_order=False) -> ProductImportance | None:
+            # get top or bottom product by eoq
+
             order_col = ReorderParameter.eoq.asc().nulls_last() if asc_order else ReorderParameter.eoq.desc().nulls_last()
             q = select(Product, Supplier, ReorderParameter).join(Supplier, Product.supplier_id == Supplier.id).join(ReorderParameter, Product.id == ReorderParameter.product_id)
             if supplier_id is not None:
@@ -128,6 +134,8 @@ class DashboardService:
             )
 
         def build_forecast_series(window_days: int, horizon_days: int) -> tuple[list[ForecastSeriesPoint], Decimal, Decimal]:
+                # build moving average and smoothing forecast points
+
             if not historical_values:
                 empty = [
                     ForecastSeriesPoint(
@@ -211,6 +219,8 @@ class DashboardService:
         window: int,
         supplier_id: int | None = None,
     ) -> DashboardForecastResponse:
+        # build detailed forecast for one product
+
         import math
         if window not in {30, 60}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="window must be 30 or 60")
@@ -342,6 +352,8 @@ class DashboardService:
     def get_alerts(
         db: Session, *, supplier_id: int | None = None, limit: int = 50
     ) -> DashboardAlertsResponse:
+        # collect stockout, overstock, and slow items
+
         product_filters = []
         if supplier_id is not None:
             product_filters.append(Product.supplier_id == supplier_id)

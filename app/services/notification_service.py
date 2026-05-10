@@ -11,6 +11,7 @@ from app.schemas.notification import NotificationRead, NotificationSenderRead
 class NotificationService:
     allowed_types = {"Info", "Alert", "Reminder", "System", "Task", "Message"}
 
+    # get all notifications for a user
     @staticmethod
     def list_for_user(db: Session, user_id: int) -> list[NotificationRead]:
         # Cast type to String so legacy DB values (e.g. "Report") don't trigger enum lookup errors.
@@ -51,6 +52,7 @@ class NotificationService:
 
         return notifications
 
+    # send notifications to multiple recipients
     @classmethod
     def send_notifications(
         cls,
@@ -90,6 +92,7 @@ class NotificationService:
         db.commit()
         return len(notifications)
 
+    # get all active users as notification recipients
     @staticmethod
     def list_recipients(db: Session) -> list[User]:
         return db.scalars(select(User).where(User.is_active.is_(True)).order_by(User.full_name.asc())).all()

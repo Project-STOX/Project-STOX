@@ -67,6 +67,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   @override
   void initState() {
+    // Initialize product detail form with product data or empty values
     super.initState();
 
     final product = widget.product;
@@ -126,6 +127,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   @override
   void dispose() {
+    // Dispose scroll controllers and text editing controllers
     _eoqScrollController.dispose();
     _forecastScrollController.dispose();
     nameController.dispose();
@@ -142,6 +144,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Supplier? _selectedSupplier() {
+      // Get the currently selected supplier from the suppliers list
     for (final supplier in widget.suppliers) {
       if (supplier.supplierId == selectedSupplierId) {
         return supplier;
@@ -151,6 +154,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   int? _supplierLeadTime(int supplierId) {
+      // Get lead time for a specific supplier by ID
     for (final supplier in widget.suppliers) {
       if (supplier.supplierId == supplierId) {
         return supplier.leadTimeDays;
@@ -160,22 +164,27 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   int _parseInt(String value, {int defaultValue = 0}) {
+      // Parse string to integer with default value
     return int.tryParse(value.trim()) ?? defaultValue;
   }
 
   double _parseDouble(String value, {double defaultValue = 0}) {
+      // Parse string to double with default value
     return double.tryParse(value.trim()) ?? defaultValue;
   }
 
   String _formatRs(num value) {
+      // Format number as rupees currency string
     return 'Rs. ${value.toStringAsFixed(2)}';
   }
 
   String _formatRsCompact(num value) {
+      // Format number as compact rupees currency string
     return 'Rs. ${NumberFormat.compact().format(value)}';
   }
 
   Future<void> _loadHistory() async {
+      // Load historical sales data for the product
     final product = widget.product;
     if (product == null || product.productId == 0) {
       if (!mounted) return;
@@ -208,6 +217,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   List<_DailyDemandPoint> get _dailyDemandSeries {
+      // Calculate daily demand points from historical sales data
     if (_historicalSales.isEmpty) {
       return [];
     }
@@ -235,6 +245,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   double get _dailyDemand {
+      // Calculate average daily demand from historical sales
     final demandSeries = _dailyDemandSeries;
     if (demandSeries.isEmpty) {
       return 0;
@@ -252,17 +263,22 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   double get _annualDemand => _dailyDemand * 365;
 
+  // Calculate annual demand based on daily average
   double get _unitCost => _parseDouble(costController.text);
 
+  // Get unit cost from controller
   double get _orderingCostPerOrder =>
+        // Get ordering cost per order from controller
       _parseDouble(orderingCostController.text, defaultValue: 50.0);
 
   double get _holdingCostPerUnitPerYear => math.max(
+      // Get holding cost per unit per year from controller
     1.0,
     _parseDouble(holdingCostController.text, defaultValue: _unitCost * 0.25),
   );
 
   int get _leadTimeDays {
+      // Get lead time days from controller or supplier
     final parsed = _parseInt(leadTimeController.text);
     if (parsed > 0) {
       return parsed;
@@ -272,12 +288,15 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   int get _safetyStock => _parseInt(safetyStockController.text);
 
+  // Get safety stock from controller
   int get _reorderPoint {
+      // Calculate reorder point based on daily demand, lead time, and safety stock
     final value = (_dailyDemand * _leadTimeDays) + _safetyStock;
     return value.ceil();
   }
 
   double get _eoq {
+      // Calculate economic order quantity using EOQ formula
     final annualDemand = _annualDemand;
     if (annualDemand <= 0) {
       return 0;
@@ -292,6 +311,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   List<FlSpot> _buildDemandSpots(List<_DailyDemandPoint> points) {
+      // Convert daily demand points to chart coordinates
     return List<FlSpot>.generate(
       points.length,
       (index) => FlSpot(index.toDouble(), points[index].quantity),
@@ -299,6 +319,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   List<FlSpot> _buildMovingAverageSpots(
+      // Calculate moving average line points for demand chart
     List<_DailyDemandPoint> points,
     int window,
   ) {
@@ -319,6 +340,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   List<FlSpot> _buildExponentialSmoothingSpots(
+      // Calculate exponential smoothing line points for demand chart
     List<_DailyDemandPoint> points,
     double alpha,
   ) {
@@ -340,6 +362,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   List<FlSpot> _buildEoqSpots(double maxQuantity, double step) {
+      // Calculate EOQ chart coordinates for total cost curve
     final spots = <FlSpot>[];
     for (double quantity = step; quantity <= maxQuantity; quantity += step) {
       final orderingCost = (_annualDemand / quantity) * _orderingCostPerOrder;
@@ -350,6 +373,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   void _resetEoqChart() {
+      // Reset EOQ chart zoom and scroll position
     setState(() {
       _eoqZoom = 1.0;
     });
@@ -359,6 +383,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   void _resetForecastChart() {
+      // Reset forecast chart zoom and scroll position
     setState(() {
       _forecastZoom = 1.0;
     });
@@ -368,6 +393,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _buildMetricCard(
+      // Build a metric display card with icon and value
     String label,
     String value,
     IconData icon,
@@ -402,6 +428,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _buildChartCard({
+      // Build a chart container with title, zoom controls, and legend
     required String title,
     required String subtitle,
     required String xAxisLabel,
@@ -501,6 +528,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _buildLegendItem({required Color color, required String label}) {
+      // Build legend item with color indicator and label
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -516,6 +544,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _buildEoqChart() {
+      // Build EOQ projection chart showing total, ordering, and holding costs
     final eoq = _eoq;
     if (_annualDemand <= 0) {
       return const SizedBox(
@@ -634,6 +663,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Widget _buildForecastChart() {
+      // Build demand forecast chart with moving average and exponential smoothing
     final demandSeries = _dailyDemandSeries;
     if (demandSeries.isEmpty) {
       return const SizedBox(
@@ -745,6 +775,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   void _scanSerial() async {
+      // Open barcode scanner to capture serial number
     final result = await Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const BarcodeScannerView()),
@@ -755,6 +786,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Future<void> _save() async {
+      // Save product changes to controller and navigate back
     try {
       final leadTimeDays = _leadTimeDays;
       final safetyStock = _safetyStock;
@@ -793,6 +825,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
   }
 
   Future<void> _delete() async {
+      // Delete product after confirmation and navigate back
     if (widget.onDelete == null) return;
 
     try {
@@ -812,6 +845,7 @@ class _ProductDetailPageState extends State<ProductDetailPage> {
 
   @override
   Widget build(BuildContext context) {
+      // Build product detail form with fields, charts, and metrics
     final isNew = widget.product == null;
     return Scaffold(
       appBar: AppBar(
@@ -1100,8 +1134,10 @@ class _BarcodeScannerViewState extends State<BarcodeScannerView> {
 
   @override
   void dispose() {
+    // Dispose mobile scanner controller
     controller.dispose();
     super.dispose();
+    // Build barcode scanner UI with camera and torch button
   }
 
   @override

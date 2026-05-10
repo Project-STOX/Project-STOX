@@ -11,6 +11,7 @@ class SendNotificationView extends StatefulWidget {
   const SendNotificationView({super.key, required this.senderId, this.isEmbedded = false});
 
   @override
+// Handles createState.
   State<SendNotificationView> createState() => _SendNotificationViewState();
 }
 
@@ -38,11 +39,13 @@ class _SendNotificationViewState extends State<SendNotificationView> {
   ];
 
   @override
+// Handles initState.
   void initState() {
     super.initState();
     _loadData();
   }
 
+// Handles _loadData.
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
@@ -63,6 +66,7 @@ class _SendNotificationViewState extends State<SendNotificationView> {
     }
   }
 
+// Handles _filteredUsers.
   List<UserModel> get _filteredUsers {
     List<UserModel> users = _allUsers;
     if (_selectedRoleIds.isNotEmpty) {
@@ -79,6 +83,7 @@ class _SendNotificationViewState extends State<SendNotificationView> {
     return users;
   }
 
+// Handles _send.
   void _send() async {
     if (_messageController.text.trim().isEmpty) {
       ScaffoldMessenger.of(
@@ -124,10 +129,12 @@ class _SendNotificationViewState extends State<SendNotificationView> {
   }
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: widget.isEmbedded ? null : AppBar(title: const Text('Send Message')),
       body: _isLoading
+// Handles Center.
           ? const Center(child: CircularProgressIndicator())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16.0),

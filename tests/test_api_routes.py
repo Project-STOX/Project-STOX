@@ -11,6 +11,7 @@ import app.services.auth_service as auth_service
 
 
 def _fake_product():
+    # fake product data for route tests
     return SimpleNamespace(
         id=10,
         product_code="P-001",
@@ -30,6 +31,7 @@ def _fake_product():
 
 
 def _fake_supplier():
+    # fake supplier data for route tests
     return SimpleNamespace(
         id=7,
         name="Test Supplier",
@@ -42,6 +44,7 @@ def _fake_supplier():
 
 
 def _fake_forecast_payload():
+    # fake forecast payload for route tests
     return {
         "generated_records": 1,
         "forecasts": [
@@ -57,6 +60,7 @@ def _fake_forecast_payload():
 
 
 def test_health_endpoint_reports_ok(client, monkeypatch):
+    # check health endpoint response
     monkeypatch.setattr("main.is_db_fallback_active", lambda: False)
     monkeypatch.setattr("main.settings", type("S", (), {"local_only_mode": False})())
 
@@ -69,6 +73,7 @@ def test_health_endpoint_reports_ok(client, monkeypatch):
 
 
 def test_login_returns_token_pair(client, monkeypatch):
+    # check login returns tokens
     monkeypatch.setattr(
         auth_routes.AuthService,
         "login_step_one",
@@ -100,12 +105,14 @@ def test_login_returns_token_pair(client, monkeypatch):
 
 
 def test_login_rejects_empty_payload(client):
+    # check empty login payload fails
     response = client.post("/api/v1/auth/login", json={})
 
     assert response.status_code == 422
 
 
 def test_generate_2fa_requires_user_or_email(client):
+    # check 2fa needs user or email
     response = client.post("/api/v1/auth/generate-2fa", json={})
 
     assert response.status_code == 400
@@ -113,6 +120,7 @@ def test_generate_2fa_requires_user_or_email(client):
 
 
 def test_generate_2fa_unknown_email_returns_404(client, fake_db):
+    # check unknown email gives not found
     fake_db.scalar_result = None
 
     response = client.post("/api/v1/auth/generate-2fa", json={"email": "missing@stox.local"})
@@ -122,6 +130,7 @@ def test_generate_2fa_unknown_email_returns_404(client, fake_db):
 
 
 def test_me_returns_current_user(client):
+    # check current user endpoint
     response = client.get("/api/v1/auth/me")
 
     assert response.status_code == 200
@@ -130,6 +139,7 @@ def test_me_returns_current_user(client):
 
 
 def test_create_user_without_verification_creates_active_user(client, fake_db, monkeypatch):
+    # check user create without email verify
     fake_db.get = lambda model, key: SimpleNamespace(id=1, role_name="Admin") if model.__name__ == "Role" else None
     fake_db.refresh = lambda obj: setattr(obj, "id", 101)
 
@@ -167,6 +177,7 @@ def test_create_user_without_verification_creates_active_user(client, fake_db, m
 
 
 def test_create_user_with_verification_sends_email_and_marks_inactive(client, fake_db, monkeypatch):
+    # check user create with email verify
     fake_db.get = lambda model, key: SimpleNamespace(id=1, role_name="Admin") if model.__name__ == "Role" else None
     fake_db.refresh = lambda obj: setattr(obj, "id", 102)
 
@@ -215,6 +226,7 @@ def test_create_user_with_verification_sends_email_and_marks_inactive(client, fa
 
 
 def test_verify_email_activates_pending_user(client, fake_db, monkeypatch):
+    # check email verify activates user
     pending_email = "pending.user@stox.local"
     auth_service._PENDING_EMAIL_VERIFICATIONS[pending_email] = {
         "user_id": 1,
@@ -240,6 +252,7 @@ def test_verify_email_activates_pending_user(client, fake_db, monkeypatch):
 
 
 def test_verify_email_callback_serves_html(client):
+    # check verify callback page
     response = client.get("/api/v1/auth/verify-email/callback")
 
     assert response.status_code == 200
@@ -248,6 +261,7 @@ def test_verify_email_callback_serves_html(client):
 
 
 def test_send_supabase_signup_confirmation_posts_to_signup_endpoint(monkeypatch):
+    # check signup request goes to supabase
     captured = {}
 
     class FakeResponse:
@@ -282,6 +296,7 @@ def test_send_supabase_signup_confirmation_posts_to_signup_endpoint(monkeypatch)
 
 
 def test_send_email_verification_registers_pending_state_with_callback(monkeypatch):
+    # check verification state is saved
     captured = {}
     pending_email = "Pending.User@stox.local"
 
@@ -310,6 +325,7 @@ def test_send_email_verification_registers_pending_state_with_callback(monkeypat
 
 
 def test_forecast_generate_returns_service_payload(client, monkeypatch):
+    # check forecast endpoint response
     called = {}
 
     def fake_generate_forecast(db, *, alpha, windows):
@@ -327,6 +343,7 @@ def test_forecast_generate_returns_service_payload(client, monkeypatch):
 
 
 def test_create_supplier_returns_created_resource(client, monkeypatch):
+    # check supplier create route
     monkeypatch.setattr(inventory_routes.SupplierService, "create_supplier", staticmethod(lambda db, payload, created_by: _fake_supplier()))
 
     response = client.post(
@@ -347,6 +364,7 @@ def test_create_supplier_returns_created_resource(client, monkeypatch):
 
 
 def test_create_product_returns_created_resource(client, monkeypatch):
+    # check product create route
     monkeypatch.setattr(inventory_routes.ProductService, "create_product", staticmethod(lambda db, payload, actor_id: _fake_product()))
 
     response = client.post(
@@ -373,6 +391,7 @@ def test_create_product_returns_created_resource(client, monkeypatch):
 
 
 def test_product_import_rejects_non_csv_file(client):
+    # check product import rejects bad file
     response = client.post(
         "/api/v1/inventory/products/import-csv",
         files={"file": ("products.txt", b"not csv", "text/plain")},
@@ -383,6 +402,7 @@ def test_product_import_rejects_non_csv_file(client):
 
 
 def test_stock_receipt_import_rejects_empty_csv(client):
+    # check empty receipt csv fails
     response = client.post(
         "/api/v1/inventory/stock-receipts/import-csv",
         files={"file": ("receipts.csv", b"", "text/csv")},
@@ -393,6 +413,7 @@ def test_stock_receipt_import_rejects_empty_csv(client):
 
 
 def test_stock_receipt_list_query_validation_rejects_zero_limit(client):
+    # check invalid limit fails
     response = client.get("/api/v1/inventory/stock-receipts?limit=0")
 
     assert response.status_code == 422

@@ -19,6 +19,7 @@ class TwoFactorView extends StatefulWidget {
   });
 
   @override
+// Handles createState.
   _TwoFactorViewState createState() => _TwoFactorViewState();
 }
 
@@ -31,12 +32,14 @@ class _TwoFactorViewState extends State<TwoFactorView> {
   int _remainingSeconds = 300; // 5 minutes = 300 seconds
 
   @override
+// Handles initState.
   void initState() {
     super.initState();
     authController = widget.authController ?? AuthController();
     _startCountdown();
   }
 
+// Handles _startCountdown.
   void _startCountdown() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds > 0) {
@@ -50,12 +53,14 @@ class _TwoFactorViewState extends State<TwoFactorView> {
   }
 
   @override
+// Handles dispose.
   void dispose() {
     _timer.cancel();
     codeController.dispose();
     super.dispose();
   }
 
+// Handles verifyCode.
   void verifyCode() async {
     setState(() => isLoading = true);
 
@@ -78,6 +83,7 @@ class _TwoFactorViewState extends State<TwoFactorView> {
     }
   }
 
+// Handles resendCode.
   void resendCode() async {
     setState(() => isLoading = true);
     try {
@@ -111,6 +117,7 @@ class _TwoFactorViewState extends State<TwoFactorView> {
     }
   }
 
+// Handles _formatTime.
   String _formatTime(int seconds) {
     final minutes = (seconds ~/ 60).toString().padLeft(2, '0');
     final secs = (seconds % 60).toString().padLeft(2, '0');
@@ -118,6 +125,7 @@ class _TwoFactorViewState extends State<TwoFactorView> {
   }
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     final isTotpMode = widget.isTotp;
 
@@ -165,6 +173,7 @@ class _TwoFactorViewState extends State<TwoFactorView> {
             ),
             const SizedBox(height: 20),
             isLoading
+// Handles CircularProgressIndicator.
                 ? const CircularProgressIndicator()
                 : Column(
                     children: [

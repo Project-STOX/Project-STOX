@@ -28,6 +28,7 @@ class _SupplierDetailPageState extends State<SupplierDetailPage> {
   late TextEditingController contactController;
   late TextEditingController leadTimeController;
 
+  // Initialize text controllers with supplier data or empty values
   @override
   void initState() {
     super.initState();
@@ -47,6 +48,7 @@ class _SupplierDetailPageState extends State<SupplierDetailPage> {
     }
   }
 
+  // Clean up all text controllers on dispose
   @override
   void dispose() {
     supplierIdController.dispose();
@@ -57,6 +59,7 @@ class _SupplierDetailPageState extends State<SupplierDetailPage> {
     super.dispose();
   }
 
+  // Save supplier changes and navigate back
   void _save() async {
     try {
       final updated = Supplier(
@@ -78,6 +81,7 @@ class _SupplierDetailPageState extends State<SupplierDetailPage> {
     }
   }
 
+  // Delete supplier and navigate back
   void _delete() async {
     try {
       if (widget.onDelete != null) {
@@ -94,6 +98,7 @@ class _SupplierDetailPageState extends State<SupplierDetailPage> {
     }
   }
 
+  // Build supplier detail UI with form fields and action buttons
   @override
   Widget build(BuildContext context) {
     final isNew = widget.supplier == null;

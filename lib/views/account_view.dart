@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../controllers/user_controller.dart';
-import '../controllers/auth_controller.dart';
 import '../models/user.dart';
 
 class AccountView extends StatefulWidget {
@@ -21,16 +20,15 @@ class AccountView extends StatefulWidget {
 
 class _AccountViewState extends State<AccountView> {
   final UserController _userController = UserController();
-  final AuthController _authController = AuthController();
   final _formKey = GlobalKey<FormState>();
 
   late TextEditingController _usernameController;
   late TextEditingController _emailController;
 
-  bool _tfaActive = false;
   bool _isLoading = false;
   final bool _useTfaForPasswordChange = false;
   bool _verifyEmailChange = true;
+  bool _tfaActive = false;
 
   @override
   void initState() {

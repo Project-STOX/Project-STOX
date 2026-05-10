@@ -3,6 +3,7 @@ import '../models/supplier.dart';
 import '../services/api/inventory_api_service.dart';
 
 int _toInt(dynamic value, {int defaultValue = 0}) {
+  // make api value into int
   if (value is num) {
     return value.toInt();
   }
@@ -10,6 +11,7 @@ int _toInt(dynamic value, {int defaultValue = 0}) {
 }
 
 Map<String, dynamic> _supplierToMap(Supplier supplier) {
+  // make supplier map for ui
   return {
     'supplier_id': supplier.supplierId,
     'supplier_name': supplier.supplierName,
@@ -21,6 +23,7 @@ Map<String, dynamic> _supplierToMap(Supplier supplier) {
 }
 
 String _displayStatus(String? status) {
+  // show simple status text
   switch ((status ?? '').toUpperCase()) {
     case 'LOW_STOCK':
       return 'Low Stock';
@@ -37,6 +40,7 @@ class ProductController {
   final InventoryApiService _api = InventoryApiService();
 
   Future<List<Map<String, dynamic>>> fetchProducts({String? search}) async {
+    // load products and supplier data
     final products = await _api.listProducts(search: search);
     final suppliers = await fetchSuppliers();
     final supplierById = <int, Supplier>{
@@ -69,6 +73,7 @@ class ProductController {
   }
 
   Future<List<String>> fetchSearchSuggestions(String query) async {
+    // get search hints from api
     return await _api.getProductSuggestions(query);
   }
 
@@ -77,6 +82,7 @@ class ProductController {
     int roleId, {
     int? actorUserId,
   }) async {
+    // send new product to api
     await _api.createProduct({
       'product_code': product.productCode,
       'sku': product.sku,
@@ -100,6 +106,7 @@ class ProductController {
     int roleId, {
     int? actorUserId,
   }) async {
+    // send edited product to api
     await _api.updateProduct(product.productId, {
       'product_code': product.productCode,
       'sku': product.sku,
@@ -123,10 +130,12 @@ class ProductController {
     int roleId, {
     int? actorUserId,
   }) async {
+    // delete product from api
     await _api.deleteProduct(productId);
   }
 
   Future<List<Supplier>> fetchSuppliers() async {
+    // load suppliers from api
     final response = await _api.listSuppliers();
     return response.map((json) => Supplier.fromJson(json)).toList();
   }

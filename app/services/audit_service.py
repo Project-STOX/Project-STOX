@@ -10,6 +10,7 @@ IST = timezone(timedelta(hours=5, minutes=30))
 
 class AuditService:
     @staticmethod
+    # Write an audit log entry to the database with user action details
     def write_log(
         db: Session,
         *,

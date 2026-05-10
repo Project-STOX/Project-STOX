@@ -6,6 +6,7 @@ class EndOfContractView extends StatefulWidget {
   const EndOfContractView({super.key});
 
   @override
+// Handles createState.
   State<EndOfContractView> createState() => _EndOfContractViewState();
 }
 
@@ -39,6 +40,7 @@ class _EndOfContractViewState extends State<EndOfContractView> {
   bool _isExporting = false;
   String _statusMessage = '';
 
+// Handles _submitClosure.
   void _submitClosure() async {
     final selectedCategories = _categories.entries
         .where((e) => e.value)
@@ -123,6 +125,7 @@ class _EndOfContractViewState extends State<EndOfContractView> {
     }
   }
 
+// Handles _showError.
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -148,6 +151,7 @@ class _EndOfContractViewState extends State<EndOfContractView> {
   }
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -189,6 +193,7 @@ class _EndOfContractViewState extends State<EndOfContractView> {
                 FilledButton.icon(
                   onPressed: _isExporting ? null : details.onStepContinue,
                   icon: _isExporting
+// Handles SizedBox.
                       ? const SizedBox(
                           width: 16,
                           height: 16,

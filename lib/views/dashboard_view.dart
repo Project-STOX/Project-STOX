@@ -75,6 +75,7 @@ class _DashboardViewState extends State<DashboardView> {
 
   @override
   void initState() {
+    // Initialize dashboard with user data and load sidebar permissions
     super.initState();
     _currentUser = widget.user;
     authController.cacheUser(_currentUser);
@@ -85,6 +86,8 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   void _onThemeChanged() {
+      // Clear shelled state when navigation mode changes
+    // Clear shelled state when navigation mode changes
     // If navigation mode changes, clear internal shelled state to avoid UI ghosting
     if (mounted) {
       setState(() {
@@ -97,6 +100,8 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   void _startScheduleTimer() {
+      // Start timer to check for scheduled backups every 30 seconds
+    // Start timer to check for scheduled backups every 30 seconds
     // Fire every 30 s — ensures we always catch the target minute regardless
     // of when the app launched (a 60 s interval could miss a 1-minute window).
     _scheduleTimer = Timer.periodic(const Duration(seconds: 30), (_) {
@@ -107,6 +112,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Future<void> _checkAndRunSchedules() async {
+      // Check for scheduled backups that are due and run them
     if (!mounted) return;
     try {
       final schedules = await _exportService.getSchedules();
@@ -130,6 +136,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Future<void> _runScheduledBackup(
+      // Run scheduled backup and display success/failure notification
     BackupScheduleModel schedule, {
     bool isCatchUp = false,
   }) async {
@@ -196,11 +203,13 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   void _startHealthCheckTimer() {
+      // Start timer to check system health every 45 seconds
     _checkHealth(); // Initial check
     _healthTimer = Timer.periodic(const Duration(seconds: 45), (_) => _checkHealth());
   }
 
   Future<void> _checkHealth() async {
+      // Check system health and update read-only status
     try {
       final health = await _systemService.checkHealth();
       if (mounted) {
@@ -213,6 +222,7 @@ class _DashboardViewState extends State<DashboardView> {
 
   @override
   void dispose() {
+    // Cancel timers and remove listeners on dispose
     themeController.removeListener(_onThemeChanged);
     _scheduleTimer?.cancel();
     _healthTimer?.cancel();
@@ -220,6 +230,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Future<void> _loadSidebarState() async {
+      // Load user permissions and determine which sidebar items to show
     final role = await authController
         .getUserRole(_currentUser.roleId)
         .catchError((_) => _currentUser.role);
@@ -270,6 +281,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   void _logout(BuildContext context) async {
+      // Sign out user and navigate to login page
     try {
       // Sign out and remove remembered mobile session token.
       await authController.signOutAndInvalidateRememberedSession(
@@ -294,6 +306,7 @@ class _DashboardViewState extends State<DashboardView> {
 
   // ── Shelled Navigation Logic ──────────────────────────────────────────────
   void _navigateTo(_NavItem item) {
+      // Navigate to selected item or embed it in shell mode
     // Current mode determines if we shell/embed or push/standalone
     final bool isHeaderMode =
         themeController.navigationMode == AppNavigationMode.header;
@@ -318,6 +331,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   void _navigateBack() {
+      // Navigate back to previous screen or dashboard
     if (_navigationStack.isNotEmpty) {
       setState(() {
         _shelledContent = _navigationStack.removeLast();
@@ -335,6 +349,7 @@ class _DashboardViewState extends State<DashboardView> {
 
   // ── Navigation Items ──────────────────────────────────────────────────────
   List<_NavItem> _getNavItems() {
+      // Build list of navigation items based on user permissions
     final list = <_NavItem>[];
     if (_canManageRoles) {
       list.add(
@@ -437,6 +452,7 @@ class _DashboardViewState extends State<DashboardView> {
 
   @override
   Widget build(BuildContext context) {
+      // Build main dashboard scaffold with navigation
     return ListenableBuilder(
       listenable: themeController,
       builder: (context, _) {
@@ -482,6 +498,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   PreferredSizeWidget _buildAppBar(BuildContext context, bool showHeader) {
+      // Build app bar with back button, title, and account menu
     // Determine if we should show a back button or a hamburger
     final bool isShelled = _shelledContent != null;
 
@@ -541,6 +558,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Widget _buildAccountMenu(BuildContext context) {
+      // Build account dropdown menu with settings and logout options
     return PopupMenuButton(
       offset: const Offset(0, 48),
       child: Padding(
@@ -619,6 +637,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Widget _buildTopNav(BuildContext context) {
+      // Build horizontal navigation bar for header mode
     final colorScheme = Theme.of(context).colorScheme;
     final navItems = _getNavItems();
 
@@ -665,6 +684,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Widget _buildDrawer(BuildContext context) {
+      // Build side drawer with navigation items
     final navItems = _getNavItems();
     return Drawer(
       child: ListView(
@@ -779,6 +799,7 @@ class _DashboardViewState extends State<DashboardView> {
   }
 
   Widget _buildReadOnlyBanner(BuildContext context) {
+      // Build banner indicating system is in read-only mode
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,

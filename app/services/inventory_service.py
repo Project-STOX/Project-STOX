@@ -21,6 +21,7 @@ from app.schemas.supplier import SupplierCreate, SupplierUpdate
 
 
 def _product_status(current_qty: int, reorder_level: int, overstock_level: int | None = None) -> str:
+    # get stock label from qty
     if current_qty <= reorder_level:
         return "Low Stock"
     if overstock_level is not None and current_qty >= overstock_level:
@@ -29,6 +30,7 @@ def _product_status(current_qty: int, reorder_level: int, overstock_level: int |
 
 
 def _normalize_status(raw_status: str | None, current_qty: int, reorder_level: int) -> str:
+    # keep status or recalc it
     normalized = (raw_status or "").strip()
     if normalized in {"Low Stock", "In Stock", "High Stock", "Discontinued"}:
         return normalized
@@ -36,12 +38,14 @@ def _normalize_status(raw_status: str | None, current_qty: int, reorder_level: i
 
 
 def sanitize_csv_cell(value: str) -> str:
+    # clean csv text value
     sanitized = value.strip()
     if sanitized and sanitized[0] in {"=", "+", "-", "@"}:
         sanitized = sanitized[1:].strip()
     return sanitized
 
 def _calculate_eoq(db: Session, product_id: int, ordering_cost: Decimal, holding_cost: Decimal) -> Decimal | None:
+    # calculate eoq from sales
     if ordering_cost <= 0 or holding_cost <= 0:
         return None
         
@@ -78,6 +82,7 @@ class SupplierService:
     def list_suppliers(
         db: Session, *, limit: int, offset: int, name: str | None, is_active: bool | None
     ) -> list[Supplier]:
+        # get supplier list
         stmt: Select[tuple[Supplier]] = select(Supplier).order_by(Supplier.id.desc()).limit(limit).offset(offset)
         if name:
             stmt = stmt.where(Supplier.name.ilike(f"%{sanitize_text(name, max_length=255)}%"))
@@ -85,6 +90,7 @@ class SupplierService:
 
     @staticmethod
     def get_supplier(db: Session, supplier_id: int) -> Supplier:
+        # get one supplier
         supplier = db.get(Supplier, supplier_id)
         if supplier is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Supplier not found")
@@ -92,6 +98,7 @@ class SupplierService:
 
     @staticmethod
     def create_supplier(db: Session, payload: SupplierCreate, created_by: int) -> Supplier:
+        # create new supplier
         data = payload.model_dump()
         contact_info = data.get("email") or data.get("phone")
         supplier = Supplier(
@@ -108,6 +115,7 @@ class SupplierService:
 
     @staticmethod
     def update_supplier(db: Session, supplier: Supplier, payload: SupplierUpdate) -> Supplier:
+        # update supplier data
         updates = payload.model_dump(exclude_none=True)
         if "name" in updates:
             supplier.name = sanitize_text(str(updates["name"]), max_length=100)
@@ -129,6 +137,7 @@ class SupplierService:
 
     @staticmethod
     def delete_supplier(db: Session, supplier: Supplier) -> None:
+        # delete supplier if safe
         has_products = db.scalar(select(Product.id).where(Product.supplier_id == supplier.id).limit(1))
         if has_products:
             raise HTTPException(
@@ -142,6 +151,7 @@ class SupplierService:
 class ProductService:
     @staticmethod
     def _validate_supplier_exists(db: Session, supplier_id: int) -> None:
+        # make sure supplier exists
         if db.get(Supplier, supplier_id) is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid supplier_id")
 
@@ -155,6 +165,7 @@ class ProductService:
         status_flag: str | None,
         search: str | None,
     ) -> list[Product]:
+        # get product list
         stmt: Select[tuple[Product]] = (
             select(Product)
             .options(selectinload(Product.reorder_params))
@@ -183,6 +194,7 @@ class ProductService:
 
     @staticmethod
     def search_suggestions(db: Session, query: str) -> list[str]:
+        # get search hints
         if not query:
             return []
         
@@ -205,6 +217,7 @@ class ProductService:
 
     @staticmethod
     def get_product(db: Session, product_id: int) -> Product:
+        # get one product
         product = db.scalar(
             select(Product)
             .where(Product.id == product_id)
@@ -217,6 +230,7 @@ class ProductService:
 
     @staticmethod
     def create_product(db: Session, payload: ProductCreate, actor_id: int) -> Product:
+        # create product and reorder data
         ProductService._validate_supplier_exists(db, payload.supplier_id)
         
         if db.scalar(select(Product.id).where(Product.product_code == payload.product_code)):
@@ -249,6 +263,7 @@ class ProductService:
 
     @staticmethod
     def update_product(db: Session, product: Product, payload: ProductUpdate, actor_id: int) -> Product:
+        # update product and reorder data
         updates = payload.model_dump(exclude_none=True)
         safety_stock_val = updates.pop("overstock_level", None)
         lead_time = updates.pop("lead_time_days", None)
@@ -294,6 +309,7 @@ class ProductService:
 
     @staticmethod
     def delete_product(db: Session, product: Product) -> None:
+        # delete product if safe
         has_receipts = db.scalar(select(StockReceipt.id).where(StockReceipt.product_id == product.id).limit(1))
         if has_receipts:
             raise HTTPException(
@@ -323,6 +339,7 @@ class StockReceiptService:
         supplier_id: int | None,
         reference_no: str | None,
     ) -> list[StockReceipt]:
+        # get receipt list
         stmt: Select[tuple[StockReceipt]] = (
             select(StockReceipt)
             .options(selectinload(StockReceipt.user))
@@ -340,6 +357,7 @@ class StockReceiptService:
 
     @staticmethod
     def get_receipt(db: Session, receipt_id: int) -> StockReceipt:
+        # get one receipt
         receipt = db.scalar(select(StockReceipt).where(StockReceipt.id == receipt_id).options(selectinload(StockReceipt.user)))
         if receipt is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stock receipt not found")
@@ -347,6 +365,7 @@ class StockReceiptService:
 
     @staticmethod
     def create_receipt(db: Session, payload: StockReceiptCreate, recorded_by: int) -> StockReceipt:
+        # create receipt and update stock
         product = db.get(Product, payload.product_id)
         if product is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid product_id")
@@ -378,6 +397,7 @@ class StockReceiptService:
 
     @staticmethod
     def update_receipt(db: Session, receipt: StockReceipt, payload: StockReceiptUpdate, updated_by: int) -> StockReceipt:
+        # update receipt and stock
         updates = payload.model_dump(exclude_none=True)
 
         next_product_id = int(updates.get("product_id", receipt.product_id))
@@ -432,6 +452,7 @@ class StockReceiptService:
 
     @staticmethod
     def delete_receipt(db: Session, receipt: StockReceipt) -> None:
+        # delete receipt and adjust stock
         product = db.get(Product, receipt.product_id)
         if product is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Linked product does not exist")
@@ -458,6 +479,7 @@ class CsvImportService:
 
     @staticmethod
     def _parse_positive_int(raw: str, field: str) -> int:
+        # parse positive int value
         try:
             value = int(float(raw))
         except (TypeError, ValueError) as exc:
@@ -468,12 +490,14 @@ class CsvImportService:
 
     @staticmethod
     def _parse_optional_int(raw: str, field: str) -> int | None:
+        # parse optional int value
         if not raw or raw.strip().lower() == "n/a" or raw.strip() == "":
             return None
         return CsvImportService._parse_positive_int(raw, field)
 
     @staticmethod
     def _parse_decimal(raw: str, field: str) -> Decimal:
+        # parse decimal value
         try:
             value = Decimal(raw)
         except (InvalidOperation, TypeError) as exc:
@@ -484,6 +508,7 @@ class CsvImportService:
 
     @staticmethod
     def import_products_csv(db: Session, csv_content: bytes, actor_id: int) -> CsvImportResult:
+        # import products from csv
         try:
             decoded = csv_content.decode("utf-8-sig")
         except UnicodeDecodeError as exc:
@@ -586,6 +611,7 @@ class CsvImportService:
 
     @staticmethod
     def import_receipts_csv(db: Session, csv_content: bytes, actor_id: int) -> CsvImportResult:
+        # import receipts from csv
         try:
             decoded = csv_content.decode("utf-8-sig")
         except UnicodeDecodeError as exc:

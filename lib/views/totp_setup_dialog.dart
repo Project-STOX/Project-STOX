@@ -8,6 +8,7 @@ class TOTPSetupDialog extends StatefulWidget {
   const TOTPSetupDialog({super.key, required this.user});
 
   @override
+// Handles createState.
   State<TOTPSetupDialog> createState() => _TOTPSetupDialogState();
 }
 
@@ -24,11 +25,13 @@ class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
   int _step = 1; // 1: QR Scan, 2: Backup Codes
 
   @override
+// Handles initState.
   void initState() {
     super.initState();
     _loadSetupData();
   }
 
+// Handles _loadSetupData.
   Future<void> _loadSetupData() async {
     try {
       final data = await _authController.setupTOTP();
@@ -49,6 +52,7 @@ class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
     }
   }
 
+// Handles _verifySetup.
   Future<void> _verifySetup() async {
     if (_codeController.text.length != 6) return;
 
@@ -76,6 +80,7 @@ class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
   }
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     
@@ -84,10 +89,13 @@ class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
       content: SizedBox(
         width: 400,
         child: _isLoading 
+// Handles SizedBox.
           ? const SizedBox(height: 200, child: Center(child: CircularProgressIndicator()))
           : _errorMessage != null
+// Handles Text.
             ? Text('Error: $_errorMessage')
             : _step == 1 
+// Handles _buildSetupStep.
               ? _buildSetupStep(theme)
               : _buildBackupStep(theme),
       ),
@@ -100,6 +108,7 @@ class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
             FilledButton(
               onPressed: _isVerifying ? null : _verifySetup,
               child: _isVerifying 
+// Handles SizedBox.
                 ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                 : const Text('Verify & Enable'),
             ),
@@ -113,6 +122,7 @@ class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
     );
   }
 
+// Handles _buildSetupStep.
   Widget _buildSetupStep(ThemeData theme) {
     return SingleChildScrollView(
       child: Column(
@@ -193,6 +203,7 @@ class _TOTPSetupDialogState extends State<TOTPSetupDialog> {
     );
   }
 
+// Handles _buildBackupStep.
   Widget _buildBackupStep(ThemeData theme) {
     return Column(
       mainAxisSize: MainAxisSize.min,

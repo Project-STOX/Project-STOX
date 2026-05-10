@@ -17,9 +17,9 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+ 
 # Category keys — must match the string values sent from the Flutter client
-# ─────────────────────────────────────────────────────────────────────────────
+ 
 CATEGORY_USERS = "users"
 CATEGORY_ROLES = "roles_permissions"
 CATEGORY_PRODUCTS = "products"
@@ -46,6 +46,7 @@ ALL_CATEGORIES = [
 import tempfile
 import os
 
+# Stream rows to a CSV file inside a ZIP archive
 def _stream_to_zip(zf: zipfile.ZipFile, filename: str, rows_iter, fieldnames: list[str] = None):
     """Helper to stream rows to a CSV file inside the ZIP archive."""
     with zf.open(filename, "w") as byte_writer:
@@ -74,6 +75,7 @@ def _stream_to_zip(zf: zipfile.ZipFile, filename: str, rows_iter, fieldnames: li
                 writer.writerow(row)
 
 import json
+# Stream rows to a JSON file inside a ZIP archive
 def _stream_to_zip_json(zf: zipfile.ZipFile, filename: str, rows_iter):
     """Helper to stream rows to a JSON file inside the ZIP archive."""
     with zf.open(filename, "w") as byte_writer:
@@ -94,6 +96,7 @@ def _stream_to_zip_json(zf: zipfile.ZipFile, filename: str, rows_iter):
             text_writer.write("[\\n  ")
             
             # Datetime & Decimal serializer helper
+            # Convert datetime and Decimal objects to JSON-serializable formats
             def _json_serial(obj):
                 if isinstance(obj, (datetime, date)):
                     return obj.isoformat()
@@ -112,7 +115,7 @@ def _stream_to_zip_json(zf: zipfile.ZipFile, filename: str, rows_iter):
             text_writer.write("\\n]\\n")
 
 
-
+# Stream rows to a SQL INSERT statements file inside a ZIP archive
 def _stream_to_zip_sql(zf: zipfile.ZipFile, filename: str, table_name: str, rows_iter):
     """Helper to stream rows to a SQL file inside the ZIP archive."""
     with zf.open(filename, "w") as byte_writer:
@@ -129,7 +132,8 @@ def _stream_to_zip_sql(zf: zipfile.ZipFile, filename: str, table_name: str, rows
             
             columns = list(peek.keys())
             cols_str = ", ".join([f'"{c}"' for c in columns])
-            
+
+            # Format a database value for SQL INSERT statement
             def _format_val(val):
                 if val is None:
                     return "NULL"
@@ -143,6 +147,7 @@ def _stream_to_zip_sql(zf: zipfile.ZipFile, filename: str, table_name: str, rows
                 val_str = str(val).replace("'", "''")
                 return f"'{val_str}'"
             
+            # Write a single row as a SQL INSERT statement
             def write_row(row):
                 vals_str = ", ".join([_format_val(row[c]) for c in columns])
                 text_writer.write(f"INSERT INTO {table_name} ({cols_str}) VALUES ({vals_str});\n")
@@ -156,10 +161,11 @@ def _stream_to_zip_sql(zf: zipfile.ZipFile, filename: str, table_name: str, rows
             for row in rows_iter:
                 write_row(row)
 
-# ─────────────────────────────────────────────────────────────────────────────
+ 
 # Individual category fetchers
-# ─────────────────────────────────────────────────────────────────────────────
+ 
 
+# Fetch all users with their role assignments
 def _fetch_users(db: Session) -> list[dict[str, Any]]:
     from app.models.user import User
     from app.models.role import Role
@@ -179,6 +185,7 @@ def _fetch_users(db: Session) -> list[dict[str, Any]]:
     return (dict(row._mapping) for row in db.execute(stmt.execution_options(yield_per=2000)))
 
 
+# Fetch roles, permissions, and their associations
 def _fetch_roles_permissions(db: Session) -> dict[str, list[dict[str, Any]]]:
     """Returns multiple named CSVs: roles, permissions, role_permissions."""
     from app.models.role import Role
@@ -206,6 +213,7 @@ def _fetch_roles_permissions(db: Session) -> dict[str, list[dict[str, Any]]]:
     return {"roles": roles, "permissions": permissions, "role_permissions": role_perms}
 
 
+# Fetch products with their reorder parameters
 def _fetch_products(db: Session) -> dict[str, list[dict[str, Any]]]:
     """Products + reorder parameters (recursive include)."""
     from app.models.product import Product
@@ -248,6 +256,7 @@ def _fetch_products(db: Session) -> dict[str, list[dict[str, Any]]]:
     return {"products": products, "reorder_parameters": reorder_params}
 
 
+# Fetch all suppliers with creator information
 def _fetch_suppliers(db: Session) -> list[dict[str, Any]]:
     from app.models.supplier import Supplier
     from app.models.user import User
@@ -267,6 +276,7 @@ def _fetch_suppliers(db: Session) -> list[dict[str, Any]]:
     return (dict(row._mapping) for row in db.execute(stmt.execution_options(yield_per=2000)))
 
 
+# Fetch all stock receipt records with product and supplier details
 def _fetch_stock_receipts(db: Session) -> list[dict[str, Any]]:
     from app.models.stock_receipt import StockReceipt
     from app.models.product import Product
@@ -293,6 +303,7 @@ def _fetch_stock_receipts(db: Session) -> list[dict[str, Any]]:
     return (dict(row._mapping) for row in db.execute(stmt.execution_options(yield_per=2000)))
 
 
+# Fetch historical sales records with product information
 def _fetch_historical_sales(db: Session) -> list[dict[str, Any]]:
     from app.models.historical_sale import HistoricalSale
     from app.models.product import Product
@@ -312,6 +323,7 @@ def _fetch_historical_sales(db: Session) -> list[dict[str, Any]]:
     return (dict(row._mapping) for row in db.execute(stmt.execution_options(yield_per=2000)))
 
 
+# Fetch demand forecast records with product and model information
 def _fetch_demand_forecasts(db: Session) -> list[dict[str, Any]]:
     from app.models.demand_forecast import DemandForecast
     from app.models.product import Product
@@ -333,6 +345,7 @@ def _fetch_demand_forecasts(db: Session) -> list[dict[str, Any]]:
     return (dict(row._mapping) for row in db.execute(stmt.execution_options(yield_per=2000)))
 
 
+# Fetch audit log records with user information
 def _fetch_audit_log(db: Session) -> list[dict[str, Any]]:
     from app.models.audit_log import AuditLog
     from app.models.user import User
@@ -352,6 +365,7 @@ def _fetch_audit_log(db: Session) -> list[dict[str, Any]]:
     return (dict(row._mapping) for row in db.execute(stmt.execution_options(yield_per=2000)))
 
 
+# Fetch notification records with sender and recipient information
 def _fetch_notifications(db: Session) -> list[dict[str, Any]]:
     from app.models.notification import Notification
     from app.models.user import User as UserModel
@@ -382,10 +396,11 @@ def _fetch_notifications(db: Session) -> list[dict[str, Any]]:
     return ({"notification_id": row.notification_id, "message": row.message, "type": str(row.type) if row.type is not None else "", "sent_at": row.sent_at, "sender": row.sender, "recipient": row.recipient} for row in db.execute(stmt.execution_options(yield_per=2000)))
 
 
-# ─────────────────────────────────────────────────────────────────────────────
+ 
 # Main ZIP builder
-# ─────────────────────────────────────────────────────────────────────────────
+ 
 
+# Build a ZIP file containing exported data in specified categories and formats
 def build_export_zip(db: Session, categories: list[str], formats: list[str] | None = None) -> tuple[str, str]:
     """
     Build a ZIP file containing one file per table for each
@@ -400,6 +415,7 @@ def build_export_zip(db: Session, categories: list[str], formats: list[str] | No
     fd, temp_path = tempfile.mkstemp(suffix=".zip")
     os.close(fd)
 
+    # Stream data to a specific file format in the ZIP archive
     def _stream(zf, base_name, data):
         # Convert to list so we can iterate multiple times if multiple formats are requested
         data_list = list(data) if data else []

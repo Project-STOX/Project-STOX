@@ -10,8 +10,11 @@ class AuditLogView extends StatefulWidget {
   final bool isEmbedded;
 
   const AuditLogView({super.key, required this.user, this.isEmbedded = false});
-
   @override
+
+  // create the state object for this widget
+  @override
+// Handles createState.
   State<AuditLogView> createState() => _AuditLogViewState();
 }
 
@@ -28,11 +31,14 @@ class _AuditLogViewState extends State<AuditLogView> {
   List<AuditLogEntry> _logs = [];
 
   @override
+// Handles initState.
   void initState() {
     super.initState();
+    // initialize state and load audit logs
     _load();
   }
 
+  // load audit logs and check permissions
   Future<void> _load() async {
     setState(() => _isLoading = true);
     try {
@@ -68,6 +74,7 @@ class _AuditLogViewState extends State<AuditLogView> {
     }
   }
 
+  // determine if a log entry represents a login/session event
   bool _isLoginSessionLog(AuditLogEntry log) {
     final action = log.action.toLowerCase();
     final entityType = log.entityType.toLowerCase();
@@ -79,6 +86,7 @@ class _AuditLogViewState extends State<AuditLogView> {
         action.contains('session');
   }
 
+  // check if a log entry falls within the selected date/time filters
   bool _matchesDateTimeFilter(AuditLogEntry log) {
     final time = log.occurredAt?.toLocal();
     if (time == null) return false;
@@ -87,6 +95,7 @@ class _AuditLogViewState extends State<AuditLogView> {
     return true;
   }
 
+  // compute the list of logs matching current filters and search
   List<AuditLogEntry> get _filteredLogs {
     final q = _query.trim().toLowerCase();
     return _logs.where((log) {
@@ -94,6 +103,7 @@ class _AuditLogViewState extends State<AuditLogView> {
       final entityType = log.entityType.toLowerCase();
 
       final categoryMatch = _selectedTab == 0
+// Handles _isLoginSessionLog.
           ? _isLoginSessionLog(log)
           : !_isLoginSessionLog(log);
 
@@ -115,6 +125,7 @@ class _AuditLogViewState extends State<AuditLogView> {
     }).toList();
   }
 
+  // show date/time pickers to select a filter period
   Future<void> _pickDateTimePeriod() async {
     final now = DateTime.now();
     final initialStart = _fromDateTime ?? now;
@@ -171,6 +182,7 @@ class _AuditLogViewState extends State<AuditLogView> {
     });
   }
 
+  // clear any date/time filters applied to the logs
   void _clearDateTimeFilters() {
     setState(() {
       _fromDateTime = null;
@@ -178,6 +190,7 @@ class _AuditLogViewState extends State<AuditLogView> {
     });
   }
 
+  // format a timestamp for display
   String _formatTimestamp(DateTime? time) {
     if (time == null) return 'N/A';
     final local = time.toLocal();
@@ -190,6 +203,7 @@ class _AuditLogViewState extends State<AuditLogView> {
   }
 
   @override
+  // build the audit log view UI
   Widget build(BuildContext context) {
     final logs = _filteredLogs;
 
@@ -207,8 +221,10 @@ class _AuditLogViewState extends State<AuditLogView> {
               ],
             ),
       body: _isLoading
+// Handles Center.
           ? const Center(child: CircularProgressIndicator())
           : !_hasPermission
+// Handles Center.
           ? const Center(
               child: Text(
                 'Access denied: you do not have permission to view audit logs.',
@@ -278,6 +294,7 @@ class _AuditLogViewState extends State<AuditLogView> {
                 ),
                 Expanded(
                   child: logs.isEmpty
+// Handles Center.
                       ? const Center(
                           child: Text(
                             'No audit records found for this filter.',
@@ -285,6 +302,7 @@ class _AuditLogViewState extends State<AuditLogView> {
                         )
                       : ListView.builder(
                           itemCount: logs.length,
+                          // build a list tile for each audit log entry
                           itemBuilder: (context, index) {
                             final log = logs[index];
                             final userText =

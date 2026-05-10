@@ -47,12 +47,14 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
   List<String> _productNames = [];
   List<String> _supplierNames = [];
 
+  // start access check and data load
   @override
   void initState() {
     super.initState();
     _checkAccessAndLoadData();
   }
 
+  // check access and load view data
   Future<void> _checkAccessAndLoadData() async {
     setState(() {
       _isLoading = true;
@@ -95,6 +97,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     await _loadSalesData();
   }
 
+  // load sales with current filters
   Future<void> _loadSalesData() async {
     setState(() {
       _isLoading = true;
@@ -127,6 +130,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     }
   }
 
+  // export matching sales as csv
   Future<void> _exportCsv() async {
     // We show a loading indicator during fetching and exporting.
     final scaffoldMessenger = ScaffoldMessenger.of(context);
@@ -182,6 +186,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     }
   }
 
+  // pick date range for sales
   Future<void> _selectDateRange(BuildContext context) async {
     final DateTimeRange? picked = await showDateRangePicker(
       context: context,
@@ -200,6 +205,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     }
   }
 
+  // clear all filters
   void _clearFilters() {
     setState(() {
       _startDate = null;
@@ -212,18 +218,22 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     _loadSalesData();
   }
 
+  // add all sales revenue
   double _getTotalRevenue() {
     return _sales.fold(0.0, (sum, item) => sum + item.revenue);
   }
 
+  // format money string
   String _formatRs(double value) {
     return 'Rs. ${value.toStringAsFixed(2)}';
   }
 
+  // format money string short
   String _formatRsCompact(double value) {
     return 'Rs. ${NumberFormat.compact().format(value)}';
   }
 
+  // find top product by qty
   String _getTopSellingProduct() {
     if (_sales.isEmpty) {
       return 'N/A';
@@ -239,6 +249,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     return topProduct.key;
   }
 
+  // get average sold qty
   double _getAvgQuantity() {
     if (_sales.isEmpty) {
       return 0.0;
@@ -247,6 +258,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     return totalQty / _sales.length;
   }
 
+  // build main page
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
@@ -329,6 +341,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     );
   }
 
+  // build filter card
   Widget _buildFilters() {
     return Card(
       elevation: 2,
@@ -340,6 +353,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
           return Padding(
             padding: const EdgeInsets.all(12.0),
             child: Wrap(
+  // build summary cards row
               spacing: 10,
               runSpacing: 10,
               crossAxisAlignment: WrapCrossAlignment.center,
@@ -495,6 +509,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     );
   }
 
+  // build single summary card
   Widget _buildCard(String title, String value, IconData icon, Color color) {
     return Expanded(
       child: Card(
@@ -529,6 +544,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     );
   }
 
+  // build product bar chart
   Widget _buildBarChart() {
     if (_sales.isEmpty) {
       return const Center(child: Text('No data for bar chart'));
@@ -627,6 +643,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     );
   }
 
+  // build revenue bar chart
   Widget _buildRevenueBarChart() {
     if (_sales.isEmpty) {
       return const Center(child: Text('No data for revenue chart'));
@@ -726,6 +743,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     );
   }
 
+  // reset visible table columns
   void _resetRecordColumns() {
     setState(() {
       _showQuantityColumn = true;
@@ -734,6 +752,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     });
   }
 
+  // build column filter chips
   Widget _buildRecordColumnFilters() {
     return Card(
       elevation: 1,
@@ -797,6 +816,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     );
   }
 
+  // build trend line chart
   Widget _buildLineChart() {
     if (_sales.isEmpty) {
       return const Center(child: Text('No data for line chart'));
@@ -1064,6 +1084,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     );
   }
 
+  // build legend row
   Widget _buildLegendItem(Color color, String label) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -1079,6 +1100,7 @@ class _HistoricalSalesViewState extends State<HistoricalSalesView> {
     );
   }
 
+  // build sales data table
   Widget _buildDataTable() {
     if (_sales.isEmpty) {
       return const Center(
@@ -1145,6 +1167,7 @@ class SalesDataSource extends DataTableSource {
   final bool showRevenueColumn;
   final bool showSupplierColumn;
 
+  // build table source
   SalesDataSource({
     required this.sales,
     required this.showIdColumn,
@@ -1155,6 +1178,7 @@ class SalesDataSource extends DataTableSource {
     required this.showSupplierColumn,
   });
 
+  // get one table row
   @override
   DataRow? getRow(int index) {
     if (index >= sales.length) {
@@ -1185,12 +1209,15 @@ class SalesDataSource extends DataTableSource {
     return DataRow(cells: cells);
   }
 
+  // table is exact length
   @override
   bool get isRowCountApproximate => false;
 
+  // total row count
   @override
   int get rowCount => sales.length;
 
+  // no selected rows
   @override
   int get selectedRowCount => 0;
 }

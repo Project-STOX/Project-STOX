@@ -500,7 +500,7 @@ class _StockReceiptViewState extends State<StockReceiptView> {
             ? null
             : _findSupplierById(productSupplierId);
       } catch (_) {
-        // Keep current selection if supplier refresh fails.
+        // Keep current selection if supplier resrefh fails.
       }
     }
 

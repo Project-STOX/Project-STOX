@@ -35,12 +35,14 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
     'Lead Time (Descending)',
   ];
 
+  // Initialize state and check user access permissions
   @override
   void initState() {
     super.initState();
     _checkAccess();
   }
 
+  // Get user role and load suppliers
   Future<void> _checkAccess() async {
     userRole = await authController.getUserRole(widget.roleId);
     if (!mounted) return;
@@ -48,6 +50,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
     loadSuppliers();
   }
 
+  // Fetch suppliers from controller and update the list
   void loadSuppliers() async {
     try {
       final data = await controller.fetchSuppliers();
@@ -67,6 +70,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
     }
   }
 
+  // Filter suppliers based on search query
   void _filterSuppliers() {
     setState(() {
       final query = searchQuery.toLowerCase().trim();
@@ -79,6 +83,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
     });
   }
 
+  // Apply selected sorting option to suppliers list
   void _applySorting() {
     switch (selectedSort) {
       case 'Name (A-Z)':
@@ -104,12 +109,14 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
     }
   }
 
+  // Trigger sorting of suppliers and update state
   void _sortSuppliers() {
     setState(() {
       _applySorting();
     });
   }
 
+  // Navigate to supplier detail page for editing
   void _showSupplierDetails(Supplier supplier) {
     Navigator.push(
       context,
@@ -139,6 +146,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
     );
   }
 
+  // Navigate to supplier detail page for creating new supplier
   void _createSupplier() {
     Navigator.push(
       context,
@@ -160,6 +168,7 @@ class _ManageSuppliersViewState extends State<ManageSuppliersView> {
     );
   }
 
+  // Build suppliers management UI with search and sorting
   @override
   Widget build(BuildContext context) {
     if (userRole == null) {

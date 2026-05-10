@@ -5,6 +5,7 @@ from app.services.audit_service import AuditService
 
 class FeedbackService:
     @staticmethod
+    # Save user feedback to local log file and audit log in database
     def save_feedback(
         db: Session,
         user_id: int,

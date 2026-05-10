@@ -19,12 +19,14 @@ class _TOTPSetupViewState extends State<TOTPSetupView> {
   List<String> backupCodes = [];
   String? secret;
 
+  // Initialize TOTP setup process
   @override
   void initState() {
     super.initState();
     _initiateSetup();
   }
 
+  // Request TOTP setup from server and display QR code
   void _initiateSetup() async {
     setState(() => isLoading = true);
     try {
@@ -48,6 +50,7 @@ class _TOTPSetupViewState extends State<TOTPSetupView> {
     }
   }
 
+  // Verify TOTP code and enable two-factor authentication
   void _verifyAndEnable() async {
     final code = codeController.text.trim();
     if (code.isEmpty || code.length != 6) {
@@ -79,12 +82,14 @@ class _TOTPSetupViewState extends State<TOTPSetupView> {
     }
   }
 
+  // Clean up text controller on dispose
   @override
   void dispose() {
     codeController.dispose();
     super.dispose();
   }
 
+  // Build TOTP setup UI with loading state
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,6 +102,7 @@ class _TOTPSetupViewState extends State<TOTPSetupView> {
     );
   }
 
+  // Build setup content with QR code, backup codes, and verification
   Widget _buildSetupContent() {
     return SingleChildScrollView(
       padding: const EdgeInsets.all(24.0),

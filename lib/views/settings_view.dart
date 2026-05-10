@@ -43,6 +43,7 @@ class SettingsView extends StatefulWidget {
   });
 
   @override
+// Handles createState.
   State<SettingsView> createState() => _SettingsViewState();
 }
 
@@ -93,6 +94,7 @@ class _SettingsViewState extends State<SettingsView> {
     return list;
   }
 
+// Handles _buildContent.
   Widget _buildContent() {
     if (_destinations.isEmpty) return const SizedBox.shrink();
     final title = _destinations[_selectedIndex].title;
@@ -111,6 +113,7 @@ class _SettingsViewState extends State<SettingsView> {
   }
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final bool isMobile = screenWidth < 700;
@@ -128,6 +131,7 @@ class _SettingsViewState extends State<SettingsView> {
                 ),
           // Use a drawer on mobile to save space
           drawer: isMobile
+// Handles Drawer.
               ? Drawer(
                   child: _SettingsSidebar(
                     destinations: _destinations,
@@ -237,6 +241,7 @@ class _SettingsSidebar extends StatelessWidget {
   });
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final surface = colorScheme.surfaceContainerLow;
@@ -345,6 +350,7 @@ class _GeneralSettingsTab extends StatelessWidget {
   const _GeneralSettingsTab({required this.user});
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final bool isMobile = MediaQuery.of(context).size.width < 700;
@@ -487,6 +493,7 @@ class _GeneralSettingsTab extends StatelessWidget {
                               ],
                             ),
                             child: isSelected
+// Handles Icon.
                                 ? const Icon(
                                     Icons.check,
                                     color: Colors.white,
@@ -623,6 +630,7 @@ class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title, required this.icon});
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
@@ -652,6 +660,7 @@ class _SettingsCard extends StatelessWidget {
   const _SettingsCard({required this.children});
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
@@ -672,6 +681,7 @@ class _InfoRow extends StatelessWidget {
   const _InfoRow({required this.label, required this.value});
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     return ListTile(
       title: Text(
@@ -695,6 +705,7 @@ class _AdvancedSettingsTab extends StatelessWidget {
   const _AdvancedSettingsTab({required this.user});
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     if (user.roleId != 1) {
       return const Center(child: Text('Unauthorized'));
@@ -792,6 +803,7 @@ class _SecuritySettingsTab extends StatefulWidget {
   const _SecuritySettingsTab({required this.user});
 
   @override
+// Handles createState.
   State<_SecuritySettingsTab> createState() => _SecuritySettingsTabState();
 }
 
@@ -817,6 +829,7 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
   final bool _useTfaForPasswordChange = false;
 
   @override
+// Handles initState.
   void initState() {
     super.initState();
     _user = widget.user;
@@ -825,6 +838,7 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
     _refreshUser();
   }
 
+// Handles _refreshUser.
   Future<void> _refreshUser() async {
     try {
       final user = await _authController.getCurrentUser();
@@ -844,6 +858,7 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
   }
 
   @override
+// Handles dispose.
   void dispose() {
     _oldPasswordController.dispose();
     _newPasswordController.dispose();
@@ -852,6 +867,7 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
     super.dispose();
   }
 
+// Handles _changePassword.
   Future<void> _changePassword() async {
     if (!(_passwordFormKey.currentState?.validate() ?? false)) return;
 
@@ -894,6 +910,7 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
     }
   }
 
+// Handles _sendTfaCode.
   Future<void> _sendTfaCode() async {
     setState(() => _isLoading = true);
     try {
@@ -921,6 +938,7 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
     }
   }
 
+// Handles _toggleEmail2fa.
   Future<void> _toggleEmail2fa(bool enabled) async {
     setState(() => _isLoading = true);
     try {
@@ -951,6 +969,7 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
     }
   }
 
+// Handles _startTotpSetup.
   Future<void> _startTotpSetup() async {
     final success = await showDialog<bool>(
       context: context,
@@ -968,6 +987,7 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
     }
   }
 
+// Handles _disableTotp.
   Future<void> _disableTotp() async {
     final passwordController = TextEditingController();
     final confirmed = await showDialog<bool>(
@@ -1028,6 +1048,7 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
   }
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     if (_isLoading) return const Center(child: CircularProgressIndicator());
 
@@ -1071,12 +1092,14 @@ class _SecuritySettingsTabState extends State<_SecuritySettingsTab> {
                   'Use an app like Google Authenticator or Ente.',
                 ),
                 trailing: _totpEnabled
+// Handles Icon.
                     ? const Icon(Icons.check_circle, color: Colors.green)
                     : null,
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: _totpEnabled
+// Handles SizedBox.
                     ? SizedBox(
                         width: double.infinity,
                         child: OutlinedButton.icon(

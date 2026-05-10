@@ -31,10 +31,12 @@ class _ManageUsersViewState extends State<ManageUsersView> {
   @override
   void initState() {
     super.initState();
+    // Initialize state and load users and roles data
     _loadData();
   }
 
   Future<void> _loadData() async {
+    // Fetch all users and roles from controller
     setState(() => _isLoading = true);
     try {
       final users = await _userController.getAllUsers();
@@ -55,10 +57,12 @@ class _ManageUsersViewState extends State<ManageUsersView> {
   }
 
   Future<void> _refreshData() async {
+    // Reload all users and roles data
     await _loadData();
   }
 
   void _showUserDetails(UserModel user) {
+    // Show user details dialog for editing
     showDialog(
       context: context,
       builder: (context) => UserDetailsDialog(
@@ -73,6 +77,7 @@ class _ManageUsersViewState extends State<ManageUsersView> {
   }
 
   void _showManageRolesDialog() {
+    // Show manage roles dialog
     showDialog(
       context: context,
       builder: (context) => ManageRolesDialog(
@@ -84,6 +89,7 @@ class _ManageUsersViewState extends State<ManageUsersView> {
   }
 
   void _showAddUserDialog() {
+    // Show add user dialog for creating new user
     showDialog(
       context: context,
       builder: (context) => AddUserDialog(
@@ -97,6 +103,7 @@ class _ManageUsersViewState extends State<ManageUsersView> {
   }
 
   Future<void> _deleteUser(UserModel user) async {
+    // Delete a user after confirmation
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -145,6 +152,7 @@ class _ManageUsersViewState extends State<ManageUsersView> {
   }
 
   Future<void> _toggleUserActive(UserModel user) async {
+    // Toggle user active/inactive status
     try {
       final newStatus = !user.isActive;
       await _userController.toggleUserActive(
@@ -180,6 +188,7 @@ class _ManageUsersViewState extends State<ManageUsersView> {
 
   @override
   Widget build(BuildContext context) {
+    // Build users management UI with list and action buttons
     return Scaffold(
       appBar: widget.isEmbedded
           ? null
@@ -306,6 +315,7 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
 
   @override
   void initState() {
+    // Initialize user details form with current values
     super.initState();
     _usernameController = TextEditingController(text: widget.user.username);
     _emailController = TextEditingController(text: widget.user.email);
@@ -317,11 +327,15 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
 
   @override
   void dispose() {
+    // Clean up all text controllers on dispose
     _usernameController.dispose();
     _emailController.dispose();
     super.dispose();
   }
 
+
+  // Save user changes to controller
+  // Save user changes to controller
   Future<void> _saveChanges() async {
     setState(() => _isLoading = true);
     try {
@@ -371,6 +385,9 @@ class _UserDetailsDialogState extends State<UserDetailsDialog> {
     }
   }
 
+
+  // Build user details dialog form
+  // Build user details dialog form
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -473,12 +490,16 @@ class _AddUserDialogState extends State<AddUserDialog> {
 
   @override
   void dispose() {
+    // Clean up text controllers on dispose
     _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
+
+  // Create new user with form validation
+  // Create new user with form validation
   Future<void> _createUser() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -509,6 +530,9 @@ class _AddUserDialogState extends State<AddUserDialog> {
     }
   }
 
+
+  // Build add user dialog form with validation
+  // Build add user dialog form with validation
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
@@ -623,11 +647,13 @@ class _ManageRolesDialogState extends State<ManageRolesDialog> {
 
   @override
   void initState() {
+    // Initialize roles list
     super.initState();
     _roles = List.from(widget.roles);
   }
 
   void _showAddRoleDialog() {
+      // Show dialog for adding new role
     showDialog(
       context: context,
       builder: (context) => AddRoleDialog(
@@ -640,6 +666,7 @@ class _ManageRolesDialogState extends State<ManageRolesDialog> {
   }
 
   void _showEditRoleDialog(Role role) {
+      // Show dialog for editing existing role
     showDialog(
       context: context,
       builder: (context) => EditRoleDialog(
@@ -658,6 +685,8 @@ class _ManageRolesDialogState extends State<ManageRolesDialog> {
   }
 
   Future<void> _deleteRole(Role role) async {
+      // Delete role after confirmation
+      // Build manage roles dialog UI
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -783,12 +812,14 @@ class _AddRoleDialogState extends State<AddRoleDialog> {
 
   @override
   void dispose() {
+    // Clean up text controllers on dispose
     _nameController.dispose();
     _descriptionController.dispose();
     super.dispose();
   }
 
   Future<void> _createRole() async {
+      // Create new role with validation
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);

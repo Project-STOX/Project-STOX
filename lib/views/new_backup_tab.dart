@@ -18,6 +18,7 @@ class NewBackupTab extends StatefulWidget {
   const NewBackupTab({super.key, required this.user});
 
   @override
+// Handles createState.
   State<NewBackupTab> createState() => _NewBackupTabState();
 }
 
@@ -59,6 +60,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
   ];
 
   @override
+// Handles initState.
   void initState() {
     super.initState();
     _loadCategories();
@@ -67,6 +69,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
   }
 
   @override
+// Handles dispose.
   void dispose() {
     _progressTimer?.cancel();
     super.dispose();
@@ -74,6 +77,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
 
   // ─── Loaders ─────────────────────────────────────────────────────────────
 
+// Handles _loadCategories.
   Future<void> _loadCategories() async {
     try {
       final cats = await _service.getCategories();
@@ -94,6 +98,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
     }
   }
 
+// Handles _loadSchedules.
   Future<void> _loadSchedules() async {
     try {
       final schedules = await _service.getSchedules();
@@ -112,6 +117,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
     }
   }
 
+// Handles _loadDbSnapshots.
   Future<void> _loadDbSnapshots() async {
     try {
       final list = await _dbBackupService.listBackups();
@@ -128,6 +134,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
     }
   }
 
+// Handles _showError.
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -141,6 +148,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
 
   // ─── Manual Backup ───────────────────────────────────────────────────────
 
+// Handles _runBackup.
   Future<void> _runBackup({
     List<String>? categoryOverride,
     bool silent = false,
@@ -250,6 +258,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
     }
   }
 
+// Handles _runDbBackup.
   Future<void> _runDbBackup() async {
     setState(() {
       _isDbBackupRunning = true;
@@ -285,6 +294,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
 
   // ─── Schedule Dialog ─────────────────────────────────────────────────────
 
+// Handles _showAddScheduleDialog.
   Future<void> _showAddScheduleDialog() async {
     if (_schedules.length >= maxSchedules) {
       _showError('Maximum of 10 schedules reached. Delete one to add another.');
@@ -328,6 +338,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
     );
   }
 
+// Handles _deleteSchedule.
   Future<void> _deleteSchedule(BackupScheduleModel schedule) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -361,6 +372,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
   // ─── Build ────────────────────────────────────────────────────────────────
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -579,6 +591,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
                         ? null
                         : _runBackup,
                     icon: _isRunning
+// Handles SizedBox.
                         ? const SizedBox(
                             width: 18,
                             height: 18,
@@ -695,6 +708,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
                 trailing: FilledButton.icon(
                   onPressed: _isDbBackupRunning ? null : _runDbBackup,
                   icon: _isDbBackupRunning
+// Handles SizedBox.
                       ? const SizedBox(
                           width: 14,
                           height: 14,
@@ -759,6 +773,7 @@ class _NewBackupTabState extends State<NewBackupTab> {
     );
   }
 
+// Handles _categoryIcon.
   Widget _categoryIcon(String key, ColorScheme cs) {
     final icon = switch (key) {
       'users' => Icons.people_rounded,
@@ -785,6 +800,7 @@ class _ScheduleTile extends StatelessWidget {
   const _ScheduleTile({required this.schedule, required this.onDelete});
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return ListTile(
@@ -847,6 +863,7 @@ class _AddScheduleDialog extends StatefulWidget {
   const _AddScheduleDialog({required this.categories, required this.onSave});
 
   @override
+// Handles createState.
   State<_AddScheduleDialog> createState() => _AddScheduleDialogState();
 }
 
@@ -885,6 +902,7 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
   ];
 
   @override
+// Handles initState.
   void initState() {
     super.initState();
     _selectedCats = Set.from(widget.categories.map((c) => c.key));
@@ -892,17 +910,20 @@ class _AddScheduleDialogState extends State<_AddScheduleDialog> {
   }
 
   @override
+// Handles dispose.
   void dispose() {
     _labelCtrl.dispose();
     super.dispose();
   }
 
+// Handles _updateLabel.
   void _updateLabel() {
     _labelCtrl.text =
         '${_frequency[0].toUpperCase()}${_frequency.substring(1)} Backup';
   }
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('New Backup Data Schedule'),
@@ -1127,6 +1148,7 @@ class _FormatChoice extends StatelessWidget {
   });
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     return ChoiceChip(
       label: Text(label, style: const TextStyle(fontSize: 12)),
@@ -1145,6 +1167,7 @@ class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title, required this.icon});
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(left: 4, bottom: 8),
@@ -1172,6 +1195,7 @@ class _Card extends StatelessWidget {
   const _Card({required this.children});
 
   @override
+// Handles build.
   Widget build(BuildContext context) {
     return Card(
       elevation: 0,
