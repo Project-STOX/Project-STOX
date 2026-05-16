@@ -1,0 +1,89 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Start FastAPI Backend",
+			"type": "shell",
+			"command": "${workspaceFolder}\\.venv\\Scripts\\python.exe",
+			"args": [
+				"-m",
+				"uvicorn",
+				"main:app",
+				"--host",
+				"0.0.0.0",
+				"--port",
+				"8000",
+				"--reload"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"isBackground": true,
+			"problemMatcher": [
+				{
+					"pattern": [
+						{
+							"regexp": "^$",
+							"file": 0,
+							"message": 0
+						}
+					],
+					"background": {
+						"activeOnStart": true,
+						"beginsPattern": "Started server process|Waiting for application startup",
+						"endsPattern": "Application startup complete"
+					}
+				}
+			],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "Run Flutter Web (API)",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"run",
+				"-d",
+				"chrome",
+				"--dart-define=API_BASE_URL=http://localhost:8000/api/v1"
+			],
+			"options": {
+				"cwd": "${workspaceFolder}"
+			},
+			"isBackground": true,
+			"problemMatcher": [
+				{
+					"pattern": [
+						{
+							"regexp": "^$",
+							"file": 0,
+							"message": 0
+						}
+					],
+					"background": {
+						"activeOnStart": true,
+						"beginsPattern": "Launching lib/main.dart",
+						"endsPattern": "A Dart VM Service on"
+					}
+				}
+			],
+			"presentation": {
+				"reveal": "always",
+				"panel": "dedicated"
+			}
+		},
+		{
+			"label": "Flutter Analyze",
+			"type": "shell",
+			"command": "flutter",
+			"args": [
+				"analyze",
+				"."
+			],
+			"isBackground": false
+		}
+	]
+}

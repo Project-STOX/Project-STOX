@@ -1,0 +1,6 @@
+{
+  "schedule_enabled": true,
+  "frequency": "Daily",
+  "time": "02:00",
+  "sync_local": false
+}
