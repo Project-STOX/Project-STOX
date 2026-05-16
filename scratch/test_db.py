@@ -23,9 +23,9 @@ def test_connectivity():
         with engine.connect() as conn:
             result = conn.execute(text("SELECT current_database(), current_user"))
             db_name, user = result.fetchone()
-            print(f"✅ SUCCESS: Connected to {db_name} as {user}")
+            print(f"  SUCCESS: Connected to {db_name} as {user}")
     except Exception as e:
-        print(f"❌ FAILURE: Could not reach local database.")
+        print(f"   FAILURE: Could not reach local database.")
         print(f"   Error: {e}")
         print("\nPossible solutions:")
         print("1. Is your local PostgreSQL server running?")

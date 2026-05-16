@@ -206,7 +206,7 @@ TOTP works with any RFC 6238 compliant authenticator:
 ## Migration Notes for Supabase Free Tier
 
 ### Compatibility
-✅ **Fully compatible** with Supabase free tier:
+  **Fully compatible** with Supabase free tier:
 - No additional API costs (TOTP is local computation)
 - No rate limiting (doesn't use Supabase OTP API)
 - Minimal storage (32 bytes per secret + backup codes)

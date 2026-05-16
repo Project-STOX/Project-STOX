@@ -1,5 +1,0 @@
-﻿Analyzing historical_sales_view.dart...                         
-
-   info - The private field _rowsPerPage could be 'final' - lib\views\historical_sales_view.dart:881:7 - prefer_final_fields
-   info - Unnecessary braces in a string interpolation - lib\views\historical_sales_view.dart:931:33 - unnecessary_brace_in_string_interps
-

@@ -5,20 +5,20 @@ This branch implements Time-based One-Time Password (TOTP) authentication for ST
 ## What Was Done
 
 ### Backend
-✅ Database migration with 3 new columns (`totp_secret`, `totp_enabled`, `backup_codes`)
-✅ TOTP service with QR code generation, secret management, and backup codes
-✅ Three new API endpoints:
+  Database migration with 3 new columns (`totp_secret`, `totp_enabled`, `backup_codes`)
+  TOTP service with QR code generation, secret management, and backup codes
+  Three new API endpoints:
    - `POST /auth/totp/setup` - Initiate setup
    - `POST /auth/totp/verify-setup` - Verify and enable
    - `POST /auth/totp/disable` - Disable TOTP
-✅ Updated auth flow to prioritize TOTP over email 2FA
-✅ Support for backup codes as fallback during login
+  Updated auth flow to prioritize TOTP over email 2FA
+  Support for backup codes as fallback during login
 
 ### Frontend
-✅ TOTP setup view with QR code display and backup code management
-✅ Updated two-factor view to support both TOTP and email codes
-✅ Updated login flow to detect and handle TOTP challenges
-✅ Auth controller and API service methods for TOTP management
+  TOTP setup view with QR code display and backup code management
+  Updated two-factor view to support both TOTP and email codes
+  Updated login flow to detect and handle TOTP challenges
+  Auth controller and API service methods for TOTP management
 
 ### Dependencies Added
 - `qrcode[pil]` - For QR code generation
@@ -48,13 +48,13 @@ This branch implements Time-based One-Time Password (TOTP) authentication for ST
 
 ## Key Features
 
-✅ **No paid services** - Pure open-source, works on Supabase free tier
-✅ **No Google dependency** - Works with ANY authenticator app
-✅ **Backup codes** - 10 recovery codes per user
-✅ **QR code setup** - Easy setup with authenticator apps
-✅ **Fallback support** - Backup codes work if phone is lost
-✅ **Backward compatible** - Email 2FA still works
-✅ **Rate limit bypass** - Doesn't use Supabase OTP API
+  **No paid services** - Pure open-source, works on Supabase free tier
+  **No Google dependency** - Works with ANY authenticator app
+  **Backup codes** - 10 recovery codes per user
+  **QR code setup** - Easy setup with authenticator apps
+  **Fallback support** - Backup codes work if phone is lost
+  **Backward compatible** - Email 2FA still works
+  **Rate limit bypass** - Doesn't use Supabase OTP API
 
 ## Testing Before Merge
 
